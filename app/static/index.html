@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Alfa Only Assistant MVP</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="hero">
+        <div class="hero__copy">
+          <p class="eyebrow">Alfa Only Manager Workspace</p>
+          <h1>Dialogs-first MVP</h1>
+          <p class="hero__text">
+            Основной рабочий сценарий менеджера начинается с диалогов: кто ждет ответа, кто
+            выпадает из внимания, где высокий потенциал и где нужен срочный follow-up.
+          </p>
+        </div>
+
+        <div class="hero__stats">
+          <section class="stat-card">
+            <span class="stat-card__label">Активных задач</span>
+            <strong class="stat-card__value" id="active-task-count">0</strong>
+          </section>
+          <section class="stat-card">
+            <span class="stat-card__label">Диалогов в фокусе</span>
+            <strong class="stat-card__value" id="focused-client-count">0</strong>
+          </section>
+          <section class="stat-card stat-card--accent">
+            <span class="stat-card__label">Priority model</span>
+            <strong class="stat-card__value" id="app-stage">UI mock</strong>
+          </section>
+        </div>
+      </header>
+
+      <section class="topbar">
+        <form class="filters" id="filters-form">
+          <label class="field">
+            <span>Менеджер</span>
+            <select id="manager-select" name="manager_id">
+              <option value="m1">m1</option>
+              <option value="m2">m2</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Режим</span>
+            <input value="Dialogs only" disabled />
+          </label>
+          <button class="ghost-button" id="refresh-button" type="button">Обновить</button>
+        </form>
+      </section>
+
+      <main class="workspace">
+        <section class="panel panel--rail">
+          <div class="panel__header">
+            <div>
+              <p class="panel__eyebrow" id="rail-label">Dialogs Feed</p>
+              <h2 id="rail-title">Входящие диалоги</h2>
+            </div>
+          </div>
+
+          <div class="feed-list" id="dialog-list"></div>
+        </section>
+
+        <section class="panel panel--detail">
+          <div class="detail-empty" id="empty-state">
+            <p class="panel__eyebrow">Client Workspace</p>
+            <h2>Диалоги клиентов</h2>
+            <p>
+              Пока диалог не выбран, основной экран полностью отдан под список переписок.
+              Выберите клиента, чтобы открыть чат, приоритет и контекст справа.
+            </p>
+          </div>
+
+          <div class="detail-view hidden" id="detail-view">
+            <div class="chat-layout">
+              <aside class="chat-sidebar">
+                <div class="chat-sidebar__top">
+                  <button class="ghost-button" id="back-to-list-button" type="button">← К списку</button>
+                </div>
+                <div class="mini-dialog-list" id="mini-dialog-list"></div>
+              </aside>
+
+              <section class="chat-card">
+                <div class="chat-card__header">
+                  <div>
+                    <p class="panel__eyebrow">Conversation</p>
+                    <h2 id="client-name">-</h2>
+                    <p class="detail-subtitle" id="client-subtitle">-</p>
+                  </div>
+                  <div class="badge-row" id="client-tags"></div>
+                </div>
+
+                <div class="message-thread" id="message-thread"></div>
+
+                <form class="composer" id="composer-form">
+                  <input
+                    id="composer-input"
+                    type="text"
+                    placeholder="Написать клиенту..."
+                    aria-label="Сообщение клиенту"
+                  />
+                  <button class="primary-button" type="submit">Отправить</button>
+                </form>
+              </section>
+
+              <aside class="context-column">
+                <section class="priority-panel">
+                  <p class="panel__eyebrow">Priority</p>
+                  <button class="priority-pill" id="priority-open-button" type="button">0</button>
+                </section>
+
+                <section class="ai-assistant-panel">
+                  <div class="section-title">
+                    <div>
+                      <p class="panel__eyebrow">AI Assistant</p>
+                      <h3>Персонализированные скрипты</h3>
+                    </div>
+                    <span class="badge">mock</span>
+                  </div>
+                  <div class="assistant-thread">
+                    <article class="assistant-bubble assistant-bubble--system">
+                      AI-окно видит открытый диалог и в будущем будет предлагать персонализированные скрипты продаж.
+                    </article>
+                    <article class="assistant-bubble assistant-bubble--draft">
+                      Пока это только UI-заглушка без AI-логики и без генерации ответов.
+                    </article>
+                  </div>
+                  <form class="assistant-composer" id="assistant-composer-form">
+                    <input
+                      id="assistant-input"
+                      type="text"
+                      placeholder="Попросить скрипт или тезисы..."
+                      aria-label="Сообщение AI assistant"
+                    />
+                    <button class="ghost-button" type="submit">Запросить</button>
+                  </form>
+                </section>
+
+                <section class="summary-card summary-card--feature">
+                  <span>Мини-summary</span>
+                  <strong id="mini-summary">-</strong>
+                </section>
+
+                <section class="summary-grid summary-grid--stacked">
+                  <article class="summary-card">
+                    <span>Портфель</span>
+                    <strong id="portfolio-value">-</strong>
+                  </article>
+                  <article class="summary-card">
+                    <span>Churn risk</span>
+                    <strong id="churn-risk">-</strong>
+                  </article>
+                  <article class="summary-card">
+                    <span>Следующий контакт</span>
+                    <strong id="next-contact">-</strong>
+                  </article>
+                </section>
+
+                <section class="content-card">
+                  <h3>Профиль клиента</h3>
+                  <div class="meta-grid" id="client-profile"></div>
+                  <p class="insight" id="client-summary"></p>
+                </section>
+
+                <section class="content-card">
+                  <h3>Портфель</h3>
+                  <div class="stack-list" id="product-list"></div>
+                </section>
+              </aside>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="modal hidden" id="priority-modal">
+      <div class="modal__backdrop" id="modal-backdrop"></div>
+      <div class="modal__dialog" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <div class="modal__header">
+          <div>
+            <p class="panel__eyebrow">Priority Score</p>
+            <h2 id="modal-title">Формула и объяснение</h2>
+          </div>
+          <button class="modal__close" id="close-modal-button" type="button">×</button>
+        </div>
+
+        <section class="formula-card">
+          <p class="formula-label">Базовая формула</p>
+          <pre id="formula-basic" class="formula-block">PriorityScore = w1*T_wait + w2*C_value + w3*U_comm + w4*P_sale + w5*R_churn</pre>
+          <p class="formula-label">Текущая UI-конфигурация весов</p>
+          <pre id="formula-weights" class="formula-block">PriorityScore = 0.25*T_wait + 0.30*C_value + 0.20*U_comm + 0.15*P_sale + 0.10*R_churn</pre>
+        </section>
+
+        <section class="weights-grid">
+          <label class="field">
+            <span>w1 · T_wait</span>
+            <input id="weight-w1" type="number" min="0" max="1" step="0.01" value="0.25" />
+          </label>
+          <label class="field">
+            <span>w2 · C_value</span>
+            <input id="weight-w2" type="number" min="0" max="1" step="0.01" value="0.30" />
+          </label>
+          <label class="field">
+            <span>w3 · U_comm</span>
+            <input id="weight-w3" type="number" min="0" max="1" step="0.01" value="0.20" />
+          </label>
+          <label class="field">
+            <span>w4 · P_sale</span>
+            <input id="weight-w4" type="number" min="0" max="1" step="0.01" value="0.15" />
+          </label>
+          <label class="field">
+            <span>w5 · R_churn</span>
+            <input id="weight-w5" type="number" min="0" max="1" step="0.01" value="0.10" />
+          </label>
+        </section>
+
+        <section class="explain-grid">
+          <article class="explain-card">
+            <h3>T_wait</h3>
+            <p>Срочность по времени ожидания ответа. На следующем этапе будет считаться по диапазонам.</p>
+          </article>
+          <article class="explain-card">
+            <h3>C_value</h3>
+            <p>Ценность клиента: портфель, активность и общий бизнес-потенциал.</p>
+          </article>
+          <article class="explain-card">
+            <h3>U_comm</h3>
+            <p>Срочность и характер текущей коммуникации: urgency, tone, responsiveness.</p>
+          </article>
+          <article class="explain-card">
+            <h3>P_sale</h3>
+            <p>Склонность к покупке: product fit, свободный кэш, история отклика и gap в портфеле.</p>
+          </article>
+          <article class="explain-card">
+            <h3>R_churn</h3>
+            <p>Риск потери клиента. Пока только визуальный блок для UX, без backend-расчета.</p>
+          </article>
+        </section>
+      </div>
+    </div>
+
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>
