@@ -10,7 +10,9 @@ from ..models import (
     AssistantKBSnapshot,
     AssistantSnapshotType,
 )
+from .cockpit import ManagerCockpitService
 from .dialogs import DialogPriorityService
+from .propensity import ProductPropensityService
 
 
 SNAPSHOT_LIMITS = {
@@ -20,6 +22,7 @@ SNAPSHOT_LIMITS = {
     AssistantSnapshotType.conversation_overview: 1200,
     AssistantSnapshotType.recommendation_overview: 450,
     AssistantSnapshotType.crm_overview: 600,
+    AssistantSnapshotType.propensity_overview: 600,
 }
 
 RETRIEVAL_TYPE_CAPS = {
@@ -29,6 +32,7 @@ RETRIEVAL_TYPE_CAPS = {
     AssistantSnapshotType.conversation_overview: 1,
     AssistantSnapshotType.recommendation_overview: 1,
     AssistantSnapshotType.crm_overview: 1,
+    AssistantSnapshotType.propensity_overview: 1,
 }
 
 TOTAL_CONTEXT_BUDGET = 4500
@@ -58,9 +62,12 @@ class AssistantKnowledgeService:
         storage.delete_manager_assistant_snapshots(manager_id)
         now = utc_now()
         clients = storage.list_clients(manager_id=manager_id)
+        latest_conversations = storage.list_latest_conversations([client.id for client in clients])
         dialogs = dialog_service.list_manager_dialogs(storage=storage, manager_id=manager_id)
+        cockpit = ManagerCockpitService(dialog_service=dialog_service).build_manager_cockpit(storage=storage, manager_id=manager_id, now=now)
+        propensity_service = ProductPropensityService()
 
-        manager_overview = self._build_manager_overview(manager_id, dialogs)
+        manager_overview = self._build_manager_overview(manager_id, cockpit)
         storage.upsert_assistant_snapshot(
             AssistantKBSnapshot(
                 id=f"mgr:{manager_id}:overview",
@@ -76,11 +83,16 @@ class AssistantKnowledgeService:
         )
 
         for client in clients:
-            conversations = storage.list_client_conversations(client.id)
-            conversation = conversations[0] if conversations else None
+            conversation = latest_conversations.get(client.id)
             recommendation = dialog_service.build_recommendation(client=client, conversation=conversation) if conversation else None
             crm_notes = storage.list_client_crm_notes(client.id)[:3]
             follow_ups = storage.list_client_follow_ups(client.id)
+            propensity = propensity_service.build_client_propensity(
+                storage=storage,
+                client=client,
+                now=now,
+                conversation=conversation,
+            )
 
             snapshots = [
                 AssistantKBSnapshot(
@@ -135,6 +147,17 @@ class AssistantKnowledgeService:
                     title=f"{client.full_name} — CRM история",
                     content_text=self._build_crm_overview(crm_notes, follow_ups),
                     source_updated_at=crm_notes[0].created_at if crm_notes else now,
+                    created_at=now,
+                    updated_at=now,
+                ),
+                AssistantKBSnapshot(
+                    id=f"client:{client.id}:propensity",
+                    manager_id=manager_id,
+                    client_id=client.id,
+                    snapshot_type=AssistantSnapshotType.propensity_overview,
+                    title=f"{client.full_name} — propensity",
+                    content_text=self._build_propensity_overview(propensity),
+                    source_updated_at=now,
                     created_at=now,
                     updated_at=now,
                 ),
@@ -238,16 +261,16 @@ class AssistantKnowledgeService:
         }
         return [snapshot_map[citation.snapshot_id] for citation in citations if citation.snapshot_id in snapshot_map]
 
-    def _build_manager_overview(self, manager_id: str, dialogs: list) -> str:
-        urgent = [dialog for dialog in dialogs if dialog.priority_score >= 85][:3]
-        high_churn = [dialog for dialog in dialogs if any("риск потери клиента" in reason.lower() for reason in dialog.why)][:3]
-        nearest = [dialog for dialog in dialogs[:3]]
+    def _build_manager_overview(self, manager_id: str, cockpit) -> str:
+        urgent = [item for item in cockpit.work_queue if item.priority_score >= 85][:3]
+        tasks = [item for item in cockpit.work_queue if item.item_type.value == "task"][:3]
+        opportunities = [item for item in cockpit.work_queue if item.item_type.value == "opportunity"][:3]
         content = (
             f"Менеджер {manager_id}. "
-            f"В работе {len(dialogs)} диалогов. "
+            f"В рабочем плане {cockpit.stats.actionable_items} элементов. "
             f"Срочные: {self._dialog_list_copy(urgent)}. "
-            f"Клиенты с риском оттока: {self._dialog_list_copy(high_churn)}. "
-            f"Ближайшие по фокусу: {self._dialog_list_copy(nearest)}."
+            f"Задачи дня: {self._dialog_list_copy(tasks)}. "
+            f"Коммерческие opportunity: {self._dialog_list_copy(opportunities)}."
         )
         return self._clamp(content, SNAPSHOT_LIMITS[AssistantSnapshotType.manager_overview])
 
@@ -323,6 +346,16 @@ class AssistantKnowledgeService:
             f"Ближайший следующий контакт: {follow_up.due_at.isoformat() if follow_up else 'не назначен'}."
         )
         return self._clamp(content, SNAPSHOT_LIMITS[AssistantSnapshotType.crm_overview])
+
+    def _build_propensity_overview(self, propensity) -> str:
+        top_items = propensity.items[:3]
+        if not top_items:
+            return "Продуктовый propensity не рассчитан."
+        content = " | ".join(
+            f"{item.product_name}: score={item.score}; reasons={', '.join(item.reasons[:2])}; next={item.next_best_action}"
+            for item in top_items
+        )
+        return self._clamp(content, SNAPSHOT_LIMITS[AssistantSnapshotType.propensity_overview])
 
     @staticmethod
     def _dialog_list_copy(dialogs: list) -> str:

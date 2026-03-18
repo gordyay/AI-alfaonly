@@ -18,6 +18,8 @@ from .ai_script import AIScriptService
 from .ai_summary import AISummaryService
 from .assistant_kb import AssistantKnowledgeService
 from .dialogs import DialogPriorityService
+from .objections import ObjectionWorkflowService
+from .propensity import ProductPropensityService
 
 
 THREAD_MEMORY_TRIGGER = 12
@@ -63,6 +65,8 @@ class AssistantService:
         dialog_service: DialogPriorityService,
         ai_summary_service: AISummaryService,
         ai_script_service: AIScriptService,
+        propensity_service: ProductPropensityService,
+        objection_service: ObjectionWorkflowService,
         manager_id: str,
         thread_id: str,
         message: str,
@@ -111,10 +115,23 @@ class AssistantService:
                     provider=provider,
                     ai_script_service=ai_script_service,
                     dialog_service=dialog_service,
+                    propensity_service=propensity_service,
+                    objection_service=objection_service,
                     manager_id=manager_id,
                     thread_id=thread.id,
                     selected_client_id=selected_client_id,
                     instruction=message,
+                    log_activity=log_activity,
+                )
+            elif self._is_objection_request(message):
+                assistant_message, action_result = self._run_objection_action(
+                    storage=storage,
+                    provider=provider,
+                    objection_service=objection_service,
+                    manager_id=manager_id,
+                    thread_id=thread.id,
+                    selected_client_id=selected_client_id,
+                    objection_text=message,
                     log_activity=log_activity,
                 )
             else:
@@ -152,6 +169,15 @@ class AssistantService:
                 elif self._is_script_request(message):
                     log_activity(
                         recommendation_type="sales_script",
+                        client_id=selected_client_id,
+                        conversation_id=conversation_id,
+                        manager_id=manager_id,
+                        action="generation_failed",
+                        payload_excerpt=str(exc),
+                    )
+                elif self._is_objection_request(message):
+                    log_activity(
+                        recommendation_type="objection_workflow",
                         client_id=selected_client_id,
                         conversation_id=conversation_id,
                         manager_id=manager_id,
@@ -307,6 +333,8 @@ class AssistantService:
         provider: AIProvider,
         ai_script_service: AIScriptService,
         dialog_service: DialogPriorityService,
+        propensity_service: ProductPropensityService,
+        objection_service: ObjectionWorkflowService,
         manager_id: str,
         thread_id: str,
         selected_client_id: str | None,
@@ -354,6 +382,12 @@ class AssistantService:
 
         recommendation = dialog_service.build_recommendation(client=client, conversation=conversation)
         crm_notes = storage.list_client_crm_notes(client.id)
+        product_propensity = propensity_service.build_client_propensity(storage=storage, client=client)
+        objection_workflow = objection_service.build_workflow(
+            provider=provider,
+            client=client,
+            conversation=conversation,
+        )
         result = ai_script_service.generate_script(
             provider=provider,
             client=client,
@@ -361,6 +395,8 @@ class AssistantService:
             recommendation=recommendation,
             crm_notes=crm_notes,
             instruction=instruction,
+            product_propensities=product_propensity.items,
+            objection_workflow=objection_workflow.draft,
         )
         log_activity(
             recommendation_type="sales_script",
@@ -391,6 +427,95 @@ class AssistantService:
             conversation_id=conversation.id,
             sales_script_draft=result.draft,
             note="Скрипт сохранен в истории ассистента.",
+        )
+        return assistant_message, action_result
+
+    def _run_objection_action(
+        self,
+        *,
+        storage: SQLiteStorage,
+        provider: AIProvider,
+        objection_service: ObjectionWorkflowService,
+        manager_id: str,
+        thread_id: str,
+        selected_client_id: str | None,
+        objection_text: str,
+        log_activity,
+    ) -> tuple[AssistantMessageRecord, AssistantActionResult | None]:
+        if not selected_client_id:
+            message = AssistantMessageRecord(
+                id=str(uuid4()),
+                thread_id=thread_id,
+                role=AssistantMessageRole.assistant,
+                content="Чтобы отработать возражение, сначала откройте клиента в основном окне.",
+                citations=[],
+                used_context=[],
+                created_at=utc_now(),
+            )
+            return message, None
+
+        client = storage.get_client(selected_client_id)
+        if client is None:
+            message = AssistantMessageRecord(
+                id=str(uuid4()),
+                thread_id=thread_id,
+                role=AssistantMessageRole.assistant,
+                content="Не удалось найти выбранного клиента. Откройте его заново и повторите запрос.",
+                citations=[],
+                used_context=[],
+                created_at=utc_now(),
+            )
+            return message, None
+
+        conversations = storage.list_client_conversations(client.id)
+        conversation = conversations[0] if conversations else None
+        if conversation is None:
+            message = AssistantMessageRecord(
+                id=str(uuid4()),
+                thread_id=thread_id,
+                role=AssistantMessageRole.assistant,
+                content="У клиента нет активного диалога, поэтому objection workflow собрать нельзя.",
+                citations=[],
+                used_context=[],
+                created_at=utc_now(),
+            )
+            return message, None
+
+        result = objection_service.build_workflow(
+            provider=provider,
+            client=client,
+            conversation=conversation,
+            objection_text=objection_text,
+        )
+        log_activity(
+            recommendation_type="objection_workflow",
+            client_id=client.id,
+            conversation_id=conversation.id,
+            manager_id=manager_id,
+            action="generated",
+            payload_excerpt=result.draft.analysis.objection_label,
+        )
+
+        used_context = self._build_client_used_context(storage, manager_id, client.id)
+        assistant_message = AssistantMessageRecord(
+            id=str(uuid4()),
+            thread_id=thread_id,
+            role=AssistantMessageRole.assistant,
+            content=f"Собрал objection workflow по клиенту {client.full_name}.",
+            citations=used_context[:2],
+            used_context=used_context,
+            action_payload=AssistantMessageActionPayload(
+                action_type="objection_workflow",
+                objection_workflow_draft=result.draft,
+            ),
+            created_at=utc_now(),
+        )
+        action_result = AssistantActionResult(
+            action_type="objection_workflow",
+            client_id=client.id,
+            conversation_id=conversation.id,
+            objection_workflow_draft=result.draft,
+            note="Варианты отработки сохранены в истории ассистента.",
         )
         return assistant_message, action_result
 
@@ -445,6 +570,7 @@ class AssistantService:
                     "Сделай сводку диалога",
                     "Собери CRM-заметку",
                     "Подготовь скрипт продажи",
+                    "Как отработать возражение?",
                     "Сделай мягкий follow-up",
                     "Как ответить клиенту?",
                     "Что важно по клиенту?",
@@ -495,6 +621,22 @@ class AssistantService:
                 "сообщение клиенту",
                 "оффер",
                 "мягкий follow",
+            ]
+        )
+
+    @staticmethod
+    def _is_objection_request(message: str) -> bool:
+        lowered = message.lower()
+        return any(
+            token in lowered
+            for token in [
+                "возражен",
+                "как отработать",
+                "сомнен",
+                "дорого",
+                "не сейчас",
+                "слишком риск",
+                "что не говорить",
             ]
         )
 

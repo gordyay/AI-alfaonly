@@ -3,7 +3,12 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any
 
-from ..models import AssistantLLMResponse, GenerateScriptResponse, SummarizeDialogResponse
+from ..models import (
+    AssistantLLMResponse,
+    GenerateScriptResponse,
+    ObjectionAnalysis,
+    SummarizeDialogResponse,
+)
 
 
 class AIProviderError(Exception):
@@ -24,5 +29,5 @@ class AIProvider(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def classify_objection(self, context: dict[str, Any]) -> dict[str, Any]:
+    def classify_objection(self, context: dict[str, Any]) -> ObjectionAnalysis:
         raise NotImplementedError

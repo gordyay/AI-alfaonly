@@ -7,12 +7,19 @@ venv/
 .venv/
 env/
 
+# Frontend toolchain
+*node_modules/
+*dist/
+app/static/assets
+
 # Test/cache artifacts
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 .coverage
 htmlcov/
+test-results/
+playwright-report/
 
 # Local databases and runtime files
 *.sqlite3

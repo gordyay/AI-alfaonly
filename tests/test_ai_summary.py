@@ -18,11 +18,14 @@ from app.models import (
     ChannelType,
     GenerateScriptResponse,
     Message,
+    ObjectionAnalysis,
+    ObjectionType,
     SalesScriptDraft,
+    SalesScriptVariant,
     SummarizeDialogResponse,
 )
 from app.seed_data import seed_mvp_data
-from app.services import AIScriptService, AISummaryService, DialogPriorityService
+from app.services import AIScriptService, AISummaryService, DialogPriorityService, ObjectionWorkflowService, ProductPropensityService
 
 
 def build_summary_response() -> SummarizeDialogResponse:
@@ -58,9 +61,36 @@ def build_script_response() -> GenerateScriptResponse:
                 "Если удобно, пришлю компактное сравнение и вместе выберем оптимальный следующий шаг."
             ),
             channel=ChannelType.chat,
+            contact_goal="Отправить компактное сравнение и закрепить следующий шаг",
+            product_name="Премиальный вклад",
+            tone="soft",
+            follow_up_message="Если удобно, могу отдельно прислать совсем короткую рамку по двум сценариям.",
+            next_step="Согласовать удобное окно для follow-up после отправки сравнения.",
+            alternatives=[
+                SalesScriptVariant(
+                    label="Более деловой",
+                    manager_talking_points=["Сразу перейти к выгоде и ликвидности."],
+                    ready_script="Иван, подготовил короткое сравнение по двум спокойным сценариям размещения.",
+                ),
+                SalesScriptVariant(
+                    label="Максимально мягкий",
+                    manager_talking_points=["Не давить и предложить только один следующий шаг."],
+                    ready_script="Иван, если удобно, могу прислать совсем короткую выжимку без лишних деталей.",
+                ),
+            ],
         ),
         model_name="fake-script-stage6",
         generated_at=datetime(2026, 3, 17, 9, 30, tzinfo=UTC),
+    )
+
+
+def build_objection_analysis() -> ObjectionAnalysis:
+    return ObjectionAnalysis(
+        objection_type=ObjectionType.risk,
+        objection_label="Риск и сохранность капитала",
+        confidence=0.82,
+        evidence=["слишком высокий риск", "сохранность капитала"],
+        customer_intent="Не принимать решение без ощущения контроля над риском.",
     )
 
 
@@ -76,6 +106,7 @@ class FakeAIProvider(AIProvider):
         self.contexts: list[dict] = []
         self.script_contexts: list[dict] = []
         self.assistant_contexts: list[dict] = []
+        self.objection_contexts: list[dict] = []
 
     def generate_script(self, context: dict) -> GenerateScriptResponse:
         self.script_contexts.append(context)
@@ -101,8 +132,11 @@ class FakeAIProvider(AIProvider):
             action_type=None,
         )
 
-    def classify_objection(self, context: dict) -> dict:
-        raise NotImplementedError
+    def classify_objection(self, context: dict) -> ObjectionAnalysis:
+        self.objection_contexts.append(context)
+        if self.error:
+            raise self.error
+        return build_objection_analysis()
 
 
 @dataclass
@@ -179,12 +213,20 @@ def test_ai_script_service_builds_context(tmp_path):
     recommendation = DialogPriorityService().build_recommendation(client=client, conversation=conversation)
     crm_notes = storage.list_client_crm_notes("c1")
 
+    propensity = ProductPropensityService().build_client_propensity(storage=storage, client=client)
+    objection_workflow = ObjectionWorkflowService().build_workflow(
+        provider=FakeAIProvider(),
+        client=client,
+        conversation=conversation,
+    )
     context = AIScriptService().build_context(
         client=client,
         conversation=conversation,
         recommendation=recommendation,
         crm_notes=crm_notes,
         instruction="Подготовь короткий мягкий follow-up без давления.",
+        product_propensities=propensity.items,
+        objection_workflow=objection_workflow.draft,
     )
 
     assert context["client"]["id"] == "c1"
@@ -192,6 +234,47 @@ def test_ai_script_service_builds_context(tmp_path):
     assert context["conversation"]["id"] == conversation.id
     assert context["instruction"] == "Подготовь короткий мягкий follow-up без давления."
     assert len(context["crm_notes"]) <= 3
+    assert context["propensity_rankings"]
+    assert context["objection_workflow"]["analysis"]["objection_type"] == "risk"
+    assert context["script_job"]["preferred_tone"] in {"soft", "consultative", "concise_personal"}
+
+
+def test_product_propensity_service_ranks_products(tmp_path):
+    db_path = tmp_path / "stage7-propensity-context.sqlite3"
+    storage = SQLiteStorage(db_path=db_path)
+    seed_mvp_data(storage)
+    client = storage.get_client("c1")
+    assert client is not None
+
+    response = ProductPropensityService().build_client_propensity(storage=storage, client=client)
+
+    assert response.client_id == "c1"
+    assert len(response.items) >= 3
+    assert response.items[0].score >= response.items[1].score
+    assert {"product_fit", "affordability", "behavioral_signal", "relationship_depth", "portfolio_gap"}.issubset(
+        response.items[0].factors.model_dump().keys()
+    )
+
+
+def test_objection_workflow_service_builds_playbook(tmp_path):
+    db_path = tmp_path / "stage7-objection-context.sqlite3"
+    storage = SQLiteStorage(db_path=db_path)
+    seed_mvp_data(storage)
+    client = storage.get_client("c2")
+    assert client is not None
+    conversation = storage.list_client_conversations("c2")[0]
+    provider = FakeAIProvider()
+
+    response = ObjectionWorkflowService().build_workflow(
+        provider=provider,
+        client=client,
+        conversation=conversation,
+        objection_text="Не хочу заходить в высокий риск.",
+    )
+
+    assert response.draft.analysis.objection_type == ObjectionType.risk
+    assert len(response.draft.handling_options) >= 2
+    assert response.draft.what_not_to_say
 
 
 def test_groq_provider_parses_structured_script_content():
@@ -390,6 +473,7 @@ async def test_ai_summarize_dialog_returns_structured_draft(ai_env: AITestEnv):
     assert response.status_code == 200
     body = response.json()
     assert body["draft"]["outcome"] == "follow_up"
+    assert body["draft"]["grounding_facts"]
     assert body["model_name"] == "fake-llama-stage3"
     assert ai_env.provider.contexts
     assert ai_env.provider.contexts[0]["client"]["id"] == "c1"
@@ -512,6 +596,7 @@ async def test_ai_generate_script_returns_structured_draft(ai_env: AITestEnv):
     body = response.json()
     assert body["draft"]["channel"] == "chat"
     assert body["draft"]["ready_script"].startswith("Иван")
+    assert body["draft"]["grounding_facts"]
     assert ai_env.provider.script_contexts
     assert ai_env.provider.script_contexts[0]["instruction"] == "Подготовь короткий скрипт продажи без давления."
 
@@ -520,6 +605,27 @@ async def test_ai_generate_script_returns_structured_draft(ai_env: AITestEnv):
     assert ("sales_script", "generated") in {
         (item["recommendation_type"], item["action"]) for item in activity_log_response.json()["items"]
     }
+
+
+@pytest.mark.anyio
+async def test_objection_workflow_response_contains_grounding_facts(ai_env: AITestEnv):
+    detail_response = await ai_env.client.get("/client/c2")
+    conversation_id = detail_response.json()["conversations"][0]["id"]
+
+    response = await ai_env.client.post(
+        "/ai/objection-workflow",
+        json={
+            "client_id": "c2",
+            "conversation_id": conversation_id,
+            "manager_id": "m1",
+            "objection_text": "Меня беспокоит риск.",
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["draft"]["grounding_facts"]
+    assert "data_gaps" in body["draft"]
 
 
 @pytest.mark.anyio

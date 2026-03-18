@@ -79,7 +79,23 @@ class AISummaryService:
         recommendation: DialogRecommendation | None,
     ) -> SummarizeDialogResponse:
         context = self.build_context(client=client, conversation=conversation, recommendation=recommendation)
-        return provider.summarize_dialog(context)
+        response = provider.summarize_dialog(context)
+        response.draft = response.draft.model_copy(
+            update={
+                "grounding_facts": self._grounding_facts(
+                    client=client,
+                    conversation=conversation,
+                    recommendation=recommendation,
+                ),
+                "data_gaps": sorted(
+                    set(
+                        response.draft.data_gaps
+                        + self._data_gaps(client=client, conversation=conversation)
+                    )
+                ),
+            }
+        )
+        return response
 
     @staticmethod
     def _trim_text(value: str | None, max_chars: int) -> str | None:
@@ -89,3 +105,34 @@ class AISummaryService:
         if len(compact) <= max_chars:
             return compact
         return f"{compact[: max_chars - 1]}…"
+
+    def _grounding_facts(
+        self,
+        *,
+        client: Client,
+        conversation: Conversation,
+        recommendation: DialogRecommendation | None,
+    ) -> list[str]:
+        facts = [
+            f"Клиент {client.full_name}, риск-профиль {client.risk_profile}, сегмент {client.segment}.",
+            f"Диалог {conversation.channel.value}: {self._trim_text(conversation.topic, 80)}.",
+        ]
+        latest_client_message = next(
+            (message for message in reversed(conversation.messages) if message.sender == "client"),
+            None,
+        )
+        if latest_client_message is not None:
+            facts.append(f"Последний сигнал клиента: {self._trim_text(latest_client_message.text, 140)}")
+        if recommendation is not None and recommendation.why:
+            facts.append("Причины приоритета: " + " | ".join(recommendation.why[:3]))
+        return facts[:4]
+
+    def _data_gaps(self, *, client: Client, conversation: Conversation) -> list[str]:
+        gaps: list[str] = []
+        if not client.notes_summary:
+            gaps.append("Не хватает структурированного профиля клиента из заметок менеджера.")
+        if not conversation.insights or not conversation.insights.next_contact_reason:
+            gaps.append("Не зафиксирована причина следующего контакта в conversation insights.")
+        if len(conversation.messages) < 3:
+            gaps.append("История диалога короткая, summary опирается на ограниченный контекст.")
+        return gaps
