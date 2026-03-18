@@ -6,6 +6,13 @@ from .db import SQLiteStorage, utc_now
 from .models import ChannelType
 
 
+def _message_rows(conversation_id: str, items: list[tuple[str, str, timedelta]]) -> list[tuple[str, str, str, str, str]]:
+    rows: list[tuple[str, str, str, str, str]] = []
+    for index, (sender, text, offset) in enumerate(items, start=1):
+        rows.append((f"{conversation_id}-msg-{index}", conversation_id, sender, text, offset.isoformat()))
+    return rows
+
+
 def seed_mvp_data(storage: SQLiteStorage) -> None:
     now = utc_now()
 
@@ -39,6 +46,8 @@ def seed_mvp_data(storage: SQLiteStorage) -> None:
                 (now - timedelta(days=7)).isoformat(),
                 (now + timedelta(days=2)).isoformat(),
                 "Интерес к инвестициям, ценит быстрые ответы и персональные предложения.",
+                None,
+                None,
                 "investments|premium-card|family",
             ),
             (
@@ -59,6 +68,8 @@ def seed_mvp_data(storage: SQLiteStorage) -> None:
                 (now - timedelta(days=2)).isoformat(),
                 (now + timedelta(hours=5)).isoformat(),
                 "Ожидает проактивного сервиса, интересуется сохранением капитала и structured deals.",
+                None,
+                None,
                 "retention|deposit|vip",
             ),
             (
@@ -79,6 +90,8 @@ def seed_mvp_data(storage: SQLiteStorage) -> None:
                 (now - timedelta(days=10)).isoformat(),
                 (now + timedelta(days=1)).isoformat(),
                 "Открыт к риску, интересуется валютными инструментами и идеями для роста капитала.",
+                None,
+                None,
                 "fx|growth|brokerage",
             ),
             (
@@ -99,6 +112,8 @@ def seed_mvp_data(storage: SQLiteStorage) -> None:
                 (now - timedelta(days=20)).isoformat(),
                 (now + timedelta(hours=10)).isoformat(),
                 "Реже отвечает, нужно мягкое удержание и короткие follow-up сообщения.",
+                None,
+                None,
                 "churn-risk|soft-contact|insurance",
             ),
             (
@@ -119,6 +134,8 @@ def seed_mvp_data(storage: SQLiteStorage) -> None:
                 (now - timedelta(days=3)).isoformat(),
                 (now + timedelta(days=4)).isoformat(),
                 "Большой остаток на счете, готов обсуждать размещение ликвидности и премиальные сервисы.",
+                None,
+                None,
                 "liquidity|deposit|wealth",
             ),
             (
@@ -139,6 +156,8 @@ def seed_mvp_data(storage: SQLiteStorage) -> None:
                 (now - timedelta(days=1)).isoformat(),
                 (now + timedelta(days=3)).isoformat(),
                 "Быстро реагирует в чате, интересуется travel-benefits и инвестиционными подборками.",
+                None,
+                None,
                 "travel|premium-card|active-chat",
             ),
         ]
@@ -169,203 +188,195 @@ def seed_mvp_data(storage: SQLiteStorage) -> None:
             ("conv4", "c6", ChannelType.chat.value, "Премиальные travel-benefits", (now - timedelta(hours=18)).isoformat()),
         ]
     )
-    storage.insert_messages(
+    messages: list[tuple[str, str, str, str, str]] = []
+    messages.extend(
+        _message_rows(
+            "conv1",
+            [
+                ("client", "Добрый день. Хочу спокойно обсудить, куда разместить часть свободных средств.", now - timedelta(days=1, hours=2, minutes=25)),
+                ("manager", "Добрый день, Иван. Могу собрать 3 сценария: вклад, консервативная облигационная часть и смешанный вариант.", now - timedelta(days=1, hours=2, minutes=18)),
+                ("client", "Интересно, но важно не заходить в слишком высокий риск.", now - timedelta(days=1, hours=2, minutes=7)),
+                ("manager", "Понял. Тогда акцент сделаю на сохранении ликвидности и доходности выше обычного вклада.", now - timedelta(days=1, hours=1, minutes=59)),
+                ("client", "Да, и отдельно хочу увидеть, где можно быстро выйти в кэш без больших потерь.", now - timedelta(days=1, hours=1, minutes=46)),
+                ("manager", "Сделаю это отдельной колонкой в сравнении. Также добавлю пример распределения на 6 и 12 месяцев.", now - timedelta(days=1, hours=1, minutes=39)),
+                ("client", "Хорошо. И давайте без длинной презентации, лучше коротко и по цифрам.", now - timedelta(days=1, hours=1, minutes=27)),
+                ("manager", "Принято. Завтра после 12:00 пришлю компактную таблицу и короткий вывод по каждому сценарию.", now - timedelta(days=1, hours=1, minutes=20)),
+            ],
+        )
+    )
+    messages.extend(
+        _message_rows(
+            "conv2",
+            [
+                ("manager", "Ольга, добрый день. Подтвержу, что сегодня готов обсудить обновление портфеля.", now - timedelta(hours=6, minutes=35)),
+                ("client", "Да, после 16:00 будет удобно.", now - timedelta(hours=6, minutes=31)),
+                ("manager", "Отлично. Подготовлю сравнение по премиальному вкладу, защитной облигационной части и структурной идее.", now - timedelta(hours=6, minutes=25)),
+                ("client", "Прошу без избыточного риска. Для меня важнее сохранность капитала, чем агрессивная доходность.", now - timedelta(hours=6, minutes=18)),
+                ("manager", "Понял. Вынесу в начало только консервативные варианты и отдельно отмечу возможную доходность по каждому.", now - timedelta(hours=6, minutes=12)),
+                ("client", "Хорошо. И если возможно, до звонка пришлите короткую рамку, чтобы я посмотрела между встречами.", now - timedelta(hours=6, minutes=5)),
+                ("manager", "Да, отправлю краткое сравнение до 15:30 и в 16:00 созвонимся, чтобы пройтись по деталям.", now - timedelta(hours=5, minutes=57)),
+                ("client", "Подходит. На звонке хочу отдельно обсудить, стоит ли держать часть ликвидности на коротком сроке.", now - timedelta(hours=5, minutes=51)),
+            ],
+        )
+    )
+    messages.extend(
+        _message_rows(
+            "conv5",
+            [
+                ("client", "Добрый вечер. Смотрю на валютные идеи, но не хочу заходить слишком резко.", now - timedelta(days=2, hours=1, minutes=12)),
+                ("manager", "Понял вас. Можем зайти постепенно через брокерский счет и заранее ограничить долю валютной части.", now - timedelta(days=2, hours=1, minutes=2)),
+                ("client", "Мне нужен понятный план: стартовая сумма, распределение и когда пересматривать позицию.", now - timedelta(days=2, minutes=51)),
+                ("manager", "Соберу пошаговый сценарий на 3 шага и добавлю ориентиры для пересмотра через 30 и 90 дней.", now - timedelta(days=2, minutes=42)),
+                ("client", "Хорошо. Важно, чтобы не было ощущения, что я покупаю на пике.", now - timedelta(days=2, minutes=34)),
+                ("manager", "Тогда предложу поэтапный вход частями и отмечу, какие инструменты подойдут для умеренного риска.", now - timedelta(days=2, minutes=27)),
+                ("client", "Отлично. И если будет удобно, давайте после вашего сообщения назначим короткую встречу на следующей неделе.", now - timedelta(days=2, minutes=18)),
+                ("manager", "Сделаю. Завтра пришлю базовый план в чат, а затем предложу слоты на очную встречу.", now - timedelta(days=2, minutes=11)),
+            ],
+        )
+    )
+    messages.extend(
+        _message_rows(
+            "conv3",
+            [
+                ("manager", "Мария, добрый день. Хотел аккуратно вернуться к вопросу страховой защиты перед поездками.", now - timedelta(days=6, hours=3)),
+                ("client", "Сейчас в плотном графике, не хочу вникать в длинные описания.", now - timedelta(days=6, hours=2, minutes=12)),
+                ("manager", "Понял. Тогда не перегружаю: могу позже прислать совсем короткий вариант на 3 пункта.", now - timedelta(days=6, hours=2)),
+                ("client", "Так будет лучше, спасибо.", now - timedelta(days=6, hours=1, minutes=46)),
+                ("manager", "Верно ли понимаю, что актуально вернуться к теме уже ближе к поездке?", now - timedelta(days=5, hours=22, minutes=10)),
+                ("client", "Да, лучше через несколько дней. И только в сообщении, без звонка.", now - timedelta(days=5, hours=14, minutes=30)),
+                ("manager", "Принято. Напишу коротко в чат и без давления, когда срок будет ближе.", now - timedelta(days=5, hours=14, minutes=12)),
+                ("client", "Спасибо, такой формат мне комфортен.", now - timedelta(days=5, hours=13, minutes=58)),
+            ],
+        )
+    )
+    messages.extend(
+        _message_rows(
+            "conv6",
+            [
+                ("manager", "Дмитрий, добрый день. Вижу крупный свободный остаток и хотел предложить варианты размещения ликвидности.", now - timedelta(days=1, hours=4, minutes=40)),
+                ("client", "Добрый. Да, можно, но без длинной презентации. Нужен быстрый вывод по сути.", now - timedelta(days=1, hours=4, minutes=35)),
+                ("manager", "Понял. Подготовлю один короткий блок: срок, ликвидность и ожидаемая доходность по трем вариантам.", now - timedelta(days=1, hours=4, minutes=29)),
+                ("client", "Важно, чтобы можно было быстро сравнить вклад и облигационную альтернативу.", now - timedelta(days=1, hours=4, minutes=24)),
+                ("manager", "Сделаю это в одном сообщении и отдельно отмечу, где есть быстрый выход.", now - timedelta(days=1, hours=4, minutes=18)),
+                ("client", "Хорошо. Если задержитесь, напомните, во сколько ждать. Я буду между встречами.", now - timedelta(days=1, hours=4, minutes=13)),
+                ("manager", "Отправлю до 14:30 и, если удобно, потом коротко созвонимся на 10 минут.", now - timedelta(days=1, hours=4, minutes=9)),
+                ("client", "Созвон возможен, но только если будет совсем предметно и быстро.", now - timedelta(days=1, hours=4, minutes=6)),
+            ],
+        )
+    )
+    messages.extend(
+        _message_rows(
+            "conv4",
+            [
+                ("manager", "Елена, вижу, что у вас скоро поездка. Могу подобрать benefits по премиальной карте.", now - timedelta(hours=18, minutes=42)),
+                ("client", "Да, это актуально. Особенно интересуют lounge, страховка и быстрый проход в поездках.", now - timedelta(hours=18, minutes=38)),
+                ("manager", "Хорошо. Подберу пакет, где будут lounge, travel-страховка и приоритетный сервис.", now - timedelta(hours=18, minutes=32)),
+                ("client", "Если можно, пришлите в коротком формате, чтобы я посмотрела с телефона.", now - timedelta(hours=18, minutes=28)),
+                ("manager", "Сделаю компактный формат: 3 преимущества, условия и что включено по страховке.", now - timedelta(hours=18, minutes=24)),
+                ("client", "Отлично. Еще интересно, есть ли что-то по повышенному кэшбэку в поездках.", now - timedelta(hours=18, minutes=19)),
+                ("manager", "Да, добавлю отдельным пунктом travel-расходы и где будут максимальные бонусы.", now - timedelta(hours=18, minutes=15)),
+                ("client", "Супер, спасибо. Если пришлете сегодня, я смогу быстро посмотреть вечером.", now - timedelta(hours=18, minutes=12)),
+            ],
+        )
+    )
+    storage.insert_messages(messages)
+    storage.insert_conversation_insights(
         [
             (
-                "msg1",
                 "conv1",
-                "client",
-                "Добрый день, хочу обсудить варианты размещения средств.",
-                (now - timedelta(days=1, minutes=20)).isoformat(),
+                "interested",
+                "normal",
+                "medium",
+                12,
+                8,
+                (now + timedelta(days=1, hours=12)).isoformat(),
+                "Отправить компактное сравнение трех сценариев после 12:00",
+                ChannelType.chat.value,
+                "comparison",
+                "investments|liquidity|capital_preservation",
+                "risk|liquidity|avoid_long_presentation",
+                "p2|p3",
+                "send_comparison|emphasize_liquidity|keep_message_short",
             ),
             (
-                "msg2",
-                "conv1",
-                "manager",
-                "Добрый день! Подготовлю варианты и вернусь с предложениями.",
-                (now - timedelta(days=1, minutes=18)).isoformat(),
-            ),
-            (
-                "msg9",
-                "conv1",
-                "client",
-                "Интересуют варианты без слишком высокого риска, но с доходностью выше вклада.",
-                (now - timedelta(days=1, minutes=11)).isoformat(),
-            ),
-            (
-                "msg10",
-                "conv1",
-                "manager",
-                "Понял вас. Тогда могу предложить комбинацию из консервативной части и небольшой доли инвест-идей.",
-                (now - timedelta(days=1, minutes=8)).isoformat(),
-            ),
-            (
-                "msg11",
-                "conv1",
-                "client",
-                "Да, такой вариант уже звучит ближе. И хотелось бы понять, какая ликвидность у этих решений.",
-                (now - timedelta(days=1, minutes=5)).isoformat(),
-            ),
-            (
-                "msg12",
-                "conv1",
-                "manager",
-                "Сделаю короткую подборку с тремя сценариями и отдельно отмечу, где можно быстро выйти в кэш.",
-                (now - timedelta(days=1, minutes=2)).isoformat(),
-            ),
-            (
-                "msg3",
                 "conv2",
-                "manager",
-                "Уточняю, удобно ли сегодня обсудить обновление портфеля.",
-                (now - timedelta(hours=6, minutes=15)).isoformat(),
+                "neutral",
+                "high",
+                "high",
+                6,
+                5,
+                (now.replace(hour=16, minute=0, second=0, microsecond=0)).isoformat(),
+                "Созвон по обновлению портфеля и сравнению консервативных вариантов",
+                ChannelType.call.value,
+                "comparison",
+                "capital_protection|deposit|structured_deals",
+                "risk",
+                "p3",
+                "prepare_call|highlight_capital_protection|send_comparison",
             ),
             (
-                "msg4",
-                "conv2",
-                "client",
-                "Да, после 16:00 смогу созвониться.",
-                (now - timedelta(hours=6, minutes=10)).isoformat(),
-            ),
-            (
-                "msg13",
-                "conv2",
-                "manager",
-                "Отлично. Тогда подготовлю сравнение по вкладу, облигационной части и защитным стратегиям.",
-                (now - timedelta(hours=5, minutes=55)).isoformat(),
-            ),
-            (
-                "msg14",
-                "conv2",
-                "client",
-                "Да, и прошу сделать акцент на сохранности капитала, без лишнего риска.",
-                (now - timedelta(hours=5, minutes=48)).isoformat(),
-            ),
-            (
-                "msg15",
-                "conv2",
-                "manager",
-                "Принято. Сфокусируюсь на консервативном профиле и отдельно отмечу ожидаемую доходность.",
-                (now - timedelta(hours=5, minutes=42)).isoformat(),
-            ),
-            (
-                "msg16",
                 "conv5",
-                "client",
-                "Добрый вечер. Смотрю на валютные инструменты, но не хочу заходить слишком агрессивно.",
-                (now - timedelta(days=2, minutes=35)).isoformat(),
+                "interested",
+                "normal",
+                "medium",
+                12,
+                9,
+                (now + timedelta(days=1)).isoformat(),
+                "Отправить пошаговый FX-план и после этого предложить слоты встречи",
+                ChannelType.chat.value,
+                "detailed",
+                "fx|brokerage|portfolio_growth",
+                "timing_risk|aggressive_entry",
+                "p2|p5",
+                "send_comparison|prepare_call",
             ),
             (
-                "msg17",
-                "conv5",
-                "manager",
-                "Понимаю. Можем рассмотреть поэтапный вход через брокерский счет и ограничить долю валютной части.",
-                (now - timedelta(days=2, minutes=31)).isoformat(),
-            ),
-            (
-                "msg18",
-                "conv5",
-                "client",
-                "Мне важно, чтобы был понятный план: сколько завести, во что распределить и когда смотреть результат.",
-                (now - timedelta(days=2, minutes=25)).isoformat(),
-            ),
-            (
-                "msg19",
-                "conv5",
-                "manager",
-                "Сделаю для вас простой сценарий на 3 шага: стартовая сумма, базовое распределение и точки пересмотра портфеля.",
-                (now - timedelta(days=2, minutes=20)).isoformat(),
-            ),
-            (
-                "msg5",
                 "conv3",
-                "manager",
-                "Мария, добрый день. Хотел коротко уточнить, актуален ли для вас вопрос страховой защиты перед поездками.",
-                (now - timedelta(days=6, minutes=25)).isoformat(),
+                "neutral",
+                "low",
+                "low",
+                705,
+                28,
+                (now + timedelta(days=4)).isoformat(),
+                "Вернуться позже коротким сообщением без давления",
+                ChannelType.chat.value,
+                "short",
+                "insurance|soft_follow_up",
+                "no_long_messages|avoid_pressure|no_call",
+                "p4",
+                "avoid_pressure|keep_message_short",
             ),
             (
-                "msg6",
-                "conv3",
-                "client",
-                "Сейчас не до этого, вернусь позже.",
-                (now - timedelta(days=6, minutes=20)).isoformat(),
-            ),
-            (
-                "msg20",
-                "conv3",
-                "manager",
-                "Хорошо, не буду перегружать. Напишу ближе к дате поездки и пришлю короткий вариант без лишних деталей.",
-                (now - timedelta(days=6, minutes=14)).isoformat(),
-            ),
-            (
-                "msg21",
-                "conv3",
-                "client",
-                "Спасибо, так будет комфортнее.",
-                (now - timedelta(days=6, minutes=11)).isoformat(),
-            ),
-            (
-                "msg22",
                 "conv6",
-                "manager",
-                "Дмитрий, добрый день. Вижу крупный остаток на счете, хотел предложить коротко обсудить размещение ликвидности.",
-                (now - timedelta(days=1, hours=4, minutes=40)).isoformat(),
+                "tense",
+                "high",
+                "speed_sensitive",
+                5,
+                4,
+                (now.replace(hour=14, minute=30, second=0, microsecond=0)).isoformat(),
+                "До 14:30 отправить одно короткое сравнение и при необходимости созвониться",
+                ChannelType.chat.value,
+                "comparison",
+                "liquidity|deposit|bond_alternative",
+                "avoid_long_presentation|needs_speed|liquidity",
+                "p3|p2",
+                "send_comparison|emphasize_liquidity|keep_message_short|prepare_call",
             ),
             (
-                "msg23",
-                "conv6",
-                "client",
-                "Добрый. Да, можно, но без долгой презентации. Хочу быстро понять, где сейчас разумнее разместиться.",
-                (now - timedelta(days=1, hours=4, minutes=33)).isoformat(),
-            ),
-            (
-                "msg24",
-                "conv6",
-                "manager",
-                "Тогда подготовлю короткое сравнение: премиальный вклад, облигационная альтернатива и гибридный вариант.",
-                (now - timedelta(days=1, hours=4, minutes=25)).isoformat(),
-            ),
-            (
-                "msg25",
-                "conv6",
-                "client",
-                "Супер, только сразу дайте срок, ликвидность и ожидаемую доходность в одном сообщении.",
-                (now - timedelta(days=1, hours=4, minutes=18)).isoformat(),
-            ),
-            (
-                "msg7",
                 "conv4",
-                "manager",
-                "Елена, вижу, что у вас скоро поездка. Могу подобрать benefits по премиальной карте.",
-                (now - timedelta(hours=18, minutes=35)).isoformat(),
-            ),
-            (
-                "msg8",
-                "conv4",
-                "client",
-                "Да, это актуально, особенно lounge и страховка.",
-                (now - timedelta(hours=18, minutes=30)).isoformat(),
-            ),
-            (
-                "msg26",
-                "conv4",
-                "manager",
-                "Тогда подберу пакет, где будут проходы в lounge, travel-страховка и приоритетный сервис в поездках.",
-                (now - timedelta(hours=18, minutes=23)).isoformat(),
-            ),
-            (
-                "msg27",
-                "conv4",
-                "client",
-                "Идеально. Если можно, пришлите в коротком формате, чтобы я быстро посмотрела с телефона.",
-                (now - timedelta(hours=18, minutes=17)).isoformat(),
-            ),
-            (
-                "msg28",
-                "conv4",
-                "manager",
-                "Сделаю краткий вариант сообщением и отдельно смогу потом объяснить детали, если потребуется.",
-                (now - timedelta(hours=18, minutes=11)).isoformat(),
+                "interested",
+                "normal",
+                "high",
+                4,
+                4,
+                (now.replace(hour=20, minute=0, second=0, microsecond=0)).isoformat(),
+                "Отправить сегодня вечером короткую подборку travel-benefits",
+                ChannelType.chat.value,
+                "short",
+                "travel|premium_card|insurance|cashback",
+                "mobile_format_only",
+                "p1|p4",
+                "keep_message_short|send_comparison",
             ),
         ]
     )

@@ -9,6 +9,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from app.db import DEFAULT_DB_PATH, SQLiteStorage
 from app.seed_data import seed_mvp_data
+from app.services import AssistantKnowledgeService, DialogPriorityService
 
 
 def main() -> None:
@@ -17,6 +18,7 @@ def main() -> None:
 
     storage = SQLiteStorage()
     seed_mvp_data(storage)
+    AssistantKnowledgeService().rebuild_all_snapshots(storage, DialogPriorityService())
     print(f"Database reset and seeded: {DEFAULT_DB_PATH}")
 
 

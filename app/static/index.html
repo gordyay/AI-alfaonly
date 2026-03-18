@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Alfa Only Assistant MVP</title>
-    <link rel="stylesheet" href="/static/styles.css" />
+    <link rel="stylesheet" href="/static/styles.css?v=20260318-06" />
   </head>
   <body>
     <div class="app-shell">
@@ -14,50 +14,40 @@
           <h1>Dialogs-first MVP</h1>
           <p class="hero__text">
             Основной рабочий сценарий менеджера начинается с диалогов: кто ждет ответа, кто
-            выпадает из внимания, где высокий потенциал и где нужен срочный follow-up.
+            выпадает из внимания, где высокий потенциал и где нужен срочный повторный контакт.
           </p>
         </div>
 
         <div class="hero__stats">
           <section class="stat-card">
-            <span class="stat-card__label">Активных задач</span>
+            <span class="stat-card__label">Диалогов в работе</span>
             <strong class="stat-card__value" id="active-task-count">0</strong>
           </section>
           <section class="stat-card">
-            <span class="stat-card__label">Диалогов в фокусе</span>
+            <span class="stat-card__label">Высокий приоритет</span>
             <strong class="stat-card__value" id="focused-client-count">0</strong>
           </section>
           <section class="stat-card stat-card--accent">
-            <span class="stat-card__label">Priority model</span>
+            <span class="stat-card__label">Текущий этап</span>
             <strong class="stat-card__value" id="app-stage">UI mock</strong>
           </section>
         </div>
       </header>
 
-      <section class="topbar">
-        <form class="filters" id="filters-form">
-          <label class="field">
-            <span>Менеджер</span>
-            <select id="manager-select" name="manager_id">
-              <option value="m1">m1</option>
-              <option value="m2">m2</option>
-            </select>
-          </label>
-          <label class="field">
-            <span>Режим</span>
-            <input value="Dialogs only" disabled />
-          </label>
-          <button class="ghost-button" id="refresh-button" type="button">Обновить</button>
-        </form>
-      </section>
-
       <main class="workspace">
         <section class="panel panel--rail">
           <div class="panel__header">
             <div>
-              <p class="panel__eyebrow" id="rail-label">Dialogs Feed</p>
+              <p class="panel__eyebrow" id="rail-label">Лента диалогов</p>
               <h2 id="rail-title">Входящие диалоги</h2>
             </div>
+            <button class="sort-toggle" id="sort-toggle-button" type="button" aria-label="Переключить сортировку">
+              <span class="sort-toggle__eyebrow">Сортировка</span>
+              <span class="sort-toggle__body">
+                <span class="sort-toggle__icon">⇅</span>
+                <span class="sort-toggle__label" id="sort-toggle-label">По приоритету</span>
+              </span>
+            </button>
           </div>
 
           <div class="feed-list" id="dialog-list"></div>
@@ -65,7 +55,7 @@
 
         <section class="panel panel--detail">
           <div class="detail-empty" id="empty-state">
-            <p class="panel__eyebrow">Client Workspace</p>
+            <p class="panel__eyebrow">Рабочее окно менеджера</p>
             <h2>Диалоги клиентов</h2>
             <p>
               Пока диалог не выбран, основной экран полностью отдан под список переписок.
@@ -85,7 +75,7 @@
               <section class="chat-card">
                 <div class="chat-card__header">
                   <div>
-                    <p class="panel__eyebrow">Conversation</p>
+                    <p class="panel__eyebrow">Диалог</p>
                     <h2 id="client-name">-</h2>
                     <p class="detail-subtitle" id="client-subtitle">-</p>
                   </div>
@@ -107,72 +97,266 @@
 
               <aside class="context-column">
                 <section class="priority-panel">
-                  <p class="panel__eyebrow">Priority</p>
+                  <p class="panel__eyebrow">Приоритет</p>
                   <button class="priority-pill" id="priority-open-button" type="button">0</button>
                 </section>
 
-                <section class="ai-assistant-panel">
-                  <div class="section-title">
-                    <div>
-                      <p class="panel__eyebrow">AI Assistant</p>
-                      <h3>Персонализированные скрипты</h3>
-                    </div>
-                    <span class="badge">mock</span>
+                <section class="context-switcher">
+                  <div class="context-tabs" id="context-tabs">
+                    <button class="context-tab is-active" type="button" data-context-tab="summary">Сводка</button>
+                    <button class="context-tab" type="button" data-context-tab="assistant">CRM-заметка</button>
+                    <button class="context-tab" type="button" data-context-tab="profile">Профиль</button>
+                    <button class="context-tab" type="button" data-context-tab="portfolio">Портфель</button>
                   </div>
-                  <div class="assistant-thread">
-                    <article class="assistant-bubble assistant-bubble--system">
-                      AI-окно видит открытый диалог и в будущем будет предлагать персонализированные скрипты продаж.
-                    </article>
-                    <article class="assistant-bubble assistant-bubble--draft">
-                      Пока это только UI-заглушка без AI-логики и без генерации ответов.
-                    </article>
+
+                  <div class="context-panels">
+                    <section class="context-panel is-active" data-context-panel="summary">
+                      <section class="summary-card summary-card--feature">
+                        <div class="summary-card__header">
+                          <span>Мини-сводка</span>
+                          <button class="ghost-button summary-card__action" id="regenerate-summary-button" type="button">
+                            Сгенерировать сводку
+                          </button>
+                        </div>
+                        <strong id="mini-summary">-</strong>
+                        <p class="summary-card__status hidden" id="mini-summary-status"></p>
+                      </section>
+
+                      <section class="summary-grid summary-grid--stacked">
+                        <article class="summary-card">
+                          <span>Портфель</span>
+                          <strong id="portfolio-value">-</strong>
+                        </article>
+                        <article class="summary-card">
+                          <span>Риск оттока</span>
+                          <strong id="churn-risk">-</strong>
+                        </article>
+                        <article class="summary-card">
+                          <span>Следующий контакт</span>
+                          <strong id="next-contact">-</strong>
+                        </article>
+                      </section>
+
+                      <section class="content-card">
+                        <h3>Следующее действие</h3>
+                        <p class="next-action-copy" id="next-best-action">-</p>
+                      </section>
+
+                      <section class="content-card">
+                        <h3>О клиенте</h3>
+                        <p class="insight" id="client-summary"></p>
+                      </section>
+                    </section>
+
+                    <section class="context-panel" data-context-panel="assistant">
+                      <section class="ai-assistant-panel">
+                        <div class="section-title">
+                          <div>
+                            <p class="panel__eyebrow">CRM-заметка</p>
+                            <h3>Черновик CRM-заметки</h3>
+                          </div>
+                          <span class="badge">groq</span>
+                        </div>
+                        <p class="assistant-placeholder" id="ai-placeholder-copy">
+                          Запустите генерацию вручную, чтобы получить краткую сводку контакта и черновик CRM-заметки по открытому диалогу.
+                        </p>
+                        <button class="primary-button ai-generate-button" id="generate-ai-summary-button" type="button">
+                          Сгенерировать CRM-заметку
+                        </button>
+                        <p class="assistant-status hidden" id="ai-status"></p>
+
+                        <div class="ai-editor hidden" id="ai-editor">
+                          <div class="ai-block">
+                            <span class="panel__eyebrow">Краткая сводка</span>
+                            <textarea
+                              id="ai-contact-summary"
+                              class="ai-summary-text ai-summary-textarea"
+                              rows="4"
+                              aria-label="Краткая сводка контакта"
+                            >-</textarea>
+                          </div>
+
+                          <div class="ai-block">
+                            <span class="panel__eyebrow">Ключевые пункты</span>
+                            <div class="ai-chip-list" id="ai-key-points"></div>
+                          </div>
+
+                          <label class="field">
+                            <span>Итог контакта</span>
+                            <select id="ai-outcome-select">
+                              <option value="follow_up">Нужен повторный контакт</option>
+                              <option value="info_sent">Информация отправлена</option>
+                              <option value="meeting_scheduled">Назначена встреча / звонок</option>
+                              <option value="not_now">Не сейчас</option>
+                              <option value="closed_no_action">Закрыто без дальнейших действий</option>
+                            </select>
+                          </label>
+
+                          <label class="field">
+                            <span>Черновик CRM-заметки</span>
+                            <textarea id="ai-crm-note-text" rows="7" aria-label="Черновик CRM-заметки"></textarea>
+                          </label>
+
+                          <div class="field">
+                            <span>Дата следующего контакта</span>
+                            <div class="follow-up-inline">
+                              <input id="ai-follow-up-date" type="date" />
+                              <input
+                                id="ai-follow-up-time"
+                                type="text"
+                                inputmode="numeric"
+                                placeholder="20:30"
+                                maxlength="5"
+                                aria-label="Время следующего контакта"
+                              />
+                            </div>
+                          </div>
+
+                          <label class="field">
+                            <span>Причина следующего контакта</span>
+                            <input id="ai-follow-up-reason" type="text" placeholder="Причина следующего контакта" />
+                          </label>
+
+                          <div class="ai-save-row">
+                            <button class="primary-button" id="save-ai-draft-button" type="button">
+                              Сохранить в CRM
+                            </button>
+                            <p class="assistant-status assistant-status--inline hidden" id="ai-save-status"></p>
+                          </div>
+                        </div>
+                      </section>
+                    </section>
+
+                    <section class="context-panel" data-context-panel="profile">
+                      <section class="content-card">
+                        <h3>Профиль клиента</h3>
+                        <div class="meta-grid" id="client-profile"></div>
+                      </section>
+                    </section>
+
+                    <section class="context-panel" data-context-panel="portfolio">
+                      <section class="content-card">
+                        <h3>Портфель</h3>
+                        <div class="stack-list" id="product-list"></div>
+                      </section>
+                    </section>
                   </div>
-                  <form class="assistant-composer" id="assistant-composer-form">
-                    <input
-                      id="assistant-input"
-                      type="text"
-                      placeholder="Попросить скрипт или тезисы..."
-                      aria-label="Сообщение AI assistant"
-                    />
-                    <button class="ghost-button" type="submit">Запросить</button>
-                  </form>
-                </section>
-
-                <section class="summary-card summary-card--feature">
-                  <span>Мини-summary</span>
-                  <strong id="mini-summary">-</strong>
-                </section>
-
-                <section class="summary-grid summary-grid--stacked">
-                  <article class="summary-card">
-                    <span>Портфель</span>
-                    <strong id="portfolio-value">-</strong>
-                  </article>
-                  <article class="summary-card">
-                    <span>Churn risk</span>
-                    <strong id="churn-risk">-</strong>
-                  </article>
-                  <article class="summary-card">
-                    <span>Следующий контакт</span>
-                    <strong id="next-contact">-</strong>
-                  </article>
-                </section>
-
-                <section class="content-card">
-                  <h3>Профиль клиента</h3>
-                  <div class="meta-grid" id="client-profile"></div>
-                  <p class="insight" id="client-summary"></p>
-                </section>
-
-                <section class="content-card">
-                  <h3>Портфель</h3>
-                  <div class="stack-list" id="product-list"></div>
                 </section>
               </aside>
             </div>
           </div>
         </section>
       </main>
+    </div>
+
+    <button class="manager-fab" id="manager-toggle-button" type="button" aria-label="Сменить менеджера">
+      <span class="manager-fab__eyebrow">Менеджер</span>
+      <span class="manager-fab__value" id="manager-toggle-label">m1</span>
+    </button>
+
+    <button class="assistant-launcher" id="assistant-launcher-button" type="button" aria-label="Открыть AI-ассистента">
+      <span class="assistant-launcher__icon">✦</span>
+      <span class="assistant-launcher__label">Ассистент</span>
+    </button>
+
+    <div class="assistant-widget hidden" id="assistant-widget">
+      <div class="assistant-widget__backdrop" id="assistant-widget-backdrop"></div>
+      <section class="assistant-widget__panel" role="dialog" aria-modal="true" aria-labelledby="assistant-widget-title">
+        <header class="assistant-widget__header">
+          <div>
+            <p class="panel__eyebrow">AI-ассистент</p>
+            <h2 id="assistant-widget-title">AI-ассистент</h2>
+          </div>
+          <button class="modal__close" id="assistant-widget-close-button" type="button">×</button>
+        </header>
+
+        <div class="assistant-widget__body">
+          <aside class="assistant-thread-rail">
+            <div class="assistant-thread-rail__header">
+              <div>
+                <p class="panel__eyebrow">История</p>
+                <h3>Диалоги</h3>
+              </div>
+              <button class="ghost-button assistant-thread-rail__action" id="assistant-new-thread-button" type="button">
+                Новый диалог
+              </button>
+            </div>
+            <div class="assistant-thread-list" id="assistant-thread-list"></div>
+          </aside>
+
+          <section class="assistant-chat-shell">
+            <div class="assistant-chat-shell__header">
+              <button
+                class="ghost-button assistant-back-button"
+                id="assistant-back-button"
+                type="button"
+                aria-label="Назад к списку диалогов"
+              >
+                ←
+              </button>
+              <div>
+                <p class="panel__eyebrow">Диалог с ассистентом</p>
+                <h3 id="assistant-chat-title">Новый диалог</h3>
+              </div>
+            </div>
+
+            <div class="assistant-quick-actions">
+              <button class="ghost-button assistant-quick-action" type="button" data-assistant-prompt="Сделай сводку диалога">
+                Сделай сводку диалога
+              </button>
+              <button class="ghost-button assistant-quick-action" type="button" data-assistant-prompt="Собери CRM-заметку">
+                Собери CRM-заметку
+              </button>
+              <button
+                class="ghost-button assistant-quick-action"
+                type="button"
+                data-assistant-prompt="Подготовь скрипт продажи"
+              >
+                Подготовь скрипт продажи
+              </button>
+              <button
+                class="ghost-button assistant-quick-action"
+                type="button"
+                data-assistant-prompt="Сделай мягкий follow-up"
+              >
+                Сделай мягкий follow-up
+              </button>
+              <button class="ghost-button assistant-quick-action" type="button" data-assistant-prompt="Как ответить клиенту?">
+                Как ответить клиенту?
+              </button>
+              <button class="ghost-button assistant-quick-action" type="button" data-assistant-prompt="Что важно по клиенту?">
+                Что важно по клиенту?
+              </button>
+              <button
+                class="ghost-button assistant-quick-action"
+                type="button"
+                data-assistant-prompt="Какие клиенты сейчас самые приоритетные?"
+              >
+                Какие клиенты сейчас самые приоритетные?
+              </button>
+            </div>
+
+            <p class="assistant-status hidden" id="assistant-widget-status"></p>
+
+            <div class="assistant-thread-empty" id="assistant-thread-empty">
+              <strong>Ассистент готов.</strong>
+              <p>Откройте предыдущий диалог или начните новый, чтобы задать вопрос по клиентам и перепискам.</p>
+            </div>
+
+            <div class="assistant-message-list hidden" id="assistant-message-list"></div>
+
+            <form class="assistant-form" id="assistant-form">
+              <textarea
+                id="assistant-input"
+                rows="3"
+                placeholder="Спросите про клиента, диалог или попросите подготовить скрипт..."
+                aria-label="Сообщение AI-ассистенту"
+              ></textarea>
+              <button class="primary-button" id="assistant-send-button" type="submit">Отправить</button>
+            </form>
+          </section>
+        </div>
+      </section>
     </div>
 
     <div class="modal hidden" id="priority-modal">
@@ -191,6 +375,20 @@
           <pre id="formula-basic" class="formula-block">PriorityScore = w1*T_wait + w2*C_value + w3*U_comm + w4*P_sale + w5*R_churn</pre>
           <p class="formula-label">Текущая UI-конфигурация весов</p>
           <pre id="formula-weights" class="formula-block">PriorityScore = 0.25*T_wait + 0.30*C_value + 0.20*U_comm + 0.15*P_sale + 0.10*R_churn</pre>
+        </section>
+
+        <section class="formula-card">
+          <div class="priority-live-grid">
+            <article class="factor-tile factor-tile--score">
+              <span>Текущий score</span>
+              <strong id="modal-priority-score">0</strong>
+              <small id="modal-priority-label">-</small>
+            </article>
+          </div>
+          <p class="formula-label">Почему клиент в фокусе</p>
+          <div class="why-list" id="modal-why-list"></div>
+          <p class="formula-label">Факторы расчета</p>
+          <div class="factor-grid" id="modal-factor-grid"></div>
         </section>
 
         <section class="weights-grid">
@@ -241,6 +439,6 @@
       </div>
     </div>
 
-    <script src="/static/app.js" defer></script>
+    <script src="/static/app.js?v=20260318-06" defer></script>
   </body>
 </html>

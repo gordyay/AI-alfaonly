@@ -21,6 +21,7 @@ htmlcov/
 # Environment/config secrets
 .env
 .env.*
+!.env.example
 
 # Editor/OS files
 .DS_Store
