@@ -230,6 +230,29 @@ async def test_assistant_chat_summary_action_updates_client_summary(assistant_en
 
 
 @pytest.mark.anyio
+async def test_assistant_summary_action_uses_selected_work_item_scope(assistant_env: AssistantTestEnv):
+    thread_response = await assistant_env.client.post(
+        "/assistant/threads",
+        json={"manager_id": "m1", "selected_client_id": "c1"},
+    )
+    thread_id = thread_response.json()["thread"]["id"]
+
+    chat_response = await assistant_env.client.post(
+        "/assistant/chat",
+        json={
+          "manager_id": "m1",
+          "thread_id": thread_id,
+          "message": "Сделай сводку диалога и CRM-заметку",
+          "selected_client_id": "c1",
+          "selected_work_item_id": "task:task-9",
+        },
+    )
+
+    assert chat_response.status_code == 200
+    assert assistant_env.provider.summary_contexts[-1]["conversation"]["id"] == "conv1b"
+
+
+@pytest.mark.anyio
 async def test_assistant_chat_requests_client_context_for_summary_actions(assistant_env: AssistantTestEnv):
     thread_response = await assistant_env.client.post("/assistant/threads", json={"manager_id": "m1"})
     thread_id = thread_response.json()["thread"]["id"]

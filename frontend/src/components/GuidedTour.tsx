@@ -67,23 +67,74 @@ export function GuidedTour({ open, steps, onClose, onComplete }: GuidedTourProps
   }, [open, activeStep]);
 
   const cardStyle = useMemo(() => {
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const width = Math.min(360, viewportWidth - 32);
+    const estimatedHeight = 272;
+    const gap = 20;
+    const margin = 16;
+
     if (!targetRect) {
       return {
         top: 24,
         left: 24,
-        width: Math.min(380, window.innerWidth - 32),
+        width,
       };
     }
 
-    const width = Math.min(380, window.innerWidth - 32);
-    const preferredTop = targetRect.bottom + 20;
-    const fallbackTop = Math.max(16, targetRect.top - 220);
-    const top = preferredTop + 220 > window.innerHeight ? fallbackTop : preferredTop;
-    const left = Math.min(window.innerWidth - width - 16, Math.max(16, targetRect.left));
+    if (viewportWidth <= 1080) {
+      return {
+        top: viewportHeight - estimatedHeight - margin,
+        left: margin,
+        width,
+      };
+    }
+
+    const clampTop = (value: number) =>
+      Math.min(viewportHeight - estimatedHeight - margin, Math.max(margin, value));
+    const clampLeft = (value: number) =>
+      Math.min(viewportWidth - width - margin, Math.max(margin, value));
+
+    const rightSpace = viewportWidth - targetRect.right - margin;
+    const leftSpace = targetRect.left - margin;
+    const bottomSpace = viewportHeight - targetRect.bottom - margin;
+    const topSpace = targetRect.top - margin;
+
+    if (rightSpace >= width + gap) {
+      return {
+        top: clampTop(targetRect.top),
+        left: targetRect.right + gap,
+        width,
+      };
+    }
+
+    if (leftSpace >= width + gap) {
+      return {
+        top: clampTop(targetRect.top),
+        left: targetRect.left - width - gap,
+        width,
+      };
+    }
+
+    if (bottomSpace >= estimatedHeight + gap) {
+      return {
+        top: targetRect.bottom + gap,
+        left: clampLeft(targetRect.left),
+        width,
+      };
+    }
+
+    if (topSpace >= estimatedHeight + gap) {
+      return {
+        top: Math.max(margin, targetRect.top - estimatedHeight - gap),
+        left: clampLeft(targetRect.left),
+        width,
+      };
+    }
 
     return {
-      top,
-      left,
+      top: margin,
+      left: clampLeft(viewportWidth - width - margin),
       width,
     };
   }, [targetRect]);

@@ -1,28 +1,41 @@
-PYTHON ?= python3
+BOOTSTRAP_PYTHON ?= python3
 VENV ?= .venv
+PYTHON := $(VENV)/bin/python
 PIP := $(VENV)/bin/pip
-PYTEST ?= $(shell if [ -x "$(VENV)/bin/pytest" ]; then echo "$(VENV)/bin/pytest"; else echo "pytest"; fi)
-UVICORN ?= $(shell if [ -x "$(VENV)/bin/uvicorn" ]; then echo "$(VENV)/bin/uvicorn"; else echo "uvicorn"; fi)
+PYTEST := $(VENV)/bin/pytest
+UVICORN := $(VENV)/bin/uvicorn
 
-.PHONY: bootstrap install reset-db run test frontend-install frontend-build frontend-dev test-e2e test-all
+.PHONY: bootstrap install check-env demo-check reset-db run demo test frontend-install frontend-build frontend-dev test-e2e test-all run-e2e-server guard-venv
+
+guard-venv:
+	@test -x "$(PYTHON)" || (echo "Virtual environment is missing. Run 'make bootstrap' first."; exit 1)
 
 bootstrap: install reset-db
 
 install:
-	$(PYTHON) -m venv $(VENV)
+	$(BOOTSTRAP_PYTHON) -m venv $(VENV)
 	$(PIP) install --upgrade pip
 	$(PIP) install -r requirements.txt
 
-reset-db:
+check-env: guard-venv
+	$(PYTHON) scripts/check_env.py
+
+demo-check: guard-venv
+	$(PYTHON) scripts/check_env.py --require-static
+
+reset-db: guard-venv
 	$(PYTHON) scripts/reset_db.py
 
-run:
+run: guard-venv
 	$(UVICORN) app.main:app --reload
 
-test:
+demo: guard-venv
+	./scripts/run_demo.sh
+
+test: guard-venv
 	$(PYTEST) -q
 
-test-e2e:
+test-e2e: guard-venv
 	npm run test:e2e
 
 test-all: test frontend-build test-e2e
@@ -35,3 +48,6 @@ frontend-build:
 
 frontend-dev:
 	npm run dev
+
+run-e2e-server: guard-venv
+	./scripts/run_e2e_server.sh

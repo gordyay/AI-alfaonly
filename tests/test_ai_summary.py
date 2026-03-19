@@ -163,7 +163,7 @@ def test_ai_summary_service_builds_context(tmp_path):
     seed_mvp_data(storage)
     client = storage.get_client("c1")
     assert client is not None
-    conversation = storage.list_client_conversations("c1")[0]
+    conversation = next(item for item in storage.list_client_conversations("c1") if item.id == "conv1")
     recommendation = DialogPriorityService().build_recommendation(client=client, conversation=conversation)
 
     context = AISummaryService().build_context(client=client, conversation=conversation, recommendation=recommendation)
@@ -209,7 +209,7 @@ def test_ai_script_service_builds_context(tmp_path):
     seed_mvp_data(storage)
     client = storage.get_client("c1")
     assert client is not None
-    conversation = storage.list_client_conversations("c1")[0]
+    conversation = next(item for item in storage.list_client_conversations("c1") if item.id == "conv1")
     recommendation = DialogPriorityService().build_recommendation(client=client, conversation=conversation)
     crm_notes = storage.list_client_crm_notes("c1")
 
@@ -563,7 +563,7 @@ async def test_generate_draft_then_save_crm_note_persists_ai_metadata(ai_env: AI
     assert created_note["source_conversation_id"] == conversation_id
     assert created_note["ai_generated"] is True
 
-    refreshed_detail = await ai_env.client.get("/client/c1")
+    refreshed_detail = await ai_env.client.get("/client/c1?work_item_id=task:task-9")
     assert refreshed_detail.status_code == 200
     latest_note = refreshed_detail.json()["crm_notes"][0]
     assert latest_note["summary_text"] == draft["contact_summary"]

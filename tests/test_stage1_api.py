@@ -188,6 +188,22 @@ async def test_client_card_found(client: AsyncClient):
 
 
 @pytest.mark.anyio
+async def test_client_detail_can_be_scoped_to_specific_work_item(client: AsyncClient):
+    investment_case = await client.get('/client/c1?work_item_id=task:task-2')
+    assert investment_case.status_code == 200
+    investment_body = investment_case.json()
+    assert investment_body['selected_work_item_id'] == 'task:task-2'
+    assert investment_body['selected_conversation_id'] == 'conv1'
+
+    service_case = await client.get('/client/c1?work_item_id=task:task-9')
+    assert service_case.status_code == 200
+    service_body = service_case.json()
+    assert service_body['selected_work_item_id'] == 'task:task-9'
+    assert service_body['selected_conversation_id'] == 'conv1b'
+    assert service_body['selected_conversation_id'] != investment_body['selected_conversation_id']
+
+
+@pytest.mark.anyio
 async def test_seeded_conversation_signals(client: AsyncClient):
     speed_sensitive_found = False
     next_contact_found = False
@@ -244,7 +260,7 @@ async def test_feedback(client: AsyncClient):
     body = response.json()
     assert body['feedback']['decision'] == 'accepted'
 
-    detail_response = await client.get('/client/c1')
+    detail_response = await client.get('/client/c1?work_item_id=task:task-2')
     detail = detail_response.json()
     assert any(item['recommendation_id'] == 'rec:communication:conv1' for item in detail['recommendation_feedback'])
     assert any(item['action'] == 'decision_recorded' for item in detail['activity_log'])
@@ -268,10 +284,10 @@ async def test_crm_note_can_close_feedback_loop(client: AsyncClient):
     assert created['recommendation_id'] == 'rec:communication:conv1'
     assert created['recommendation_decision'] == 'edited'
 
-    cockpit_response = await client.get('/cockpit?manager_id=m1')
-    work_queue = cockpit_response.json()['work_queue']
-    communication_item = next(item for item in work_queue if item['recommendation_id'] == 'rec:communication:conv1')
-    assert communication_item['recommendation_status'] == 'edited'
+    detail_response = await client.get('/client/c1?work_item_id=task:task-2')
+    detail = detail_response.json()
+    assert any(item['recommendation_id'] == 'rec:communication:conv1' for item in detail['recommendation_feedback'])
+    assert detail['crm_notes'][0]['recommendation_id'] == 'rec:communication:conv1'
 
 
 @pytest.mark.anyio

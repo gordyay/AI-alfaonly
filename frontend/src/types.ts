@@ -40,6 +40,8 @@ export interface WorkItem {
   conversation_id?: string | null;
   source_system?: string | null;
   product_code?: string | null;
+  product_name?: string | null;
+  client_churn_risk?: string | null;
 }
 
 export interface CockpitSection {
@@ -358,6 +360,8 @@ export interface ClientDetailResponse {
   client: Client;
   tasks: Array<Record<string, unknown>>;
   conversations: Conversation[];
+  selected_work_item_id?: string | null;
+  selected_conversation_id?: string | null;
   dialog_recommendation?: WorkItem | null;
   work_items: WorkItem[];
   product_propensity?: ProductPropensityResponse | null;

@@ -2,10 +2,12 @@ import { startTransition, useDeferredValue, useEffect, useState } from "react";
 import { apiGet, apiPost } from "./lib/api";
 import {
   cloneDraft,
-  filterSectionsByQuery,
+  filterWorkQueue,
   formatDateTime,
   getConversationForWorkItem,
+  groupWorkQueue,
   getRecommendationStatusLabel,
+  type WorkQueueFilters,
 } from "./lib/utils";
 import type {
   AISummaryDraft,
@@ -35,6 +37,14 @@ import { WorkQueueRail } from "./components/WorkQueueRail";
 type UiStatus = { type: "loading" | "success" | "error"; text: string } | null;
 const ONBOARDING_STORAGE_KEY = "alfa_only_onboarding_hidden";
 const TOUR_SEEN_STORAGE_KEY = "alfa_only_guided_tour_seen";
+const DEFAULT_QUEUE_FILTERS: WorkQueueFilters = {
+  itemType: "all",
+  productCode: "all",
+  priorityLabel: "all",
+  recommendationStatus: "all",
+  churnRisk: "all",
+  channel: "all",
+};
 
 const TOUR_STEPS: GuidedTourStep[] = [
   {
@@ -105,6 +115,22 @@ function getSelectedWorkItem(
   );
 }
 
+function getDetailCacheKey(clientId: string, workItemId?: string | null) {
+  return `${clientId}::${workItemId || "default"}`;
+}
+
+function findWorkItemByConversation(items: WorkItem[], clientId: string, conversationId?: string | null) {
+  if (!conversationId) {
+    return items.find((item) => item.client_id === clientId) ?? null;
+  }
+
+  return (
+    items.find((item) => item.client_id === clientId && item.conversation_id === conversationId) ??
+    items.find((item) => item.client_id === clientId) ??
+    null
+  );
+}
+
 function createDraftThread(managerId: string, selectedClientName?: string | null): AssistantThread {
   const now = new Date().toISOString();
   return {
@@ -122,6 +148,7 @@ export function App() {
   const [managerId, setManagerId] = useState("m1");
   const [sortMode, setSortMode] = useState<SortMode>("priority");
   const [filterQuery, setFilterQuery] = useState("");
+  const [queueFilters, setQueueFilters] = useState<WorkQueueFilters>(DEFAULT_QUEUE_FILTERS);
   const deferredQuery = useDeferredValue(filterQuery.trim().toLowerCase());
   const [onboardingCollapsed, setOnboardingCollapsed] = useState(false);
   const [tourOpen, setTourOpen] = useState(false);
@@ -156,12 +183,34 @@ export function App() {
   const [assistantInput, setAssistantInput] = useState("");
 
   const workQueue = cockpit?.work_queue ?? [];
-  const selectedDetail = selectedClientId ? clientDetails[selectedClientId] ?? null : null;
+  const selectedDetailKey = selectedClientId ? getDetailCacheKey(selectedClientId, selectedWorkItemId) : null;
+  const selectedDetail = selectedDetailKey ? clientDetails[selectedDetailKey] ?? null : null;
   const selectedWorkItem = getSelectedWorkItem(workQueue, selectedDetail, selectedWorkItemId);
   const selectedConversation = selectedDetail
     ? getConversationForWorkItem(selectedDetail.conversations, selectedWorkItem)
     : null;
-  const filteredSections = filterSectionsByQuery(cockpit?.sections ?? [], deferredQuery);
+  const filteredWorkQueue = filterWorkQueue(workQueue, deferredQuery, queueFilters);
+  const filteredSections = groupWorkQueue(filteredWorkQueue);
+  const productOptions = [
+    { value: "all", label: "Все продукты" },
+    ...Array.from(
+      new Map(
+        workQueue
+          .filter((item) => item.product_code && item.product_name)
+          .map((item) => [item.product_code as string, { value: item.product_code as string, label: item.product_name as string }]),
+      ).values(),
+    ),
+  ];
+  const currentFeedback =
+    selectedDetail?.recommendation_feedback.find((item) => item.recommendation_id === selectedWorkItem?.recommendation_id) ??
+    null;
+  const savedFeedbackDecision =
+    currentFeedback?.decision ??
+    (selectedWorkItem?.recommendation_status !== "pending" ? selectedWorkItem?.recommendation_status : null);
+  const savedCRMNote =
+    selectedDetail?.crm_notes.find((note) => note.recommendation_id === selectedWorkItem?.recommendation_id) ??
+    selectedDetail?.crm_notes[0] ??
+    null;
   const journeySteps = [
     {
       id: "select",
@@ -173,31 +222,29 @@ export function App() {
     {
       id: "decide",
       title: "Принять решение",
-      description: feedbackDecision
-        ? `Решение: ${getRecommendationStatusLabel(feedbackDecision)}`
+      description: savedFeedbackDecision
+        ? `Решение сохранено: ${getRecommendationStatusLabel(savedFeedbackDecision)}`
+        : feedbackDecision
+          ? `Готово к сохранению: ${getRecommendationStatusLabel(feedbackDecision)}`
         : "Выберите: принять, доработать или отклонить.",
-      done: Boolean(feedbackDecision),
-      active: Boolean(selectedWorkItem) && !feedbackDecision,
+      done: Boolean(savedFeedbackDecision),
+      active: Boolean(selectedWorkItem) && !savedFeedbackDecision,
     },
     {
       id: "prepare",
       title: "Подготовить артефакт",
       description: aiDraft ? "Сводка и запись в CRM готовы к проверке." : "Подготовьте сводку, запись в CRM или спросите помощника.",
       done: Boolean(aiDraft),
-      active: Boolean(selectedWorkItem) && !aiDraft,
+      active: Boolean(selectedWorkItem) && Boolean(savedFeedbackDecision) && !aiDraft,
     },
     {
       id: "save",
       title: "Закрыть цикл",
-      description:
-        selectedDetail?.crm_notes[0]?.recommendation_id === selectedWorkItem?.recommendation_id
-          ? "Результат уже сохранён в CRM и попал в историю действий."
-          : "Сохраните итог в CRM, чтобы он появился в общей сводке.",
-      done: Boolean(
-        selectedWorkItem &&
-          selectedDetail?.crm_notes.some((note) => note.recommendation_id === selectedWorkItem.recommendation_id),
-      ),
-      active: Boolean(selectedWorkItem),
+      description: savedCRMNote
+        ? "Результат уже сохранён в CRM и попал в историю действий."
+        : "Сохраните итог в CRM, чтобы он появился в общей сводке.",
+      done: Boolean(savedCRMNote),
+      active: Boolean(selectedWorkItem) && Boolean(savedFeedbackDecision),
     },
   ];
 
@@ -236,16 +283,18 @@ export function App() {
     }
   }
 
-  async function loadClientDetail(clientId: string): Promise<ClientDetailResponse> {
-    const cachedDetail = clientDetails[clientId];
+  async function loadClientDetail(clientId: string, workItemId?: string | null): Promise<ClientDetailResponse> {
+    const cacheKey = getDetailCacheKey(clientId, workItemId);
+    const cachedDetail = clientDetails[cacheKey];
     if (cachedDetail) {
       return cachedDetail;
     }
 
     setDetailLoading(true);
     try {
-      const detail = await apiGet<ClientDetailResponse>(`/client/${clientId}`);
-      setClientDetails((current) => ({ ...current, [clientId]: detail }));
+      const query = workItemId ? `?work_item_id=${encodeURIComponent(workItemId)}` : "";
+      const detail = await apiGet<ClientDetailResponse>(`/client/${clientId}${query}`);
+      setClientDetails((current) => ({ ...current, [cacheKey]: detail }));
       return detail;
     } finally {
       setDetailLoading(false);
@@ -259,17 +308,19 @@ export function App() {
       setSelectedClientId(nextClientId);
       setSelectedWorkItemId(item.id);
       setActiveTab("summary");
+      setAiDraft(null);
       setAiStatus(null);
       setAiSaveStatus(null);
     });
 
-    const detail = await loadClientDetail(nextClientId);
+    const detail = await loadClientDetail(nextClientId, item.id);
     setAiDraft(cloneDraft(detail.saved_ai_draft));
   }
 
-  async function reloadClientDetail(clientId: string) {
-    const detail = await apiGet<ClientDetailResponse>(`/client/${clientId}`);
-    setClientDetails((current) => ({ ...current, [clientId]: detail }));
+  async function reloadClientDetail(clientId: string, workItemId?: string | null) {
+    const query = workItemId ? `?work_item_id=${encodeURIComponent(workItemId)}` : "";
+    const detail = await apiGet<ClientDetailResponse>(`/client/${clientId}${query}`);
+    setClientDetails((current) => ({ ...current, [getDetailCacheKey(clientId, workItemId)]: detail }));
     return detail;
   }
 
@@ -328,10 +379,11 @@ export function App() {
       return;
     }
 
-    const detail = await reloadClientDetail(actionResult.client_id);
+    const nextWorkItem = findWorkItemByConversation(workQueue, actionResult.client_id, actionResult.conversation_id);
+    const detail = await reloadClientDetail(actionResult.client_id, nextWorkItem?.id ?? null);
     setSelectedClientId(actionResult.client_id);
-    setSelectedWorkItemId(detail.work_items[0]?.id ?? null);
-    await loadCockpit(detail.work_items[0]?.id ?? null, actionResult.client_id);
+    setSelectedWorkItemId(detail.selected_work_item_id ?? nextWorkItem?.id ?? null);
+    await loadCockpit(detail.selected_work_item_id ?? nextWorkItem?.id ?? null, actionResult.client_id);
 
     if (actionResult.draft) {
       setAiDraft(cloneDraft(actionResult.draft));
@@ -359,6 +411,7 @@ export function App() {
         thread_id: threadId,
         message,
         selected_client_id: selectedClientId,
+        selected_work_item_id: selectedWorkItemId,
       });
 
       setAssistantInput("");
@@ -405,7 +458,7 @@ export function App() {
       });
 
       setAiDraft(response.draft);
-      await reloadClientDetail(selectedDetail.client.id);
+      await reloadClientDetail(selectedDetail.client.id, selectedWorkItem?.id ?? null);
       await loadCockpit(selectedWorkItem?.id ?? null, selectedDetail.client.id);
       setActiveTab("crm");
       setAiStatus({
@@ -433,7 +486,7 @@ export function App() {
         manager_id: managerId,
         task_id: selectedWorkItem.task_id,
         recommendation_id: selectedWorkItem.recommendation_id,
-        recommendation_decision: feedbackDecision ?? "accepted",
+        recommendation_decision: savedFeedbackDecision ?? null,
         decision_comment: feedbackComment || null,
         note_text: aiDraft.crm_note_draft,
         outcome: aiDraft.outcome,
@@ -446,7 +499,7 @@ export function App() {
         ai_draft_payload: aiDraft,
       });
 
-      const detail = await reloadClientDetail(selectedDetail.client.id);
+      const detail = await reloadClientDetail(selectedDetail.client.id, selectedWorkItem.id);
       setAiDraft(cloneDraft(detail.saved_ai_draft) ?? cloneDraft(aiDraft));
       await loadCockpit(selectedWorkItem.id, selectedDetail.client.id);
       await loadSupervisorDashboard();
@@ -458,8 +511,8 @@ export function App() {
     }
   }
 
-  async function handleRecordFeedback(decision: RecommendationStatus) {
-    if (!selectedDetail || !selectedWorkItem) {
+  async function handleRecordFeedback() {
+    if (!selectedDetail || !selectedWorkItem || !feedbackDecision) {
       return;
     }
 
@@ -473,14 +526,13 @@ export function App() {
         recommendation_type: "manager_work_item",
         client_id: selectedDetail.client.id,
         conversation_id: selectedWorkItem.conversation_id,
-        decision,
+        decision: feedbackDecision,
         comment: feedbackComment || null,
         selected_variant:
           aiDraft?.crm_note_draft || aiDraft?.contact_summary || selectedWorkItem.next_best_action,
       });
 
-      setFeedbackDecision(decision);
-      await reloadClientDetail(selectedDetail.client.id);
+      await reloadClientDetail(selectedDetail.client.id, selectedWorkItem.id);
       await loadCockpit(selectedWorkItem.id, selectedDetail.client.id);
       await loadSupervisorDashboard();
       setFeedbackStatus({ type: "success", text: "Решение менеджера сохранено." });
@@ -525,6 +577,7 @@ export function App() {
     setSelectedWorkItemId(null);
     setAiDraft(null);
     setFilterQuery("");
+    setQueueFilters(DEFAULT_QUEUE_FILTERS);
     loadCockpit().catch(() => undefined);
     loadSupervisorDashboard().catch(() => undefined);
     setAssistantThreads([]);
@@ -540,11 +593,11 @@ export function App() {
     if (!selectedClientId) {
       return;
     }
-    const detail = clientDetails[selectedClientId];
+    const detail = clientDetails[getDetailCacheKey(selectedClientId, selectedWorkItemId)];
     if (detail) {
       setAiDraft((current) => current ?? cloneDraft(detail.saved_ai_draft));
     }
-  }, [clientDetails, selectedClientId]);
+  }, [clientDetails, selectedClientId, selectedWorkItemId]);
 
   useEffect(() => {
     if (!selectedDetail || !selectedWorkItem) {
@@ -554,9 +607,9 @@ export function App() {
       return;
     }
 
-    const latestFeedback = selectedDetail.recommendation_feedback.find(
-      (item) => item.recommendation_id === selectedWorkItem.recommendation_id,
-    );
+    const latestFeedback =
+      selectedDetail.recommendation_feedback.find((item) => item.recommendation_id === selectedWorkItem.recommendation_id) ??
+      null;
     setFeedbackDecision(
       latestFeedback?.decision ??
         (selectedWorkItem.recommendation_status !== "pending" ? selectedWorkItem.recommendation_status : null),
@@ -629,6 +682,8 @@ export function App() {
         <div data-tour="queue">
           <WorkQueueRail
             sections={filteredSections}
+            totalItems={workQueue.length}
+            visibleItems={filteredWorkQueue.length}
             selectedWorkItemId={selectedWorkItemId}
             filterValue={filterQuery}
             onFilterChange={setFilterQuery}
@@ -636,6 +691,11 @@ export function App() {
               selectWorkItem(item).catch(() => undefined);
             }}
             sortMode={sortMode}
+            filters={queueFilters}
+            productOptions={productOptions}
+            onChangeQueueFilter={(name, value) => {
+              setQueueFilters((current) => ({ ...current, [name]: value }));
+            }}
           />
         </div>
 
@@ -671,12 +731,18 @@ export function App() {
                 setAiDraft(draft);
               }}
               feedbackDecision={feedbackDecision}
+              savedFeedbackDecision={savedFeedbackDecision}
               feedbackComment={feedbackComment}
               feedbackSubmitting={feedbackSubmitting}
               feedbackStatus={feedbackStatus}
+              assistantSending={assistantSending}
               onFeedbackCommentChange={setFeedbackComment}
-              onRecordFeedback={(decision) => {
-                handleRecordFeedback(decision).catch(() => undefined);
+              onFeedbackDecisionChange={setFeedbackDecision}
+              onSubmitFeedback={() => {
+                handleRecordFeedback().catch(() => undefined);
+              }}
+              onQuickAssistantAction={(message) => {
+                handleSendAssistantMessage(message).catch(() => undefined);
               }}
             />
           )}

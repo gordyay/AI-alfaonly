@@ -35,9 +35,19 @@ class ManagerCockpitService:
         reference_now = now or utc_now()
         clients = storage.list_clients(manager_id=manager_id)
         tasks = storage.list_tasks(manager_id=manager_id)
+        products_by_id = {product.id: product for product in storage.list_products()}
 
         clients_by_id = {client.id: client for client in clients}
-        latest_conversations = storage.list_latest_conversations([client.id for client in clients])
+        client_conversations = {client.id: storage.list_client_conversations(client.id) for client in clients}
+        latest_conversations = {
+            client.id: (client_conversations[client.id][0] if client_conversations[client.id] else None)
+            for client in clients
+        }
+        conversations_by_id = {
+            conversation.id: conversation
+            for conversations in client_conversations.values()
+            for conversation in conversations
+        }
         task_items: list[WorkItem] = []
         communication_items: list[WorkItem] = []
         opportunity_items: list[WorkItem] = []
@@ -50,7 +60,8 @@ class ManagerCockpitService:
                 self._build_task_item(
                     client=client,
                     task=task,
-                    conversation=latest_conversations.get(client.id),
+                    conversation=conversations_by_id.get(task.linked_conversation_id) or latest_conversations.get(client.id),
+                    product_name=products_by_id.get(task.product_code).name if task.product_code in products_by_id else None,
                     now=reference_now,
                 )
             )
@@ -64,6 +75,10 @@ class ManagerCockpitService:
                         client=client,
                         conversation=conversation,
                         recommendation=recommendation,
+                        product_name=products_by_id.get(conversation.insights.mentioned_product_codes[0]).name
+                        if conversation and conversation.insights and conversation.insights.mentioned_product_codes
+                        and conversation.insights.mentioned_product_codes[0] in products_by_id
+                        else None,
                         now=reference_now,
                     )
                 )
@@ -72,6 +87,10 @@ class ManagerCockpitService:
                     client=client,
                     conversation=conversation,
                     recommendation=recommendation,
+                    product_name=products_by_id.get(conversation.insights.mentioned_product_codes[0]).name
+                    if conversation and conversation.insights and conversation.insights.mentioned_product_codes
+                    and conversation.insights.mentioned_product_codes[0] in products_by_id
+                    else None,
                     now=reference_now,
                 )
                 if opportunity is not None:
@@ -103,21 +122,21 @@ class ManagerCockpitService:
                 title="План на сегодня",
                 subtitle="Задачи менеджера с понятной бизнес-целью и сроком.",
                 item_type=WorkItemType.task,
-                items=task_items[:6],
+                items=task_items,
             ),
             CockpitSection(
                 id="urgent-communications",
                 title="Срочные коммуникации",
                 subtitle="Клиенты, которым нужно ответить или вернуться с follow-up.",
                 item_type=WorkItemType.communication,
-                items=communication_items[:6],
+                items=communication_items,
             ),
             CockpitSection(
                 id="product-opportunities",
                 title="Коммерческие возможности",
                 subtitle="Opportunity-слой: где есть шанс перевести клиента к следующему шагу.",
                 item_type=WorkItemType.opportunity,
-                items=opportunity_items[:6],
+                items=opportunity_items,
             ),
         ]
 
@@ -178,6 +197,7 @@ class ManagerCockpitService:
         client: Client,
         task: Task,
         conversation: Conversation | None,
+        product_name: str | None,
         now: datetime,
     ) -> WorkItem:
         urgency = self._task_urgency(task, now)
@@ -232,6 +252,8 @@ class ManagerCockpitService:
             conversation_id=task.linked_conversation_id,
             source_system=task.source_system,
             product_code=task.product_code,
+            product_name=product_name,
+            client_churn_risk=client.churn_risk,
         )
 
     def _build_communication_item(
@@ -240,6 +262,7 @@ class ManagerCockpitService:
         client: Client,
         conversation: Conversation | None,
         recommendation,
+        product_name: str | None,
         now: datetime,
     ) -> WorkItem:
         assert conversation is not None
@@ -284,6 +307,9 @@ class ManagerCockpitService:
             channel=conversation.channel,
             conversation_id=conversation.id,
             source_system="dialog_engine",
+            product_code=(conversation.insights.mentioned_product_codes[0] if conversation.insights and conversation.insights.mentioned_product_codes else None),
+            product_name=product_name,
+            client_churn_risk=client.churn_risk,
         )
 
     def _build_opportunity_item(
@@ -292,6 +318,7 @@ class ManagerCockpitService:
         client: Client,
         conversation: Conversation | None,
         recommendation,
+        product_name: str | None,
         now: datetime,
     ) -> WorkItem | None:
         if conversation is None:
@@ -349,6 +376,8 @@ class ManagerCockpitService:
             conversation_id=conversation.id,
             source_system="opportunity_engine",
             product_code=(conversation.insights.mentioned_product_codes[0] if conversation.insights and conversation.insights.mentioned_product_codes else None),
+            product_name=product_name,
+            client_churn_risk=client.churn_risk,
         )
 
     @staticmethod

@@ -39,11 +39,15 @@ interface FocusPanelProps {
   onCopyCRM: () => void;
   onUpdateDraft: (draft: AISummaryDraft) => void;
   feedbackDecision?: RecommendationStatus | null;
+  savedFeedbackDecision?: RecommendationStatus | null;
   feedbackComment: string;
   feedbackSubmitting: boolean;
   feedbackStatus?: { type: "loading" | "success" | "error"; text: string } | null;
+  assistantSending: boolean;
   onFeedbackCommentChange: (value: string) => void;
-  onRecordFeedback: (decision: RecommendationStatus) => void;
+  onFeedbackDecisionChange: (decision: RecommendationStatus) => void;
+  onSubmitFeedback: () => void;
+  onQuickAssistantAction: (message: string) => void;
 }
 
 const TABS: Array<{ id: ViewTab; label: string }> = [
@@ -77,11 +81,15 @@ export function FocusPanel({
   onCopyCRM,
   onUpdateDraft,
   feedbackDecision,
+  savedFeedbackDecision,
   feedbackComment,
   feedbackSubmitting,
   feedbackStatus,
+  assistantSending,
   onFeedbackCommentChange,
-  onRecordFeedback,
+  onFeedbackDecisionChange,
+  onSubmitFeedback,
+  onQuickAssistantAction,
 }: FocusPanelProps) {
   if (!detail || !workItem) {
     return (
@@ -196,57 +204,7 @@ export function FocusPanel({
 
           <aside className="content-stack">
             <section className="content-card">
-              <h3>Решение по рекомендации</h3>
-              <p className="insight">
-                Зафиксируйте, что вы сделали с рекомендацией, чтобы замкнуть цикл и отразить результат в сводке по использованию помощника.
-              </p>
-              <div className="button-row">
-                <button
-                  className={`ghost-button${feedbackDecision === "accepted" ? " is-selected" : ""}`}
-                  type="button"
-                  onClick={() => onRecordFeedback("accepted")}
-                  disabled={feedbackSubmitting}
-                >
-                  Принять
-                </button>
-                <button
-                  className={`ghost-button${feedbackDecision === "edited" ? " is-selected" : ""}`}
-                  type="button"
-                  onClick={() => onRecordFeedback("edited")}
-                  disabled={feedbackSubmitting}
-                >
-                  Доработать
-                </button>
-                <button
-                  className={`ghost-button${feedbackDecision === "rejected" ? " is-selected" : ""}`}
-                  type="button"
-                  onClick={() => onRecordFeedback("rejected")}
-                  disabled={feedbackSubmitting}
-                >
-                  Отклонить
-                </button>
-              </div>
-              <label className="field">
-                <span>Комментарий к решению</span>
-                <textarea
-                  rows={3}
-                  value={feedbackComment}
-                  onChange={(event) => onFeedbackCommentChange(event.target.value)}
-                  placeholder="Почему рекомендация принята, доработана или отклонена"
-                />
-              </label>
-              <StatusMessage type={feedbackStatus?.type} message={feedbackStatus?.text} />
-              {currentFeedback ? (
-                <div className="stack-card">
-                  <strong>Последнее решение: {getRecommendationStatusLabel(currentFeedback.decision)}</strong>
-                  <p>{currentFeedback.comment || "Комментарий не указан."}</p>
-                  <small>{formatDateTime(currentFeedback.created_at)}</small>
-                </div>
-              ) : null}
-            </section>
-
-            <section className="content-card">
-              <h3>Почему кейс важен</h3>
+              <h3>Почему этот кейс в фокусе</h3>
               <p className="insight">{workItem.expected_benefit}</p>
               <div className="chip-row">
                 {workItem.why.map((reason) => (
@@ -263,6 +221,120 @@ export function FocusPanel({
                   </article>
                 ))}
               </div>
+            </section>
+
+            <section className="content-card">
+              <h3>Решение и следующий шаг</h3>
+              <div className="stack-list">
+                <article className="stack-card">
+                  <strong>Бизнес-цель кейса</strong>
+                  <p>{workItem.business_goal || "Нужно закрыть точный следующий шаг без потери темпа."}</p>
+                </article>
+                <article className="stack-card">
+                  <strong>Рекомендуемое действие</strong>
+                  <p>{workItem.next_best_action}</p>
+                </article>
+                <article className="stack-card">
+                  <strong>Продуктовый фокус</strong>
+                  <p>{workItem.product_name || "Явный продукт не выделен, фокус идёт по кейсу и следующему действию."}</p>
+                </article>
+              </div>
+            </section>
+
+            <section className="content-card">
+              <h3>AI-действия по кейсу</h3>
+              <p className="insight">
+                Главный путь теперь идёт из центра: сначала выберите действие по кейсу, затем при необходимости углубляйтесь в правую колонку.
+              </p>
+              <div className="button-row">
+                <button
+                  className="ghost-button"
+                  type="button"
+                  onClick={() => onQuickAssistantAction("Подготовь скрипт продажи по текущему кейсу")}
+                  disabled={assistantSending}
+                >
+                  {assistantSending ? "Готовим..." : "Подготовить скрипт"}
+                </button>
+                <button
+                  className="ghost-button"
+                  type="button"
+                  onClick={() => onQuickAssistantAction("Как отработать возражение по текущему кейсу?")}
+                  disabled={assistantSending}
+                >
+                  Разбор возражения
+                </button>
+                <button
+                  className="ghost-button"
+                  type="button"
+                  onClick={onGenerateSummary}
+                  disabled={aiLoading}
+                >
+                  {aiLoading ? "Готовим сводку..." : "Подготовить CRM"}
+                </button>
+              </div>
+              <p className="insight">
+                Скрипт и objection workflow запускаются из этого кейса и собираются по выбранной коммуникации, а не по клиенту “вообще”.
+              </p>
+            </section>
+
+            <section className="content-card">
+              <h3>Решение по рекомендации</h3>
+              <p className="insight">
+                Сначала выберите статус, затем отдельно сохраните решение. Это убирает случайные клики и оставляет чистый audit trail.
+              </p>
+              <div className="button-row">
+                <button
+                  className={`ghost-button${feedbackDecision === "accepted" ? " is-selected" : ""}`}
+                  type="button"
+                  onClick={() => onFeedbackDecisionChange("accepted")}
+                  disabled={feedbackSubmitting}
+                >
+                  Принять
+                </button>
+                <button
+                  className={`ghost-button${feedbackDecision === "edited" ? " is-selected" : ""}`}
+                  type="button"
+                  onClick={() => onFeedbackDecisionChange("edited")}
+                  disabled={feedbackSubmitting}
+                >
+                  Доработать
+                </button>
+                <button
+                  className={`ghost-button${feedbackDecision === "rejected" ? " is-selected" : ""}`}
+                  type="button"
+                  onClick={() => onFeedbackDecisionChange("rejected")}
+                  disabled={feedbackSubmitting}
+                >
+                  Отклонить
+                </button>
+              </div>
+              <label className="field">
+                <span>Комментарий к решению</span>
+                <textarea
+                  rows={3}
+                  value={feedbackComment}
+                  onChange={(event) => onFeedbackCommentChange(event.target.value)}
+                  placeholder="Почему рекомендация принята, доработана или отклонена"
+                />
+              </label>
+              <button
+                className="primary-button"
+                type="button"
+                onClick={onSubmitFeedback}
+                disabled={feedbackSubmitting || !feedbackDecision}
+              >
+                {feedbackSubmitting ? "Сохраняем решение..." : "Зафиксировать решение"}
+              </button>
+              <StatusMessage type={feedbackStatus?.type} message={feedbackStatus?.text} />
+              {currentFeedback ? (
+                <div className="stack-card">
+                  <strong>
+                    Последнее решение: {getRecommendationStatusLabel(savedFeedbackDecision || currentFeedback.decision)}
+                  </strong>
+                  <p>{currentFeedback.comment || "Комментарий не указан."}</p>
+                  <small>{formatDateTime(currentFeedback.created_at)}</small>
+                </div>
+              ) : null}
             </section>
 
             <section className="content-card">

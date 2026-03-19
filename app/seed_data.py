@@ -160,6 +160,50 @@ def seed_mvp_data(storage: SQLiteStorage) -> None:
                 None,
                 "travel|premium-card|active-chat",
             ),
+            (
+                "c7",
+                "Наталья Белова",
+                "Alfa Only",
+                "moderate",
+                "m1",
+                39,
+                "Москва",
+                "chat",
+                "married",
+                "Партнер в консалтинге",
+                "high",
+                11800000.0,
+                1450000.0,
+                "medium",
+                (now - timedelta(days=4)).isoformat(),
+                (now + timedelta(hours=9)).isoformat(),
+                "Ожидает короткие персональные follow-up, часто реагирует на сервисные и travel-темы.",
+                None,
+                None,
+                "travel|service|campaign",
+            ),
+            (
+                "c8",
+                "Сергей Лебедев",
+                "Alfa Only",
+                "conservative",
+                "m1",
+                54,
+                "Москва",
+                "call",
+                "married",
+                "Управляющий партнер",
+                "very_high",
+                33500000.0,
+                3800000.0,
+                "high",
+                (now - timedelta(days=9)).isoformat(),
+                (now + timedelta(hours=7)).isoformat(),
+                "Нужен дисциплинированный контакт по ликвидности и удержанию части средств в банке.",
+                None,
+                None,
+                "retention|liquidity|vip",
+            ),
         ]
     )
     storage.insert_client_products(
@@ -176,6 +220,10 @@ def seed_mvp_data(storage: SQLiteStorage) -> None:
             ("c6", "p1", "active", 180000.0, (now - timedelta(days=300)).isoformat()),
             ("c6", "p2", "active", 960000.0, (now - timedelta(days=200)).isoformat()),
             ("c6", "p4", "active", 42000.0, (now - timedelta(days=25)).isoformat()),
+            ("c7", "p1", "active", 260000.0, (now - timedelta(days=430)).isoformat()),
+            ("c7", "p4", "active", 56000.0, (now - timedelta(days=120)).isoformat()),
+            ("c8", "p1", "active", 720000.0, (now - timedelta(days=980)).isoformat()),
+            ("c8", "p3", "active", 16400000.0, (now - timedelta(days=210)).isoformat()),
         ]
     )
     storage.insert_tasks(
@@ -276,16 +324,67 @@ def seed_mvp_data(storage: SQLiteStorage) -> None:
                 "conv4",
                 "p1",
             ),
+            (
+                "task-7",
+                "c7",
+                "Отправить подборку travel-сервиса",
+                "Подготовить короткий follow-up по travel-benefits и сервисным опциям без перегруза условиями.",
+                "new",
+                (now + timedelta(hours=9)).isoformat(),
+                (now - timedelta(hours=2, minutes=30)).isoformat(),
+                ChannelType.chat.value,
+                "medium",
+                "service_follow_up",
+                "Удержать высокий интерес к сервису и перевести его в follow-up по премиальной карте",
+                "crm",
+                "conv7",
+                "p1",
+            ),
+            (
+                "task-8",
+                "c8",
+                "Согласовать окно по ликвидности",
+                "Собрать короткий call-brief по размещению остатка и удержанию части средств в банке.",
+                "new",
+                (now + timedelta(hours=7)).isoformat(),
+                (now - timedelta(hours=4, minutes=20)).isoformat(),
+                ChannelType.call.value,
+                "high",
+                "retention_follow_up",
+                "Не потерять окно для удержания ликвидности и обновления краткосрочного размещения",
+                "sfa",
+                "conv8",
+                "p3",
+            ),
+            (
+                "task-9",
+                "c1",
+                "Разобрать отдельный запрос по сервису карты",
+                "После продуктового сценария коротко закрыть сервисный вопрос по премиальной карте и не смешивать его с инвест-оффером.",
+                "new",
+                (now + timedelta(hours=20)).isoformat(),
+                (now - timedelta(hours=1, minutes=40)).isoformat(),
+                ChannelType.chat.value,
+                "medium",
+                "service_follow_up",
+                "Сохранить точность кейса и не смешать сервисный запрос с инвестиционной коммуникацией",
+                "crm",
+                "conv1b",
+                "p1",
+            ),
         ]
     )
     storage.insert_conversations(
         [
-            ("conv1", "c1", ChannelType.chat.value, "Инвестиционные идеи", (now - timedelta(days=1)).isoformat()),
+            ("conv1", "c1", ChannelType.chat.value, "Инвестиционные идеи", (now - timedelta(days=2)).isoformat()),
+            ("conv1b", "c1", ChannelType.chat.value, "Сервис по премиальной карте", (now - timedelta(hours=8)).isoformat()),
             ("conv2", "c2", ChannelType.call.value, "Обновление портфеля", (now - timedelta(hours=6)).isoformat()),
             ("conv5", "c3", ChannelType.chat.value, "Валютные идеи и брокерский счет", (now - timedelta(days=2)).isoformat()),
             ("conv3", "c4", ChannelType.chat.value, "Возврат в коммуникацию", (now - timedelta(days=6)).isoformat()),
             ("conv6", "c5", ChannelType.chat.value, "Размещение свободной ликвидности", (now - timedelta(days=1, hours=4)).isoformat()),
             ("conv4", "c6", ChannelType.chat.value, "Премиальные travel-benefits", (now - timedelta(hours=18)).isoformat()),
+            ("conv7", "c7", ChannelType.chat.value, "Travel-сервис и benefits", (now - timedelta(hours=11)).isoformat()),
+            ("conv8", "c8", ChannelType.call.value, "Краткосрочное размещение ликвидности", (now - timedelta(hours=9, minutes=30)).isoformat()),
         ]
     )
     messages: list[tuple[str, str, str, str, str]] = []
@@ -301,6 +400,20 @@ def seed_mvp_data(storage: SQLiteStorage) -> None:
                 ("manager", "Сделаю это отдельной колонкой в сравнении. Также добавлю пример распределения на 6 и 12 месяцев.", now - timedelta(days=1, hours=1, minutes=39)),
                 ("client", "Хорошо. И давайте без длинной презентации, лучше коротко и по цифрам.", now - timedelta(days=1, hours=1, minutes=27)),
                 ("manager", "Принято. Завтра после 12:00 пришлю компактную таблицу и короткий вывод по каждому сценарию.", now - timedelta(days=1, hours=1, minutes=20)),
+            ],
+        )
+    )
+    messages.extend(
+        _message_rows(
+            "conv1b",
+            [
+                ("client", "Иван, еще отдельно вопрос по премиальной карте: какие сейчас travel-привилегии реально работают в поездках?", now - timedelta(hours=8, minutes=34)),
+                ("manager", "Добрый день. Могу прислать короткий список: lounge, страховка, fast track и ограничения по пакетам.", now - timedelta(hours=8, minutes=29)),
+                ("client", "Да, только коротко. Не хочу смешивать это с инвестиционным предложением и точно не хочу лишнего риска или сложных условий.", now - timedelta(hours=8, minutes=22)),
+                ("manager", "Согласен, вынесу в отдельное сообщение и без лишних деталей.", now - timedelta(hours=8, minutes=18)),
+                ("client", "Отлично. Если есть 2-3 самых полезных пункта, этого будет достаточно.", now - timedelta(hours=8, minutes=11)),
+                ("manager", "Тогда соберу компактную подборку и пришлю отдельно вечером.", now - timedelta(hours=8, minutes=5)),
+                ("client", "Хорошо, тогда жду отдельный короткий сервисный follow-up сегодня вечером.", now - timedelta(hours=7, minutes=59)),
             ],
         )
     )
@@ -379,6 +492,32 @@ def seed_mvp_data(storage: SQLiteStorage) -> None:
             ],
         )
     )
+    messages.extend(
+        _message_rows(
+            "conv7",
+            [
+                ("client", "Наталья, добрый день. Подскажите, можно ли коротко собрать travel-benefits по карте перед поездкой?", now - timedelta(hours=11, minutes=18)),
+                ("manager", "Да, подготовлю короткий список с lounge, страховкой и сервисом в поездках.", now - timedelta(hours=11, minutes=12)),
+                ("client", "Супер. Мне важно, чтобы это было в одном сообщении и без длинных условий.", now - timedelta(hours=11, minutes=7)),
+                ("manager", "Принял. Сделаю подборку в формате 3 пункта плюс что нужно активировать.", now - timedelta(hours=11, minutes=1)),
+                ("client", "И отдельно, если можно, отметьте, где есть реальная сервисная ценность, а не просто формальные опции.", now - timedelta(hours=10, minutes=54)),
+                ("manager", "Да, выделю именно практические benefits и добавлю короткий next step.", now - timedelta(hours=10, minutes=47)),
+            ],
+        )
+    )
+    messages.extend(
+        _message_rows(
+            "conv8",
+            [
+                ("manager", "Сергей, добрый день. Хотел предложить коротко обсудить размещение части свободной ликвидности на коротком сроке.", now - timedelta(hours=9, minutes=26)),
+                ("client", "Добрый день. Можно, но только с очень понятным сравнением и без расплывчатых идей.", now - timedelta(hours=9, minutes=20)),
+                ("manager", "Понял. Подготовлю короткий call-brief по вкладу, короткой облигационной альтернативе и срокам выхода.", now - timedelta(hours=9, minutes=14)),
+                ("client", "Хорошо. И отдельно скажите, что имеет смысл удерживать в банке, а что оставить свободным.", now - timedelta(hours=9, minutes=10)),
+                ("manager", "Да, это будет отдельным блоком: сколько держать ликвидным, сколько можно разместить без дискомфорта.", now - timedelta(hours=9, minutes=4)),
+                ("client", "Тогда давайте созвонимся, если успеете прислать короткий ориентир заранее.", now - timedelta(hours=8, minutes=58)),
+            ],
+        )
+    )
     storage.insert_messages(messages)
     storage.insert_conversation_insights(
         [
@@ -397,6 +536,22 @@ def seed_mvp_data(storage: SQLiteStorage) -> None:
                 "risk|liquidity|avoid_long_presentation",
                 "p2|p3",
                 "send_comparison|emphasize_liquidity|keep_message_short",
+            ),
+            (
+                "conv1b",
+                "neutral",
+                "normal",
+                "high",
+                9,
+                6,
+                (now.replace(hour=19, minute=30, second=0, microsecond=0)).isoformat(),
+                "Отдельно отправить короткую подборку по travel-benefits без смешения с инвестиционным кейсом",
+                ChannelType.chat.value,
+                "short",
+                "travel|premium_card|service",
+                "risk|avoid_topic_mixing|keep_message_short",
+                "p1|p4",
+                "keep_message_short|separate_topics|send_comparison",
             ),
             (
                 "conv2",
@@ -477,6 +632,38 @@ def seed_mvp_data(storage: SQLiteStorage) -> None:
                 "mobile_format_only",
                 "p1|p4",
                 "keep_message_short|send_comparison",
+            ),
+            (
+                "conv7",
+                "interested",
+                "normal",
+                "high",
+                7,
+                6,
+                (now.replace(hour=18, minute=30, second=0, microsecond=0)).isoformat(),
+                "Отправить короткий travel-follow-up в одном сообщении с сервисной ценностью",
+                ChannelType.chat.value,
+                "short",
+                "travel|service|premium_card",
+                "avoid_long_terms|mobile_format_only",
+                "p1|p4",
+                "keep_message_short|send_comparison|emphasize_service",
+            ),
+            (
+                "conv8",
+                "neutral",
+                "high",
+                "speed_sensitive",
+                8,
+                5,
+                (now.replace(hour=15, minute=0, second=0, microsecond=0)).isoformat(),
+                "До звонка отправить короткий ориентир по размещению ликвидности и удержанию части средств",
+                ChannelType.call.value,
+                "comparison",
+                "liquidity|retention|deposit",
+                "needs_precision|avoid_long_presentation",
+                "p3|p2",
+                "prepare_call|send_comparison|emphasize_liquidity",
             ),
         ]
     )

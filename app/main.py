@@ -111,6 +111,83 @@ def create_app(
             )
         )
 
+    def work_item_matches_note(work_item, note: CRMNote) -> bool:
+        return any(
+            (
+                work_item.recommendation_id and note.recommendation_id == work_item.recommendation_id,
+                work_item.conversation_id and note.source_conversation_id == work_item.conversation_id,
+                work_item.task_id and note.task_id == work_item.task_id,
+            )
+        )
+
+    def build_case_view(client_id: str, manager_id: str, work_item_id: str | None = None) -> dict:
+        cockpit = cockpit_service.build_manager_cockpit(storage=storage, manager_id=manager_id)
+        client_work_items = [item for item in cockpit.work_queue if item.client_id == client_id]
+        selected_work_item = (
+            next((item for item in client_work_items if item.id == work_item_id), None)
+            if work_item_id
+            else None
+        ) or (client_work_items[0] if client_work_items else None)
+        conversations = storage.list_client_conversations(client_id)
+        selected_conversation = (
+            next(
+                (conversation for conversation in conversations if conversation.id == selected_work_item.conversation_id),
+                None,
+            )
+            if selected_work_item and selected_work_item.conversation_id
+            else None
+        )
+
+        crm_notes = storage.list_client_crm_notes(client_id)
+        case_crm_notes = (
+            [note for note in crm_notes if work_item_matches_note(selected_work_item, note)]
+            if selected_work_item
+            else crm_notes
+        )
+        feedback = storage.list_feedback(manager_id=manager_id, client_id=client_id, limit=20)
+        if selected_work_item is not None:
+            feedback = [
+                item
+                for item in feedback
+                if item.recommendation_id == selected_work_item.recommendation_id
+                or (selected_work_item.conversation_id and item.conversation_id == selected_work_item.conversation_id)
+            ]
+        activity_log = storage.list_client_activity_logs(client_id)
+        if selected_work_item is not None:
+            activity_log = [
+                entry
+                for entry in activity_log
+                if entry.recommendation_id == selected_work_item.recommendation_id
+                or (selected_work_item.conversation_id and entry.conversation_id == selected_work_item.conversation_id)
+            ]
+        follow_ups = storage.list_client_follow_ups(client_id)
+        if case_crm_notes:
+            case_note_ids = {note.id for note in case_crm_notes}
+            follow_ups = [item for item in follow_ups if item.crm_note_id in case_note_ids]
+        elif selected_work_item is not None:
+            follow_ups = []
+
+        saved_ai_draft = next(
+            (
+                note.ai_draft_payload
+                for note in case_crm_notes
+                if note.ai_generated and note.ai_draft_payload is not None
+            ),
+            None,
+        )
+        return {
+            "cockpit": cockpit,
+            "work_items": client_work_items,
+            "selected_work_item": selected_work_item,
+            "conversations": conversations,
+            "selected_conversation": selected_conversation,
+            "crm_notes": case_crm_notes,
+            "feedback": feedback,
+            "activity_log": activity_log,
+            "follow_ups": follow_ups,
+            "saved_ai_draft": saved_ai_draft,
+        }
+
     @app.get("/", include_in_schema=False)
     async def index():
         return HTMLResponse((app_settings.static_dir / "index.html").read_text(encoding="utf-8"))
@@ -165,45 +242,45 @@ def create_app(
         return {"items": dialog_service.list_manager_dialogs(storage=storage, manager_id=manager_id, sort_by=sort_by)}
 
     @app.get("/client/{client_id}")
-    async def get_client(client_id: str):
+    async def get_client(client_id: str, work_item_id: str | None = Query(default=None)):
         client = storage.get_client(client_id)
         if not client:
             raise HTTPException(status_code=404, detail="Client not found")
 
-        conversations = storage.list_client_conversations(client_id)
-        latest_conversation = conversations[0] if conversations else None
-        crm_notes = storage.list_client_crm_notes(client_id)
+        case_view = build_case_view(client_id, client.manager_id, work_item_id=work_item_id)
+        selected_work_item = case_view["selected_work_item"]
+        if work_item_id and selected_work_item is None:
+            raise HTTPException(status_code=404, detail="Work item not found for client")
+
+        conversations = case_view["conversations"]
+        selected_conversation = case_view["selected_conversation"]
         propensity = propensity_service.build_client_propensity(storage=storage, client=client)
         objection_workflow = (
             objection_service.build_workflow(
                 provider=app.state.ai_provider,
                 client=client,
-                conversation=latest_conversation,
+                conversation=selected_conversation,
             )
-            if latest_conversation is not None
+            if selected_conversation is not None
             else None
         )
-        saved_ai_draft = next(
-            (note.ai_draft_payload for note in crm_notes if note.ai_generated and note.ai_draft_payload is not None),
-            None,
-        )
-        cockpit = cockpit_service.build_manager_cockpit(storage=storage, manager_id=client.manager_id)
-        client_work_items = [item for item in cockpit.work_queue if item.client_id == client_id]
 
         return {
             "client": client,
             "tasks": storage.list_client_tasks(client_id),
             "conversations": conversations,
-            "dialog_recommendation": dialog_service.build_recommendation(client=client, conversation=latest_conversation),
-            "work_items": client_work_items,
+            "selected_work_item_id": selected_work_item.id if selected_work_item else None,
+            "selected_conversation_id": selected_conversation.id if selected_conversation else None,
+            "dialog_recommendation": dialog_service.build_recommendation(client=client, conversation=selected_conversation),
+            "work_items": case_view["work_items"],
             "product_propensity": propensity,
             "objection_workflow": objection_workflow,
-            "crm_notes": crm_notes,
-            "follow_ups": storage.list_client_follow_ups(client_id),
-            "recommendation_feedback": storage.list_feedback(manager_id=client.manager_id, client_id=client_id, limit=20),
-            "activity_log": storage.list_client_activity_logs(client_id),
-            "generated_artifacts": cockpit_service.build_client_artifacts(client, crm_notes),
-            "saved_ai_draft": saved_ai_draft,
+            "crm_notes": case_view["crm_notes"],
+            "follow_ups": case_view["follow_ups"],
+            "recommendation_feedback": case_view["feedback"],
+            "activity_log": case_view["activity_log"],
+            "generated_artifacts": cockpit_service.build_client_artifacts(client, case_view["crm_notes"]),
+            "saved_ai_draft": case_view["saved_ai_draft"],
         }
 
     @app.get("/client/{client_id}/activity-log")
@@ -249,6 +326,8 @@ def create_app(
                 thread_id=payload.thread_id,
                 message=payload.message,
                 selected_client_id=payload.selected_client_id,
+                selected_work_item_id=payload.selected_work_item_id,
+                cockpit_service=cockpit_service,
                 log_activity=log_activity,
             )
         except ValueError as exc:
@@ -443,7 +522,7 @@ def create_app(
             created_at=datetime.now(UTC),
         )
         created = storage.create_crm_note(note)
-        if payload.recommendation_id:
+        if payload.recommendation_id and payload.recommendation_decision is not None:
             feedback = storage.add_feedback(
                 FeedbackRequest(
                     recommendation_id=payload.recommendation_id,
@@ -451,7 +530,7 @@ def create_app(
                     recommendation_type="manager_work_item",
                     client_id=payload.client_id,
                     conversation_id=payload.source_conversation_id,
-                    decision=payload.recommendation_decision or FeedbackDecision.accepted,
+                    decision=payload.recommendation_decision,
                     comment=payload.decision_comment or "Решение зафиксировано вместе с CRM-заметкой.",
                     selected_variant=payload.note_text[:240],
                 )

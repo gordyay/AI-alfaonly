@@ -243,6 +243,8 @@ class WorkItem(BaseModel):
     conversation_id: Optional[str] = None
     source_system: Optional[str] = None
     product_code: Optional[str] = None
+    product_name: Optional[str] = None
+    client_churn_risk: Optional[str] = None
 
 
 class CockpitSection(BaseModel):
@@ -506,6 +508,7 @@ class AssistantChatRequest(BaseModel):
     thread_id: str
     message: str
     selected_client_id: Optional[str] = None
+    selected_work_item_id: Optional[str] = None
 
 
 class AssistantChatResponse(BaseModel):

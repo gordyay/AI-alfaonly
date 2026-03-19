@@ -1,4 +1,20 @@
-import type { AISummaryDraft, Conversation, ProductPropensityResponse, WorkItem, WorkItemType } from "../types";
+import type {
+  AISummaryDraft,
+  CockpitSection,
+  Conversation,
+  ProductPropensityResponse,
+  WorkItem,
+  WorkItemType,
+} from "../types";
+
+export interface WorkQueueFilters {
+  itemType: string;
+  productCode: string;
+  priorityLabel: string;
+  recommendationStatus: string;
+  churnRisk: string;
+  channel: string;
+}
 
 export function formatDateTime(value?: string | null): string {
   if (!value) {
@@ -107,10 +123,10 @@ export function getConversationForWorkItem(
   }
 
   if (workItem?.conversation_id) {
-    return conversations.find((conversation) => conversation.id === workItem.conversation_id) ?? conversations[0];
+    return conversations.find((conversation) => conversation.id === workItem.conversation_id) ?? null;
   }
 
-  return conversations[0];
+  return null;
 }
 
 export function getMiniSummaryCopy(args: {
@@ -137,20 +153,60 @@ export function cloneDraft<T>(draft: T | null | undefined): T | null {
   return JSON.parse(JSON.stringify(draft)) as T;
 }
 
-export function filterSectionsByQuery<T extends { title: string; client_name: string; summary: string }>(
-  sections: Array<{ id: string; title: string; subtitle: string; items: T[] }>,
-  query: string,
-) {
-  if (!query) {
-    return sections;
-  }
+export function filterWorkQueue(items: WorkItem[], query: string, filters: WorkQueueFilters): WorkItem[] {
+  return items.filter((item) => {
+    const matchesQuery =
+      !query ||
+      `${item.title} ${item.client_name} ${item.summary} ${item.product_name || ""} ${item.business_goal || ""}`
+        .toLowerCase()
+        .includes(query);
 
-  return sections
-    .map((section) => ({
-      ...section,
-      items: section.items.filter((item) =>
-        `${item.title} ${item.client_name} ${item.summary}`.toLowerCase().includes(query),
-      ),
+    const matchesType = filters.itemType === "all" || item.item_type === filters.itemType;
+    const matchesProduct = filters.productCode === "all" || item.product_code === filters.productCode;
+    const matchesPriority = filters.priorityLabel === "all" || item.priority_label === filters.priorityLabel;
+    const matchesStatus =
+      filters.recommendationStatus === "all" || item.recommendation_status === filters.recommendationStatus;
+    const matchesChurn = filters.churnRisk === "all" || item.client_churn_risk === filters.churnRisk;
+    const matchesChannel = filters.channel === "all" || item.channel === filters.channel;
+
+    return (
+      matchesQuery &&
+      matchesType &&
+      matchesProduct &&
+      matchesPriority &&
+      matchesStatus &&
+      matchesChurn &&
+      matchesChannel
+    );
+  });
+}
+
+export function groupWorkQueue(items: WorkItem[]): CockpitSection[] {
+  const definitions: Array<Pick<CockpitSection, "id" | "title" | "subtitle" | "item_type">> = [
+    {
+      id: "daily-plan",
+      title: "План на сегодня",
+      subtitle: "Задачи менеджера с понятной бизнес-целью и сроком.",
+      item_type: "task",
+    },
+    {
+      id: "urgent-communications",
+      title: "Срочные коммуникации",
+      subtitle: "Кейсы, где нужно ответить или вернуться с follow-up.",
+      item_type: "communication",
+    },
+    {
+      id: "product-opportunities",
+      title: "Коммерческие возможности",
+      subtitle: "Opportunity-слой с явным продуктовым следующим шагом.",
+      item_type: "opportunity",
+    },
+  ];
+
+  return definitions
+    .map((definition) => ({
+      ...definition,
+      items: items.filter((item) => item.item_type === definition.item_type),
     }))
     .filter((section) => section.items.length > 0);
 }
@@ -177,6 +233,22 @@ export function getRecommendationTypeLabel(value?: string | null): string {
   };
 
   return labels[value] ?? value.replaceAll("_", " ");
+}
+
+export function getPriorityLabel(value?: string | null): string {
+  if (value === "urgent") {
+    return "Срочно";
+  }
+  if (value === "high") {
+    return "Высокий приоритет";
+  }
+  if (value === "medium") {
+    return "Средний приоритет";
+  }
+  if (value === "low") {
+    return "Низкий приоритет";
+  }
+  return "Без приоритета";
 }
 
 export function getActivityActionLabel(value?: string | null): string {
@@ -208,6 +280,20 @@ export function getChannelLabel(value?: string | null): string {
     meeting: "Встреча",
     phone: "Телефон",
     email: "Почта",
+  };
+
+  return labels[value] ?? value;
+}
+
+export function getChurnRiskLabel(value?: string | null): string {
+  if (!value) {
+    return "Риск не указан";
+  }
+
+  const labels: Record<string, string> = {
+    low: "Низкий риск оттока",
+    medium: "Средний риск оттока",
+    high: "Высокий риск оттока",
   };
 
   return labels[value] ?? value;
