@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import type { CockpitSection, SortMode, WorkItem } from "../types";
 import type { WorkQueueFilters } from "../lib/utils";
 import {
@@ -19,7 +20,9 @@ interface WorkQueueRailProps {
   sections: CockpitSection[];
   totalItems: number;
   visibleItems: number;
+  loading: boolean;
   selectedWorkItemId?: string | null;
+  selectedWorkItemTitle?: string | null;
   filterValue: string;
   onFilterChange: (value: string) => void;
   onSelectWorkItem: (item: WorkItem) => void;
@@ -65,10 +68,10 @@ const STATUS_OPTIONS: FilterOption[] = [
 ];
 
 const CHURN_OPTIONS: FilterOption[] = [
-  { value: "all", label: "Любой риск churn" },
-  { value: "high", label: "Высокий churn" },
-  { value: "medium", label: "Средний churn" },
-  { value: "low", label: "Низкий churn" },
+  { value: "all", label: "Любой риск оттока" },
+  { value: "high", label: "Высокий риск оттока" },
+  { value: "medium", label: "Средний риск оттока" },
+  { value: "low", label: "Низкий риск оттока" },
 ];
 
 const CHANNEL_OPTIONS: FilterOption[] = [
@@ -78,47 +81,13 @@ const CHANNEL_OPTIONS: FilterOption[] = [
   { value: "meeting", label: "Встреча" },
 ];
 
-function QueueFilters({
-  filters,
-  productOptions,
-  onChangeQueueFilter,
-}: {
-  filters: WorkQueueFilters;
-  productOptions: FilterOption[];
-  onChangeQueueFilter: (name: keyof WorkQueueFilters, value: string) => void;
-}) {
-  const controls: Array<{ name: keyof WorkQueueFilters; label: string; options: FilterOption[] }> = [
-    { name: "itemType", label: "Тип кейса", options: ITEM_TYPE_OPTIONS },
-    { name: "productCode", label: "Фокус по продукту", options: productOptions },
-    { name: "priorityLabel", label: "Срочность", options: PRIORITY_OPTIONS },
-    { name: "recommendationStatus", label: "Статус решения", options: STATUS_OPTIONS },
-    { name: "churnRisk", label: "Риск churn", options: CHURN_OPTIONS },
-    { name: "channel", label: "Канал", options: CHANNEL_OPTIONS },
-  ];
-
-  return (
-    <div className="queue-filter-grid">
-      {controls.map((control) => (
-        <label className="field" key={control.name}>
-          <span>{control.label}</span>
-          <select value={filters[control.name]} onChange={(event) => onChangeQueueFilter(control.name, event.target.value)}>
-            {control.options.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-      ))}
-    </div>
-  );
-}
-
 export function WorkQueueRail({
   sections,
   totalItems,
   visibleItems,
+  loading,
   selectedWorkItemId,
+  selectedWorkItemTitle,
   filterValue,
   onFilterChange,
   onSelectWorkItem,
@@ -127,6 +96,45 @@ export function WorkQueueRail({
   productOptions,
   onChangeQueueFilter,
 }: WorkQueueRailProps) {
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const itemRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+
+  useEffect(() => {
+    if (!selectedWorkItemId) {
+      return;
+    }
+
+    itemRefs.current[selectedWorkItemId]?.scrollIntoView({
+      block: "nearest",
+      behavior: "smooth",
+    });
+  }, [selectedWorkItemId]);
+
+  const primaryControls: Array<{ name: keyof WorkQueueFilters; label: string; options: FilterOption[] }> = [
+    { name: "itemType", label: "Тип кейса", options: ITEM_TYPE_OPTIONS },
+    { name: "priorityLabel", label: "Срочность", options: PRIORITY_OPTIONS },
+  ];
+  const secondaryControls: Array<{ name: keyof WorkQueueFilters; label: string; options: FilterOption[] }> = [
+    { name: "productCode", label: "Продукт", options: productOptions },
+    { name: "recommendationStatus", label: "Статус решения", options: STATUS_OPTIONS },
+    { name: "churnRisk", label: "Риск оттока", options: CHURN_OPTIONS },
+    { name: "channel", label: "Канал", options: CHANNEL_OPTIONS },
+  ];
+
+  const renderControls = (controls: Array<{ name: keyof WorkQueueFilters; label: string; options: FilterOption[] }>) =>
+    controls.map((control) => (
+      <label className="field" key={control.name}>
+        <span>{control.label}</span>
+        <select value={filters[control.name]} onChange={(event) => onChangeQueueFilter(control.name, event.target.value)}>
+          {control.options.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
+    ));
+
   return (
     <section className="panel rail-panel">
       <div className="panel__header panel__header--stack">
@@ -137,10 +145,17 @@ export function WorkQueueRail({
           </div>
           <div className="queue-summary-card">
             <strong>{visibleItems}</strong>
-            <span>из {totalItems} кейсов в текущем фокусе</span>
+            <span>{loading && totalItems === 0 ? "обновляем очередь" : `из ${totalItems} кейсов в текущем фокусе`}</span>
             <small>{sortMode === "priority" ? "Сортировка по приоритету" : "Сортировка по сроку"}</small>
           </div>
         </div>
+
+        {selectedWorkItemTitle ? (
+          <div className="queue-focus-banner">
+            <strong>Сейчас открыт кейс:</strong>
+            <span>{selectedWorkItemTitle}</span>
+          </div>
+        ) : null}
 
         <label className="search-field">
           <span>Поиск по клиенту, кейсу, цели или продукту</span>
@@ -152,11 +167,33 @@ export function WorkQueueRail({
           />
         </label>
 
-        <QueueFilters filters={filters} productOptions={productOptions} onChangeQueueFilter={onChangeQueueFilter} />
+        <div className="queue-filter-grid">{renderControls(primaryControls)}</div>
+
+        <div className="button-row">
+          <button className="ghost-button" type="button" onClick={() => setShowAdvancedFilters((current) => !current)}>
+            {showAdvancedFilters ? "Скрыть дополнительные фильтры" : "Показать дополнительные фильтры"}
+          </button>
+        </div>
+
+        {showAdvancedFilters ? <div className="queue-filter-grid">{renderControls(secondaryControls)}</div> : null}
       </div>
 
       <div className="rail-sections">
-        {sections.length ? (
+        {loading && totalItems === 0 ? (
+          <div className="queue-skeleton-list" aria-hidden="true">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <article className="work-item-card work-item-card--skeleton" key={index}>
+                <div className="work-item-card__score" />
+                <div className="work-item-card__avatar" />
+                <div className="work-item-card__body">
+                  <div className="skeleton-line skeleton-line--short" />
+                  <div className="skeleton-line" />
+                  <div className="skeleton-line skeleton-line--medium" />
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : sections.length ? (
           sections.map((section) => (
             <section className="cockpit-section" key={section.id}>
               <header className="cockpit-section__header">
@@ -172,6 +209,9 @@ export function WorkQueueRail({
                   <button
                     className={`work-item-card${item.id === selectedWorkItemId ? " is-active" : ""}`}
                     key={item.id}
+                    ref={(node) => {
+                      itemRefs.current[item.id] = node;
+                    }}
                     type="button"
                     onClick={() => onSelectWorkItem(item)}
                   >

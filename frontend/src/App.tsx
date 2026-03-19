@@ -16,6 +16,7 @@ import type {
   AssistantThreadDetail,
   ClientDetailResponse,
   GenerateScriptResponse,
+  HealthResponse,
   ManagerCockpit,
   ObjectionWorkflowResponse,
   RecommendationStatus,
@@ -152,8 +153,9 @@ export function App() {
   const [filterQuery, setFilterQuery] = useState("");
   const [queueFilters, setQueueFilters] = useState<WorkQueueFilters>(DEFAULT_QUEUE_FILTERS);
   const deferredQuery = useDeferredValue(filterQuery.trim().toLowerCase());
-  const [onboardingCollapsed, setOnboardingCollapsed] = useState(false);
+  const [onboardingCollapsed, setOnboardingCollapsed] = useState(true);
   const [tourOpen, setTourOpen] = useState(false);
+  const [health, setHealth] = useState<HealthResponse | null>(null);
 
   const [cockpit, setCockpit] = useState<ManagerCockpit | null>(null);
   const [cockpitLoading, setCockpitLoading] = useState(true);
@@ -223,6 +225,8 @@ export function App() {
     selectedDetail?.crm_notes.find((note) => note.recommendation_id === selectedWorkItem?.recommendation_id) ??
     selectedDetail?.crm_notes[0] ??
     null;
+  const aiEnabled = health?.ai.available ?? false;
+  const aiUnavailableMessage = health?.ai.reason ?? "AI-функции временно недоступны.";
   const journeySteps = [
     {
       id: "select",
@@ -247,10 +251,10 @@ export function App() {
       title: "Подготовить артефакт",
       description:
         aiDraft || latestScriptArtifact || latestObjectionArtifact
-          ? "Сценарий, objection flow или CRM draft готовы к проверке."
-          : "Подготовьте script, objection flow или CRM-черновик по кейсу.",
+          ? "Сценарий, разбор возражения или CRM-черновик готовы к проверке."
+          : "Подготовьте сценарий, разбор возражения или CRM-черновик по кейсу.",
       done: Boolean(aiDraft || latestScriptArtifact || latestObjectionArtifact),
-      active: Boolean(selectedWorkItem) && Boolean(savedFeedbackDecision) && !aiDraft && !latestScriptArtifact && !latestObjectionArtifact,
+      active: Boolean(selectedWorkItem) && !aiDraft && !latestScriptArtifact && !latestObjectionArtifact,
     },
     {
       id: "save",
@@ -259,9 +263,14 @@ export function App() {
         ? "Результат уже сохранён в CRM и попал в историю действий."
         : "Сохраните итог в CRM, чтобы он появился в общей сводке.",
       done: Boolean(savedCRMNote),
-      active: Boolean(selectedWorkItem) && Boolean(savedFeedbackDecision),
+      active: Boolean(selectedWorkItem) && !savedCRMNote,
     },
   ];
+
+  async function loadHealth() {
+    const response = await apiGet<HealthResponse>("/health");
+    setHealth(response);
+  }
 
   async function loadSupervisorDashboard() {
     const response = await apiGet<SupervisorDashboardResponse>(
@@ -486,8 +495,9 @@ export function App() {
       });
 
       setAiDraft(response.draft);
-      await reloadClientDetail(selectedDetail.client.id, selectedWorkItem?.id ?? null);
+      const refreshedDetail = await reloadClientDetail(selectedDetail.client.id, selectedWorkItem?.id ?? null);
       await loadCockpit(selectedWorkItem?.id ?? null, selectedDetail.client.id);
+      setAiDraft(cloneDraft(refreshedDetail.saved_ai_draft) ?? cloneDraft(response.draft));
       setActiveTab("crm");
       setAiStatus({
         type: "success",
@@ -718,14 +728,11 @@ export function App() {
 
   useEffect(() => {
     const savedValue = window.localStorage.getItem(ONBOARDING_STORAGE_KEY);
-    if (savedValue === "true") {
-      setOnboardingCollapsed(true);
+    if (savedValue !== "true") {
+      window.localStorage.setItem(ONBOARDING_STORAGE_KEY, "true");
     }
-
-    const hasSeenTour = window.localStorage.getItem(TOUR_SEEN_STORAGE_KEY) === "true";
-    if (!hasSeenTour) {
-      setTourOpen(true);
-    }
+    setOnboardingCollapsed(true);
+    loadHealth().catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -793,6 +800,7 @@ export function App() {
           stats={cockpit?.stats}
           managerId={managerId}
           sortMode={sortMode}
+          loading={cockpitLoading && !cockpit}
           onToggleSort={() => setSortMode((current) => getNextSortMode(current))}
           onToggleManager={() =>
             startTransition(() => {
@@ -821,14 +829,6 @@ export function App() {
         }}
       />
 
-      <div data-tour="journey">
-        <JourneyBar steps={journeySteps} />
-      </div>
-
-      <div data-tour="supervisor">
-        <SupervisorPanel dashboard={supervisorDashboard} />
-      </div>
-
       <GuidedTour
         open={tourOpen}
         steps={TOUR_STEPS}
@@ -852,7 +852,9 @@ export function App() {
             sections={filteredSections}
             totalItems={workQueue.length}
             visibleItems={filteredWorkQueue.length}
+            loading={cockpitLoading}
             selectedWorkItemId={selectedWorkItemId}
+            selectedWorkItemTitle={selectedWorkItem?.title ?? null}
             filterValue={filterQuery}
             onFilterChange={setFilterQuery}
             onSelectWorkItem={(item) => {
@@ -879,6 +881,8 @@ export function App() {
               detail={selectedDetail}
               workItem={selectedWorkItem}
               conversation={selectedConversation}
+              aiEnabled={aiEnabled}
+              aiUnavailableMessage={aiUnavailableMessage}
               activeTab={activeTab}
               onChangeTab={setActiveTab}
               aiDraft={aiDraft}
@@ -944,6 +948,8 @@ export function App() {
             threads={assistantThreads}
             selectedThreadId={assistantSelectedThreadId}
             threadDetail={assistantThreadDetail}
+            aiEnabled={aiEnabled}
+            aiUnavailableMessage={aiUnavailableMessage}
             loading={assistantLoading}
             sending={assistantSending}
             status={assistantStatus}
@@ -965,6 +971,17 @@ export function App() {
           />
         </div>
       </main>
+
+      <div data-tour="journey">
+        <JourneyBar
+          steps={journeySteps}
+          note="Шаги можно проходить в удобном порядке. Цикл считается завершённым, когда решение зафиксировано и итог сохранён в CRM."
+        />
+      </div>
+
+      <div data-tour="supervisor">
+        <SupervisorPanel dashboard={supervisorDashboard} />
+      </div>
     </div>
   );
 }

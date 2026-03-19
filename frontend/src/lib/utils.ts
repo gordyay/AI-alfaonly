@@ -62,7 +62,7 @@ export function getRecommendationStatusLabel(status?: string | null): string {
     return "Отклонено";
   }
   if (status === "edited") {
-    return "Изменено";
+    return "Доработано";
   }
   return "Ожидает решения";
 }
@@ -227,7 +227,9 @@ export function getRecommendationTypeLabel(value?: string | null): string {
   const labels: Record<string, string> = {
     manager_work_item: "Рекомендация менеджеру",
     dialog_summary: "Сводка диалога",
+    mini_summary: "Краткая сводка",
     crm_note: "CRM-заметка",
+    crm_note_draft: "Черновик CRM",
     objection_workflow: "Разбор возражения",
     sales_script: "Скрипт продажи",
   };
@@ -303,6 +305,14 @@ export function getChurnRiskLabel(value?: string | null): string {
   };
 
   return labels[value] ?? value;
+}
+
+export function formatProductCode(value?: string | null): string {
+  if (!value) {
+    return "Продукт не указан";
+  }
+
+  return value.toUpperCase();
 }
 
 export function getToneLabel(value?: string | null): string {

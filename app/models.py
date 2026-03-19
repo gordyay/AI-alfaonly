@@ -686,6 +686,7 @@ class SupervisorDecisionBreakdown(BaseModel):
 
 class SupervisorProductDistribution(BaseModel):
     product_code: str
+    product_name: Optional[str] = None
     count: int
 
 

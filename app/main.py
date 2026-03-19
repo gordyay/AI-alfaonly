@@ -80,6 +80,17 @@ def create_app(
     app.state.settings = app_settings
     app.mount("/static", StaticFiles(directory=app_settings.static_dir), name="static")
 
+    def get_ai_health() -> dict[str, str | bool | None]:
+        provider = app.state.ai_provider
+        settings = getattr(provider, "settings", None)
+        api_key = getattr(settings, "api_key", None)
+        available = bool(api_key)
+        return {
+            "available": available,
+            "provider": provider.__class__.__name__,
+            "reason": None if available else "AI-функции отключены: не настроен GROQ_API_KEY.",
+        }
+
     def log_activity(
         *,
         recommendation_type: str,
@@ -282,6 +293,7 @@ def create_app(
             "storage": "sqlite",
             "version": app_settings.version,
             "feature_flags": app_settings.features.as_dict(),
+            "ai": get_ai_health(),
         }
 
     @app.get("/cockpit")

@@ -1,5 +1,11 @@
+import { useState } from "react";
 import type { SupervisorDashboardResponse } from "../types";
-import { formatDateTime, getRecommendationStatusLabel, getRecommendationTypeLabel } from "../lib/utils";
+import {
+  formatDateTime,
+  formatProductCode,
+  getRecommendationStatusLabel,
+  getRecommendationTypeLabel,
+} from "../lib/utils";
 
 interface SupervisorPanelProps {
   dashboard?: SupervisorDashboardResponse | null;
@@ -7,12 +13,12 @@ interface SupervisorPanelProps {
 
 function getMetricLabel(id: string, fallback: string): string {
   const labels: Record<string, string> = {
-    "adoption-rate": "Adoption",
-    "acceptance-rate": "Acceptance",
-    "edited-rate": "Edited",
-    "rejected-rate": "Rejected",
-    "coverage-rate": "Coverage",
-    "latency-hours": "Latency",
+    "adoption-rate": "Взято в работу",
+    "acceptance-rate": "Принято без правок",
+    "edited-rate": "Доработано",
+    "rejected-rate": "Отклонено",
+    "coverage-rate": "Покрытие срочных кейсов",
+    "latency-hours": "Среднее время реакции",
   };
 
   return labels[id] ?? fallback;
@@ -36,6 +42,8 @@ function getMetricHelperText(id: string, fallback?: string | null): string | nul
 }
 
 export function SupervisorPanel({ dashboard }: SupervisorPanelProps) {
+  const [expanded, setExpanded] = useState(false);
+
   if (!dashboard) {
     return null;
   }
@@ -45,9 +53,14 @@ export function SupervisorPanel({ dashboard }: SupervisorPanelProps) {
       <header className="panel__header">
         <div>
           <p className="panel__eyebrow">Контроль и эффект</p>
-          <h2>Как используется помощник</h2>
+          <h2>Сводка по использованию и качеству решений</h2>
         </div>
-        <small>{formatDateTime(dashboard.generated_at)}</small>
+        <div className="button-row">
+          <button className="ghost-button" type="button" onClick={() => setExpanded((current) => !current)}>
+            {expanded ? "Свернуть аналитику" : "Показать аналитику"}
+          </button>
+          <small>{formatDateTime(dashboard.generated_at)}</small>
+        </div>
       </header>
 
       <div className="supervisor-cards">
@@ -60,9 +73,9 @@ export function SupervisorPanel({ dashboard }: SupervisorPanelProps) {
         ))}
       </div>
 
-      <div className="supervisor-grid">
+      {expanded ? <div className="supervisor-grid">
         <section className="content-card">
-          <h3>Completion funnel</h3>
+          <h3>Путь по кейсам</h3>
           <div className="stack-list">
             {dashboard.completion_funnel.length ? (
               dashboard.completion_funnel.map((stage) => (
@@ -74,7 +87,7 @@ export function SupervisorPanel({ dashboard }: SupervisorPanelProps) {
                 </article>
               ))
             ) : (
-              <p className="insight">Funnel появится после первых действий по кейсам.</p>
+              <p className="insight">Сводка по шагам появится после первых действий по кейсам.</p>
             )}
           </div>
         </section>
@@ -107,7 +120,7 @@ export function SupervisorPanel({ dashboard }: SupervisorPanelProps) {
                   <strong>
                     {getRecommendationTypeLabel(item.recommendation_type)} · {getRecommendationStatusLabel(item.decision)}
                   </strong>
-                  <p>{item.comment || "Комментарий не указан."}</p>
+                  <p>{item.comment || "Менеджер сохранил решение без комментария."}</p>
                   <small>{formatDateTime(item.created_at)}</small>
                 </article>
               ))
@@ -123,8 +136,9 @@ export function SupervisorPanel({ dashboard }: SupervisorPanelProps) {
             {dashboard.product_distribution.length ? (
               dashboard.product_distribution.map((item) => (
                 <article className="stack-card" key={item.product_code}>
-                  <strong>{item.product_code}</strong>
+                  <strong>{item.product_name || formatProductCode(item.product_code)}</strong>
                   <p>{item.count} использованных рекомендаций</p>
+                  {item.product_name ? <small>{formatProductCode(item.product_code)}</small> : null}
                 </article>
               ))
             ) : (
@@ -132,7 +146,7 @@ export function SupervisorPanel({ dashboard }: SupervisorPanelProps) {
             )}
           </div>
         </section>
-      </div>
+      </div> : null}
     </section>
   );
 }

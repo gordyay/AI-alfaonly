@@ -433,6 +433,19 @@ export interface ThreadListResponse {
   items: AssistantThread[];
 }
 
+export interface HealthResponse {
+  status: string;
+  stage: string;
+  storage: string;
+  version: string;
+  feature_flags: Record<string, boolean>;
+  ai: {
+    available: boolean;
+    provider: string;
+    reason?: string | null;
+  };
+}
+
 export interface SupervisorMetricCard {
   id: string;
   label: string;
@@ -451,6 +464,7 @@ export interface SupervisorDecisionBreakdown {
 
 export interface SupervisorProductDistribution {
   product_code: string;
+  product_name?: string | null;
   count: number;
 }
 

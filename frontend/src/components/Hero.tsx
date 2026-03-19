@@ -4,6 +4,7 @@ interface HeroProps {
   stats?: CockpitStats | null;
   managerId: string;
   sortMode: SortMode;
+  loading: boolean;
   onToggleSort: () => void;
   onToggleManager: () => void;
 }
@@ -13,7 +14,26 @@ const SORT_LABELS: Record<SortMode, string> = {
   due_at: "По ближайшему сроку",
 };
 
-export function Hero({ stats, managerId, sortMode, onToggleSort, onToggleManager }: HeroProps) {
+function HeroStat({
+  label,
+  value,
+  loading,
+  accent = false,
+}: {
+  label: string;
+  value?: number | null;
+  loading: boolean;
+  accent?: boolean;
+}) {
+  return (
+    <section className={`stat-card${accent ? " stat-card--accent" : ""}${loading ? " stat-card--loading" : ""}`}>
+      <span className="stat-card__label">{label}</span>
+      <strong className="stat-card__value">{loading ? "..." : value ?? 0}</strong>
+    </section>
+  );
+}
+
+export function Hero({ stats, managerId, sortMode, loading, onToggleSort, onToggleManager }: HeroProps) {
   return (
     <header className="hero">
       <div className="hero__copy">
@@ -35,22 +55,10 @@ export function Hero({ stats, managerId, sortMode, onToggleSort, onToggleManager
       </div>
 
       <div className="hero__stats">
-        <section className="stat-card">
-          <span className="stat-card__label">Кейсов в работе</span>
-          <strong className="stat-card__value">{stats?.actionable_items ?? 0}</strong>
-        </section>
-        <section className="stat-card">
-          <span className="stat-card__label">Срочно сегодня</span>
-          <strong className="stat-card__value">{stats?.urgent_items ?? 0}</strong>
-        </section>
-        <section className="stat-card">
-          <span className="stat-card__label">Клиентов в фокусе</span>
-          <strong className="stat-card__value">{stats?.clients_in_focus ?? 0}</strong>
-        </section>
-        <section className="stat-card stat-card--accent">
-          <span className="stat-card__label">Возможности</span>
-          <strong className="stat-card__value">{stats?.opportunity_items ?? 0}</strong>
-        </section>
+        <HeroStat label="Кейсов в работе" value={stats?.actionable_items} loading={loading} />
+        <HeroStat label="Срочно сегодня" value={stats?.urgent_items} loading={loading} />
+        <HeroStat label="Клиентов в фокусе" value={stats?.clients_in_focus} loading={loading} />
+        <HeroStat label="Возможности" value={stats?.opportunity_items} loading={loading} accent />
       </div>
     </header>
   );

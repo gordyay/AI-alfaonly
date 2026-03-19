@@ -13,6 +13,8 @@ interface AssistantPanelProps {
   threads: AssistantThread[];
   selectedThreadId?: string | null;
   threadDetail?: AssistantThreadDetail | null;
+  aiEnabled: boolean;
+  aiUnavailableMessage?: string | null;
   loading: boolean;
   sending: boolean;
   status?: { type: "loading" | "success" | "error"; text: string } | null;
@@ -182,6 +184,8 @@ export function AssistantPanel({
   threads,
   selectedThreadId,
   threadDetail,
+  aiEnabled,
+  aiUnavailableMessage,
   loading,
   sending,
   status,
@@ -206,6 +210,7 @@ export function AssistantPanel({
       <p className="assistant-panel__scope">
         Контекст: <strong>{selectedClientName || "общий контекст менеджера"}</strong>
       </p>
+      {!aiEnabled ? <StatusMessage type="error" message={aiUnavailableMessage} /> : null}
       <StatusMessage type={status?.type} message={status?.text} />
 
       <div className="assistant-panel__threads">
@@ -231,7 +236,13 @@ export function AssistantPanel({
 
       <div className="assistant-quick-actions">
         {QUICK_ACTIONS.map((action) => (
-          <button className="ghost-button" key={action} type="button" onClick={() => onSendMessage(action)} disabled={sending}>
+          <button
+            className="ghost-button"
+            key={action}
+            type="button"
+            onClick={() => onSendMessage(action)}
+            disabled={!aiEnabled || sending}
+          >
             {action}
           </button>
         ))}
@@ -260,8 +271,9 @@ export function AssistantPanel({
           onChange={(event) => onInputChange(event.target.value)}
           placeholder="Спросите про клиента, текст сообщения, разбор возражения или следующий шаг"
           rows={4}
+          disabled={!aiEnabled}
         />
-        <button className="primary-button" disabled={sending || !inputValue.trim()} type="submit">
+        <button className="primary-button" disabled={!aiEnabled || sending || !inputValue.trim()} type="submit">
           {sending ? "Отправляем..." : "Отправить"}
         </button>
       </form>

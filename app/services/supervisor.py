@@ -33,6 +33,7 @@ class SupervisorDashboardService:
         feedback_items = storage.list_feedback(manager_id=manager_id)
         activity_logs = storage.list_manager_activity_logs(manager_id)
         crm_notes = storage.list_manager_crm_notes(manager_id)
+        products_by_id = {product.id: product for product in storage.list_products()}
         work_items_by_recommendation = {item.recommendation_id: item for item in cockpit.work_queue}
         latest_feedback = self._latest_feedback(feedback_items)
 
@@ -114,7 +115,11 @@ class SupervisorDashboardService:
             if item.product_code
         )
         product_distribution = [
-            SupervisorProductDistribution(product_code=product_code, count=count)
+            SupervisorProductDistribution(
+                product_code=product_code,
+                product_name=products_by_id.get(product_code).name if product_code in products_by_id else None,
+                count=count,
+            )
             for product_code, count in product_counter.most_common(6)
         ]
 

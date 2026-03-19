@@ -8,15 +8,17 @@ interface JourneyStep {
 
 interface JourneyBarProps {
   steps: JourneyStep[];
+  note?: string;
 }
 
-export function JourneyBar({ steps }: JourneyBarProps) {
+export function JourneyBar({ steps, note }: JourneyBarProps) {
   return (
     <section className="panel journey-bar">
       <div className="panel__header">
         <div>
-          <p className="panel__eyebrow">Основной путь</p>
-          <h2>От выбора кейса до зафиксированного результата</h2>
+          <p className="panel__eyebrow">Рабочий цикл</p>
+          <h2>Что уже сделано по кейсу</h2>
+          {note ? <p className="journey-bar__note">{note}</p> : null}
         </div>
       </div>
 

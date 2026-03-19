@@ -32,6 +32,8 @@ interface FocusPanelProps {
   detail?: ClientDetailResponse | null;
   workItem?: WorkItem | null;
   conversation?: Conversation | null;
+  aiEnabled: boolean;
+  aiUnavailableMessage?: string | null;
   activeTab: ViewTab;
   onChangeTab: (tab: ViewTab) => void;
   aiDraft?: AISummaryDraft | null;
@@ -71,7 +73,7 @@ interface FocusPanelProps {
 
 const TABS: Array<{ id: ViewTab; label: string }> = [
   { id: "summary", label: "Сводка" },
-  { id: "script", label: "Script" },
+  { id: "script", label: "Сценарий" },
   { id: "objections", label: "Возражения" },
   { id: "crm", label: "CRM" },
   { id: "profile", label: "Профиль" },
@@ -88,8 +90,8 @@ const OUTCOME_LABELS: Record<AISummaryDraft["outcome"], string> = {
 
 function getCRMRevisionStageLabel(stage: string): string {
   const labels: Record<string, string> = {
-    ai_generated: "AI draft",
-    manager_finalized: "Manager final",
+    ai_generated: "Черновик ИИ",
+    manager_finalized: "Финальная версия менеджера",
   };
   return labels[stage] ?? stage.replaceAll("_", " ");
 }
@@ -98,6 +100,8 @@ export function FocusPanel({
   detail,
   workItem,
   conversation,
+  aiEnabled,
+  aiUnavailableMessage,
   activeTab,
   onChangeTab,
   aiDraft,
@@ -164,6 +168,17 @@ export function FocusPanel({
   const latestObjectionRecord = detail.objection_history[0] ?? null;
   const visibleObjectionDraft = latestObjectionRecord?.draft ?? detail.objection_workflow?.draft ?? null;
   const latestSavedNote = detail.crm_notes[0] ?? null;
+  const savedFeedbackComment = currentFeedback?.comment || "";
+  const isFeedbackDirty =
+    (feedbackDecision || null) !== (savedFeedbackDecision || null) ||
+    feedbackComment.trim() !== savedFeedbackComment.trim();
+  const feedbackButtonLabel = feedbackSubmitting
+    ? "Сохраняем решение..."
+    : savedFeedbackDecision
+      ? isFeedbackDirty
+        ? "Обновить решение"
+        : "Решение сохранено"
+      : "Зафиксировать решение";
 
   return (
     <section className="panel focus-panel">
@@ -300,7 +315,7 @@ export function FocusPanel({
               </p>
               <div className="button-row">
                 <button className="ghost-button" type="button" onClick={() => onChangeTab("script")}>
-                  Открыть script
+                  Открыть сценарий
                 </button>
                 <button className="ghost-button" type="button" onClick={() => onChangeTab("objections")}>
                   Открыть возражения
@@ -312,11 +327,12 @@ export function FocusPanel({
                   className="ghost-button"
                   type="button"
                   onClick={() => onQuickAssistantAction("Подскажи следующий шаг по текущему кейсу")}
-                  disabled={assistantSending}
+                  disabled={!aiEnabled || assistantSending}
                 >
-                  {assistantSending ? "Готовим..." : "Спросить ассистента"}
+                  {!aiEnabled ? "AI недоступен" : assistantSending ? "Готовим..." : "Спросить ассистента"}
                 </button>
               </div>
+              {!aiEnabled ? <StatusMessage compact type="error" message={aiUnavailableMessage} /> : null}
             </section>
 
             <section className="content-card">
@@ -364,9 +380,9 @@ export function FocusPanel({
                 className="primary-button"
                 type="button"
                 onClick={onSubmitFeedback}
-                disabled={feedbackSubmitting || !feedbackDecision}
+                disabled={feedbackSubmitting || !feedbackDecision || !isFeedbackDirty}
               >
-                {feedbackSubmitting ? "Сохраняем решение..." : "Зафиксировать решение"}
+                {feedbackButtonLabel}
               </button>
               <StatusMessage type={feedbackStatus?.type} message={feedbackStatus?.text} />
               {currentFeedback ? (
@@ -375,7 +391,7 @@ export function FocusPanel({
                     Последнее решение:{" "}
                     {getRecommendationStatusLabel(savedFeedbackDecision || currentFeedback.decision)}
                   </strong>
-                  <p>{currentFeedback.comment || "Комментарий не указан."}</p>
+                  <p>{currentFeedback.comment || "Комментарий не был добавлен."}</p>
                   <small>{formatDateTime(currentFeedback.created_at)}</small>
                 </div>
               ) : null}
@@ -392,7 +408,7 @@ export function FocusPanel({
                         {getActivityActionLabel(item.action)}
                         {item.decision ? ` · ${getRecommendationStatusLabel(item.decision)}` : ""}
                       </strong>
-                      <p>{item.payload_excerpt || "Текстовое описание действия не сохранено."}</p>
+                      <p>{item.payload_excerpt || "Краткое описание действия не было сохранено."}</p>
                       <small>{formatDateTime(item.created_at)}</small>
                     </article>
                   ))
@@ -408,16 +424,21 @@ export function FocusPanel({
       {activeTab === "script" ? (
         <section className="focus-layout">
           <section className="content-card">
-            <div className="section-title">
-              <div>
-                <p className="panel__eyebrow">Script</p>
-                <h3>Сценарий контакта по кейсу</h3>
-              </div>
+              <div className="section-title">
+                <div>
+                  <p className="panel__eyebrow">Сценарий</p>
+                  <h3>Сценарий контакта по кейсу</h3>
+                </div>
               <div className="button-row">
-                <button className="primary-button" type="button" onClick={onGenerateScript} disabled={scriptLoading}>
-                  {scriptLoading ? "Генерируем..." : "Сгенерировать script"}
-                </button>
-              </div>
+                  <button
+                    className="primary-button"
+                    type="button"
+                    onClick={onGenerateScript}
+                    disabled={!aiEnabled || scriptLoading}
+                  >
+                    {scriptLoading ? "Генерируем..." : "Собрать сценарий"}
+                  </button>
+                </div>
             </div>
 
             <label className="field">
@@ -429,6 +450,7 @@ export function FocusPanel({
                 placeholder="Какой следующий шаг нужно закрыть в этом контакте"
               />
             </label>
+            {!aiEnabled ? <StatusMessage compact type="error" message={aiUnavailableMessage} /> : null}
             <StatusMessage type={scriptStatus?.type} message={scriptStatus?.text} />
 
             {latestScript ? (
@@ -452,7 +474,7 @@ export function FocusPanel({
                 </article>
 
                 <article className="stack-card">
-                  <strong>Talking points</strong>
+                  <strong>Опорные тезисы</strong>
                   <p>{latestScript.draft.manager_talking_points.join(" · ") || "Не указаны"}</p>
                 </article>
 
@@ -460,9 +482,7 @@ export function FocusPanel({
                   <article className="stack-card" key={variant.label}>
                     <strong>{variant.label}</strong>
                     <p>{variant.ready_script}</p>
-                    <small>
-                      {(variant.style || "style не задан") + " · " + (variant.tactic || "tactic не задан")}
-                    </small>
+                    <small>{[variant.style, variant.tactic].filter(Boolean).join(" · ") || "Дополнительные пометки не указаны"}</small>
                     {variant.manager_talking_points.length ? (
                       <p>{variant.manager_talking_points.join(" · ")}</p>
                     ) : null}
@@ -480,19 +500,19 @@ export function FocusPanel({
                 ))}
 
                 <article className="stack-card">
-                  <strong>Grounding</strong>
+                  <strong>На чём основан сценарий</strong>
                   <p>{latestScript.draft.grounding_facts.join(" · ") || "Не указано"}</p>
                 </article>
                 {latestScript.draft.data_gaps.length ? (
                   <article className="stack-card">
-                    <strong>Data gaps</strong>
+                    <strong>Чего не хватает</strong>
                     <p>{latestScript.draft.data_gaps.join(" · ")}</p>
                   </article>
                 ) : null}
               </div>
             ) : (
               <div className="empty-state empty-state--small">
-                <strong>Script ещё не собран</strong>
+                <strong>Сценарий ещё не собран</strong>
                 <p>Сформируйте сценарий из текущего кейса, затем отдельно выберите вариант для контакта.</p>
               </div>
             )}
@@ -500,7 +520,7 @@ export function FocusPanel({
 
           <aside className="content-stack">
             <section className="content-card">
-              <h3>История script generation</h3>
+              <h3>История сценариев</h3>
               <div className="stack-list">
                 {detail.script_history.length ? (
                   detail.script_history.map((record) => (
@@ -516,7 +536,7 @@ export function FocusPanel({
                     </article>
                   ))
                 ) : (
-                  <p className="insight">История появится после первого generation.</p>
+                  <p className="insight">История появится после первого собранного сценария.</p>
                 )}
               </div>
             </section>
@@ -527,21 +547,21 @@ export function FocusPanel({
       {activeTab === "objections" ? (
         <section className="focus-layout">
           <section className="content-card">
-            <div className="section-title">
-              <div>
-                <p className="panel__eyebrow">Objection Workflow</p>
-                <h3>Разбор возражения по кейсу</h3>
-              </div>
+              <div className="section-title">
+                <div>
+                  <p className="panel__eyebrow">Возражения</p>
+                  <h3>Разбор возражения по кейсу</h3>
+                </div>
               <div className="button-row">
-                <button
-                  className="primary-button"
-                  type="button"
-                  onClick={onGenerateObjectionWorkflow}
-                  disabled={objectionLoading}
-                >
-                  {objectionLoading ? "Генерируем..." : "Собрать варианты"}
-                </button>
-              </div>
+                  <button
+                    className="primary-button"
+                    type="button"
+                    onClick={onGenerateObjectionWorkflow}
+                    disabled={!aiEnabled || objectionLoading}
+                  >
+                    {objectionLoading ? "Генерируем..." : "Собрать варианты"}
+                  </button>
+                </div>
             </div>
 
             <label className="field">
@@ -553,6 +573,7 @@ export function FocusPanel({
                 placeholder="Например: дорого, слишком рискованно, не сейчас"
               />
             </label>
+            {!aiEnabled ? <StatusMessage compact type="error" message={aiUnavailableMessage} /> : null}
             <StatusMessage type={objectionStatus?.type} message={objectionStatus?.text} />
 
             {visibleObjectionDraft ? (
@@ -561,7 +582,7 @@ export function FocusPanel({
                   <strong>{visibleObjectionDraft.analysis.objection_label}</strong>
                   <p>{visibleObjectionDraft.analysis.customer_intent || "Интент клиента не извлечён."}</p>
                   <small>
-                    Confidence {Math.round(visibleObjectionDraft.analysis.confidence * 100)}% · Evidence:{" "}
+                    Уверенность {Math.round(visibleObjectionDraft.analysis.confidence * 100)}% · Основания:{" "}
                     {visibleObjectionDraft.analysis.evidence.join(" · ") || "не найдено"}
                   </small>
                 </article>
@@ -570,9 +591,7 @@ export function FocusPanel({
                   <article className="stack-card" key={option.title}>
                     <strong>{option.title}</strong>
                     <p>{option.response}</p>
-                    <small>
-                      {(option.style || "style не задан") + " · " + (option.tactic || "tactic не задан")}
-                    </small>
+                    <small>{[option.style, option.tactic].filter(Boolean).join(" · ") || "Подход не уточнён"}</small>
                     <p>{option.rationale}</p>
                     {latestObjectionRecord ? (
                       <div className="button-row">
@@ -610,7 +629,7 @@ export function FocusPanel({
               </div>
             ) : (
               <div className="empty-state empty-state--small">
-                <strong>Objection workflow ещё не собран</strong>
+                <strong>Разбор возражения ещё не собран</strong>
                 <p>Сначала сформируйте варианты, затем отдельно выберите ответ, который менеджер реально возьмёт в работу.</p>
               </div>
             )}
@@ -645,24 +664,25 @@ export function FocusPanel({
       {activeTab === "crm" ? (
         <section className="focus-layout focus-layout--crm">
           <section className="content-card">
-            <div className="section-title">
-              <div>
-                <p className="panel__eyebrow">CRM-заметка</p>
-                <h3>AI draft и финальная версия менеджера</h3>
-              </div>
+              <div className="section-title">
+                <div>
+                  <p className="panel__eyebrow">CRM-заметка</p>
+                  <h3>Черновик ИИ и финальная версия менеджера</h3>
+                </div>
               <div className="button-row">
-                <button className="ghost-button" type="button" onClick={onGenerateSummary} disabled={aiLoading}>
-                  {aiLoading ? "Генерируем..." : "Сгенерировать"}
-                </button>
-                <button className="ghost-button" type="button" onClick={onCopyCRM} disabled={!aiDraft?.crm_note_draft}>
-                  Копировать текст
-                </button>
-                <button className="primary-button" type="button" onClick={onSaveSummary} disabled={!aiDraft || aiSaving}>
-                  {aiSaving ? "Сохраняем..." : "Сохранить в CRM"}
-                </button>
-              </div>
+                  <button className="ghost-button" type="button" onClick={onGenerateSummary} disabled={!aiEnabled || aiLoading}>
+                    {aiLoading ? "Генерируем..." : "Собрать черновик"}
+                  </button>
+                  <button className="ghost-button" type="button" onClick={onCopyCRM} disabled={!aiDraft?.crm_note_draft}>
+                    Копировать текст
+                  </button>
+                  <button className="primary-button" type="button" onClick={onSaveSummary} disabled={!aiDraft || aiSaving}>
+                    {aiSaving ? "Сохраняем..." : "Сохранить в CRM"}
+                  </button>
+                </div>
             </div>
 
+            {!aiEnabled ? <StatusMessage compact type="error" message={aiUnavailableMessage} /> : null}
             <StatusMessage type={aiStatus?.type} message={aiStatus?.text} />
             <StatusMessage compact type={aiSaveStatus?.type} message={aiSaveStatus?.text} />
 
@@ -794,14 +814,14 @@ export function FocusPanel({
             ) : (
               <div className="empty-state empty-state--small">
                 <strong>Черновик ещё не создан</strong>
-                <p>Запустите generation, чтобы быстро получить AI draft и дальше довести его до финальной CRM-версии.</p>
+                <p>Соберите черновик по текущему кейсу, затем проверьте текст и сохраните итог в CRM.</p>
               </div>
             )}
           </section>
 
           <aside className="content-stack">
             <section className="content-card">
-              <h3>История draft revisions</h3>
+              <h3>История черновиков</h3>
               <div className="stack-list">
                 {detail.crm_draft_history.length ? (
                   detail.crm_draft_history.map((revision) => (
@@ -830,8 +850,8 @@ export function FocusPanel({
                   <p>{latestSavedNote.note_text}</p>
                   <small>
                     {latestSavedNote.follow_up_date
-                      ? `Follow-up: ${formatDateTime(latestSavedNote.follow_up_date)}`
-                      : "Follow-up не назначен"}
+                      ? `Следующий контакт: ${formatDateTime(latestSavedNote.follow_up_date)}`
+                      : "Следующий контакт не назначен"}
                   </small>
                   {latestSavedNote.follow_up_reason ? <p>{latestSavedNote.follow_up_reason}</p> : null}
                 </article>
