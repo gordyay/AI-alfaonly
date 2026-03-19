@@ -9,19 +9,24 @@ import type {
 } from "../types";
 import {
   fromFollowUpInputValue,
-  getActivityActionLabel,
   formatDateTime,
   formatMoney,
+  getActivityActionLabel,
   getFocusPropensityLabel,
   getMiniSummaryCopy,
   getPriorityFactorLabel,
-  getRecommendationTypeLabel,
   getRecommendationStatusLabel,
+  getRecommendationTypeLabel,
   getWorkItemTypeLabel,
   sanitizeTimeInput,
   toFollowUpInputValue,
 } from "../lib/utils";
 import { StatusMessage } from "./StatusMessage";
+
+interface UiStatus {
+  type: "loading" | "success" | "error";
+  text: string;
+}
 
 interface FocusPanelProps {
   detail?: ClientDetailResponse | null;
@@ -32,17 +37,31 @@ interface FocusPanelProps {
   aiDraft?: AISummaryDraft | null;
   aiLoading: boolean;
   aiSaving: boolean;
-  aiStatus?: { type: "loading" | "success" | "error"; text: string } | null;
-  aiSaveStatus?: { type: "loading" | "success" | "error"; text: string } | null;
+  aiStatus?: UiStatus | null;
+  aiSaveStatus?: UiStatus | null;
   onGenerateSummary: () => void;
   onSaveSummary: () => void;
   onCopyCRM: () => void;
   onUpdateDraft: (draft: AISummaryDraft) => void;
+  scriptGoal: string;
+  onScriptGoalChange: (value: string) => void;
+  scriptLoading: boolean;
+  scriptSelecting: boolean;
+  scriptStatus?: UiStatus | null;
+  onGenerateScript: () => void;
+  onSelectScriptVariant: (variantLabel: string, selectedText: string) => void;
+  objectionInput: string;
+  onObjectionInputChange: (value: string) => void;
+  objectionLoading: boolean;
+  objectionSelecting: boolean;
+  objectionStatus?: UiStatus | null;
+  onGenerateObjectionWorkflow: () => void;
+  onSelectObjectionOption: (optionTitle: string, selectedResponse: string) => void;
   feedbackDecision?: RecommendationStatus | null;
   savedFeedbackDecision?: RecommendationStatus | null;
   feedbackComment: string;
   feedbackSubmitting: boolean;
-  feedbackStatus?: { type: "loading" | "success" | "error"; text: string } | null;
+  feedbackStatus?: UiStatus | null;
   assistantSending: boolean;
   onFeedbackCommentChange: (value: string) => void;
   onFeedbackDecisionChange: (decision: RecommendationStatus) => void;
@@ -52,6 +71,8 @@ interface FocusPanelProps {
 
 const TABS: Array<{ id: ViewTab; label: string }> = [
   { id: "summary", label: "Сводка" },
+  { id: "script", label: "Script" },
+  { id: "objections", label: "Возражения" },
   { id: "crm", label: "CRM" },
   { id: "profile", label: "Профиль" },
   { id: "portfolio", label: "Портфель" },
@@ -64,6 +85,14 @@ const OUTCOME_LABELS: Record<AISummaryDraft["outcome"], string> = {
   not_now: "Не сейчас",
   closed_no_action: "Закрыто без дальнейших действий",
 };
+
+function getCRMRevisionStageLabel(stage: string): string {
+  const labels: Record<string, string> = {
+    ai_generated: "AI draft",
+    manager_finalized: "Manager final",
+  };
+  return labels[stage] ?? stage.replaceAll("_", " ");
+}
 
 export function FocusPanel({
   detail,
@@ -80,6 +109,20 @@ export function FocusPanel({
   onSaveSummary,
   onCopyCRM,
   onUpdateDraft,
+  scriptGoal,
+  onScriptGoalChange,
+  scriptLoading,
+  scriptSelecting,
+  scriptStatus,
+  onGenerateScript,
+  onSelectScriptVariant,
+  objectionInput,
+  onObjectionInputChange,
+  objectionLoading,
+  objectionSelecting,
+  objectionStatus,
+  onGenerateObjectionWorkflow,
+  onSelectObjectionOption,
   feedbackDecision,
   savedFeedbackDecision,
   feedbackComment,
@@ -117,6 +160,10 @@ export function FocusPanel({
       item.recommendation_id === workItem.recommendation_id ||
       (workItem.conversation_id && item.conversation_id === workItem.conversation_id),
   );
+  const latestScript = detail.script_history[0] ?? null;
+  const latestObjectionRecord = detail.objection_history[0] ?? null;
+  const visibleObjectionDraft = latestObjectionRecord?.draft ?? detail.objection_workflow?.draft ?? null;
+  const latestSavedNote = detail.crm_notes[0] ?? null;
 
   return (
     <section className="panel focus-panel">
@@ -125,7 +172,8 @@ export function FocusPanel({
           <p className="panel__eyebrow">Фокусный кейс</p>
           <h2>{workItem.title}</h2>
           <p className="focus-panel__subtitle">
-            {client.full_name} · {getWorkItemTypeLabel(workItem.item_type)} · {getRecommendationStatusLabel(workItem.recommendation_status)}
+            {client.full_name} · {getWorkItemTypeLabel(workItem.item_type)} ·{" "}
+            {getRecommendationStatusLabel(workItem.recommendation_status)}
           </p>
         </div>
         <div className="focus-panel__score">
@@ -236,51 +284,46 @@ export function FocusPanel({
                 </article>
                 <article className="stack-card">
                   <strong>Продуктовый фокус</strong>
-                  <p>{workItem.product_name || "Явный продукт не выделен, фокус идёт по кейсу и следующему действию."}</p>
+                  <p>
+                    {workItem.product_name ||
+                      "Явный продукт не выделен, фокус идёт по кейсу и следующему действию."}
+                  </p>
                 </article>
               </div>
             </section>
 
             <section className="content-card">
-              <h3>AI-действия по кейсу</h3>
+              <h3>Центр действий по кейсу</h3>
               <p className="insight">
-                Главный путь теперь идёт из центра: сначала выберите действие по кейсу, затем при необходимости углубляйтесь в правую колонку.
+                Сначала выберите артефакт в центре кейса, затем отдельно сохраните лучший вариант. Это убирает
+                случайные accept и оставляет чистую историю решений.
               </p>
               <div className="button-row">
-                <button
-                  className="ghost-button"
-                  type="button"
-                  onClick={() => onQuickAssistantAction("Подготовь скрипт продажи по текущему кейсу")}
-                  disabled={assistantSending}
-                >
-                  {assistantSending ? "Готовим..." : "Подготовить скрипт"}
+                <button className="ghost-button" type="button" onClick={() => onChangeTab("script")}>
+                  Открыть script
+                </button>
+                <button className="ghost-button" type="button" onClick={() => onChangeTab("objections")}>
+                  Открыть возражения
+                </button>
+                <button className="ghost-button" type="button" onClick={() => onChangeTab("crm")}>
+                  Открыть CRM
                 </button>
                 <button
                   className="ghost-button"
                   type="button"
-                  onClick={() => onQuickAssistantAction("Как отработать возражение по текущему кейсу?")}
+                  onClick={() => onQuickAssistantAction("Подскажи следующий шаг по текущему кейсу")}
                   disabled={assistantSending}
                 >
-                  Разбор возражения
-                </button>
-                <button
-                  className="ghost-button"
-                  type="button"
-                  onClick={onGenerateSummary}
-                  disabled={aiLoading}
-                >
-                  {aiLoading ? "Готовим сводку..." : "Подготовить CRM"}
+                  {assistantSending ? "Готовим..." : "Спросить ассистента"}
                 </button>
               </div>
-              <p className="insight">
-                Скрипт и objection workflow запускаются из этого кейса и собираются по выбранной коммуникации, а не по клиенту “вообще”.
-              </p>
             </section>
 
             <section className="content-card">
               <h3>Решение по рекомендации</h3>
               <p className="insight">
-                Сначала выберите статус, затем отдельно сохраните решение. Это убирает случайные клики и оставляет чистый audit trail.
+                Выбор и сохранение разделены: сначала статус, затем отдельный save. Это и есть single source of truth
+                для supervisor метрик.
               </p>
               <div className="button-row">
                 <button
@@ -329,47 +372,13 @@ export function FocusPanel({
               {currentFeedback ? (
                 <div className="stack-card">
                   <strong>
-                    Последнее решение: {getRecommendationStatusLabel(savedFeedbackDecision || currentFeedback.decision)}
+                    Последнее решение:{" "}
+                    {getRecommendationStatusLabel(savedFeedbackDecision || currentFeedback.decision)}
                   </strong>
                   <p>{currentFeedback.comment || "Комментарий не указан."}</p>
                   <small>{formatDateTime(currentFeedback.created_at)}</small>
                 </div>
               ) : null}
-            </section>
-
-            <section className="content-card">
-              <h3>Разбор возражения</h3>
-              {detail.objection_workflow?.draft ? (
-                <div className="stack-list">
-                  <article className="stack-card">
-                    <strong>На чём основан ответ</strong>
-                    <p>{detail.objection_workflow.draft.grounding_facts.join(" · ") || "Не указаны"}</p>
-                  </article>
-                  {detail.objection_workflow.draft.handling_options.map((option) => (
-                    <article className="stack-card" key={option.title}>
-                      <strong>{option.title}</strong>
-                      <p>{option.response}</p>
-                      <small>{option.rationale}</small>
-                    </article>
-                  ))}
-                  <article className="stack-card">
-                    <strong>Что не говорить</strong>
-                    <p>{detail.objection_workflow.draft.what_not_to_say.join(" · ") || "Нет явных ограничений"}</p>
-                  </article>
-                  <article className="stack-card">
-                    <strong>Следующий шаг</strong>
-                    <p>{detail.objection_workflow.draft.next_step}</p>
-                  </article>
-                  {detail.objection_workflow.draft.data_gaps.length ? (
-                    <article className="stack-card">
-                      <strong>Чего не хватает</strong>
-                      <p>{detail.objection_workflow.draft.data_gaps.join(" · ")}</p>
-                    </article>
-                  ) : null}
-                </div>
-              ) : (
-                <p className="insight">Для этого диалога разбор возражения пока не собран.</p>
-              )}
             </section>
 
             <section className="content-card">
@@ -379,7 +388,8 @@ export function FocusPanel({
                   recentAuditEntries.slice(0, 6).map((item) => (
                     <article className="stack-card" key={item.id}>
                       <strong>
-                        {getRecommendationTypeLabel(item.recommendation_type)} · {getActivityActionLabel(item.action)}
+                        {getRecommendationTypeLabel(item.recommendation_type)} ·{" "}
+                        {getActivityActionLabel(item.action)}
                         {item.decision ? ` · ${getRecommendationStatusLabel(item.decision)}` : ""}
                       </strong>
                       <p>{item.payload_excerpt || "Текстовое описание действия не сохранено."}</p>
@@ -395,13 +405,250 @@ export function FocusPanel({
         </div>
       ) : null}
 
+      {activeTab === "script" ? (
+        <section className="focus-layout">
+          <section className="content-card">
+            <div className="section-title">
+              <div>
+                <p className="panel__eyebrow">Script</p>
+                <h3>Сценарий контакта по кейсу</h3>
+              </div>
+              <div className="button-row">
+                <button className="primary-button" type="button" onClick={onGenerateScript} disabled={scriptLoading}>
+                  {scriptLoading ? "Генерируем..." : "Сгенерировать script"}
+                </button>
+              </div>
+            </div>
+
+            <label className="field">
+              <span>Цель контакта</span>
+              <input
+                type="text"
+                value={scriptGoal}
+                onChange={(event) => onScriptGoalChange(event.target.value)}
+                placeholder="Какой следующий шаг нужно закрыть в этом контакте"
+              />
+            </label>
+            <StatusMessage type={scriptStatus?.type} message={scriptStatus?.text} />
+
+            {latestScript ? (
+              <div className="stack-list">
+                <article className="stack-card">
+                  <strong>Основной вариант</strong>
+                  <p>{latestScript.draft.ready_script}</p>
+                  <small>
+                    Цель: {latestScript.draft.contact_goal || "Не указана"} · Канал: {latestScript.draft.channel}
+                  </small>
+                  <div className="button-row">
+                    <button
+                      className={`ghost-button${latestScript.selected_variant_label === "main" ? " is-selected" : ""}`}
+                      type="button"
+                      onClick={() => onSelectScriptVariant("main", latestScript.draft.ready_script)}
+                      disabled={scriptSelecting}
+                    >
+                      {latestScript.selected_variant_label === "main" ? "Выбран" : "Выбрать основной"}
+                    </button>
+                  </div>
+                </article>
+
+                <article className="stack-card">
+                  <strong>Talking points</strong>
+                  <p>{latestScript.draft.manager_talking_points.join(" · ") || "Не указаны"}</p>
+                </article>
+
+                {latestScript.draft.alternatives.map((variant) => (
+                  <article className="stack-card" key={variant.label}>
+                    <strong>{variant.label}</strong>
+                    <p>{variant.ready_script}</p>
+                    <small>
+                      {(variant.style || "style не задан") + " · " + (variant.tactic || "tactic не задан")}
+                    </small>
+                    {variant.manager_talking_points.length ? (
+                      <p>{variant.manager_talking_points.join(" · ")}</p>
+                    ) : null}
+                    <div className="button-row">
+                      <button
+                        className={`ghost-button${latestScript.selected_variant_label === variant.label ? " is-selected" : ""}`}
+                        type="button"
+                        onClick={() => onSelectScriptVariant(variant.label, variant.ready_script)}
+                        disabled={scriptSelecting}
+                      >
+                        {latestScript.selected_variant_label === variant.label ? "Выбран" : "Выбрать вариант"}
+                      </button>
+                    </div>
+                  </article>
+                ))}
+
+                <article className="stack-card">
+                  <strong>Grounding</strong>
+                  <p>{latestScript.draft.grounding_facts.join(" · ") || "Не указано"}</p>
+                </article>
+                {latestScript.draft.data_gaps.length ? (
+                  <article className="stack-card">
+                    <strong>Data gaps</strong>
+                    <p>{latestScript.draft.data_gaps.join(" · ")}</p>
+                  </article>
+                ) : null}
+              </div>
+            ) : (
+              <div className="empty-state empty-state--small">
+                <strong>Script ещё не собран</strong>
+                <p>Сформируйте сценарий из текущего кейса, затем отдельно выберите вариант для контакта.</p>
+              </div>
+            )}
+          </section>
+
+          <aside className="content-stack">
+            <section className="content-card">
+              <h3>История script generation</h3>
+              <div className="stack-list">
+                {detail.script_history.length ? (
+                  detail.script_history.map((record) => (
+                    <article className="stack-card" key={record.id}>
+                      <strong>{record.contact_goal || record.draft.contact_goal || "Без явной цели"}</strong>
+                      <p>{record.selected_text || record.draft.ready_script}</p>
+                      <small>
+                        {record.selected_variant_label
+                          ? `Выбран: ${record.selected_variant_label}`
+                          : "Вариант ещё не выбран"}{" "}
+                        · {formatDateTime(record.created_at)}
+                      </small>
+                    </article>
+                  ))
+                ) : (
+                  <p className="insight">История появится после первого generation.</p>
+                )}
+              </div>
+            </section>
+          </aside>
+        </section>
+      ) : null}
+
+      {activeTab === "objections" ? (
+        <section className="focus-layout">
+          <section className="content-card">
+            <div className="section-title">
+              <div>
+                <p className="panel__eyebrow">Objection Workflow</p>
+                <h3>Разбор возражения по кейсу</h3>
+              </div>
+              <div className="button-row">
+                <button
+                  className="primary-button"
+                  type="button"
+                  onClick={onGenerateObjectionWorkflow}
+                  disabled={objectionLoading}
+                >
+                  {objectionLoading ? "Генерируем..." : "Собрать варианты"}
+                </button>
+              </div>
+            </div>
+
+            <label className="field">
+              <span>Текущее возражение</span>
+              <textarea
+                rows={3}
+                value={objectionInput}
+                onChange={(event) => onObjectionInputChange(event.target.value)}
+                placeholder="Например: дорого, слишком рискованно, не сейчас"
+              />
+            </label>
+            <StatusMessage type={objectionStatus?.type} message={objectionStatus?.text} />
+
+            {visibleObjectionDraft ? (
+              <div className="stack-list">
+                <article className="stack-card">
+                  <strong>{visibleObjectionDraft.analysis.objection_label}</strong>
+                  <p>{visibleObjectionDraft.analysis.customer_intent || "Интент клиента не извлечён."}</p>
+                  <small>
+                    Confidence {Math.round(visibleObjectionDraft.analysis.confidence * 100)}% · Evidence:{" "}
+                    {visibleObjectionDraft.analysis.evidence.join(" · ") || "не найдено"}
+                  </small>
+                </article>
+
+                {visibleObjectionDraft.handling_options.map((option) => (
+                  <article className="stack-card" key={option.title}>
+                    <strong>{option.title}</strong>
+                    <p>{option.response}</p>
+                    <small>
+                      {(option.style || "style не задан") + " · " + (option.tactic || "tactic не задан")}
+                    </small>
+                    <p>{option.rationale}</p>
+                    {latestObjectionRecord ? (
+                      <div className="button-row">
+                        <button
+                          className={`ghost-button${latestObjectionRecord.selected_option_title === option.title ? " is-selected" : ""}`}
+                          type="button"
+                          onClick={() => onSelectObjectionOption(option.title, option.response)}
+                          disabled={objectionSelecting}
+                        >
+                          {latestObjectionRecord.selected_option_title === option.title ? "Выбран" : "Выбрать ответ"}
+                        </button>
+                      </div>
+                    ) : null}
+                  </article>
+                ))}
+
+                <article className="stack-card">
+                  <strong>Что не говорить</strong>
+                  <p>{visibleObjectionDraft.what_not_to_say.join(" · ") || "Ограничения не зафиксированы"}</p>
+                </article>
+                <article className="stack-card">
+                  <strong>Следующий шаг</strong>
+                  <p>{visibleObjectionDraft.next_step}</p>
+                </article>
+                <article className="stack-card">
+                  <strong>Факты</strong>
+                  <p>{visibleObjectionDraft.grounding_facts.join(" · ") || "Не указаны"}</p>
+                </article>
+                {visibleObjectionDraft.data_gaps.length ? (
+                  <article className="stack-card">
+                    <strong>Чего не хватает</strong>
+                    <p>{visibleObjectionDraft.data_gaps.join(" · ")}</p>
+                  </article>
+                ) : null}
+              </div>
+            ) : (
+              <div className="empty-state empty-state--small">
+                <strong>Objection workflow ещё не собран</strong>
+                <p>Сначала сформируйте варианты, затем отдельно выберите ответ, который менеджер реально возьмёт в работу.</p>
+              </div>
+            )}
+          </section>
+
+          <aside className="content-stack">
+            <section className="content-card">
+              <h3>История возражений</h3>
+              <div className="stack-list">
+                {detail.objection_history.length ? (
+                  detail.objection_history.map((record) => (
+                    <article className="stack-card" key={record.id}>
+                      <strong>{record.draft.analysis.objection_label}</strong>
+                      <p>{record.selected_response || record.draft.next_step}</p>
+                      <small>
+                        {record.selected_option_title
+                          ? `Выбран: ${record.selected_option_title}`
+                          : "Вариант ещё не выбран"}{" "}
+                        · {formatDateTime(record.created_at)}
+                      </small>
+                    </article>
+                  ))
+                ) : (
+                  <p className="insight">История появится после первого разбора возражения.</p>
+                )}
+              </div>
+            </section>
+          </aside>
+        </section>
+      ) : null}
+
       {activeTab === "crm" ? (
         <section className="focus-layout focus-layout--crm">
           <section className="content-card">
             <div className="section-title">
               <div>
                 <p className="panel__eyebrow">CRM-заметка</p>
-                <h3>Черновик после контакта</h3>
+                <h3>AI draft и финальная версия менеджера</h3>
               </div>
               <div className="button-row">
                 <button className="ghost-button" type="button" onClick={onGenerateSummary} disabled={aiLoading}>
@@ -434,7 +681,11 @@ export function FocusPanel({
                   <span>Ключевые пункты</span>
                   <div className="chip-row">
                     {aiDraft.key_points.length ? (
-                      aiDraft.key_points.map((point) => <span className="badge" key={point}>{point}</span>)
+                      aiDraft.key_points.map((point) => (
+                        <span className="badge" key={point}>
+                          {point}
+                        </span>
+                      ))
                     ) : (
                       <span className="badge">Ключевые пункты не выделены</span>
                     )}
@@ -543,27 +794,50 @@ export function FocusPanel({
             ) : (
               <div className="empty-state empty-state--small">
                 <strong>Черновик ещё не создан</strong>
-                <p>Запустите генерацию, чтобы быстро получить сводку и запись в CRM по открытому диалогу.</p>
+                <p>Запустите generation, чтобы быстро получить AI draft и дальше довести его до финальной CRM-версии.</p>
               </div>
             )}
           </section>
 
           <aside className="content-stack">
             <section className="content-card">
-              <h3>Последние артефакты</h3>
+              <h3>История draft revisions</h3>
               <div className="stack-list">
-                {detail.generated_artifacts.length ? (
-                  detail.generated_artifacts.map((artifact) => (
-                    <article className="stack-card" key={artifact.id}>
-                      <strong>{artifact.title}</strong>
-                      <p>{artifact.summary}</p>
-                      <small>{formatDateTime(artifact.created_at)}</small>
+                {detail.crm_draft_history.length ? (
+                  detail.crm_draft_history.map((revision) => (
+                    <article className="stack-card" key={revision.id}>
+                      <strong>{getCRMRevisionStageLabel(revision.stage)}</strong>
+                      <p>{revision.final_note_text || revision.draft.crm_note_draft}</p>
+                      <small>
+                        {revision.changed_fields.length
+                          ? `Изменены поля: ${revision.changed_fields.join(", ")}`
+                          : "Без изменений"}{" "}
+                        · {formatDateTime(revision.created_at)}
+                      </small>
                     </article>
                   ))
                 ) : (
-                  <p className="insight">Артефакты пока не сохранены.</p>
+                  <p className="insight">История появится после первой AI-сводки или сохранения CRM.</p>
                 )}
               </div>
+            </section>
+
+            <section className="content-card">
+              <h3>Последний финальный результат</h3>
+              {latestSavedNote ? (
+                <article className="stack-card">
+                  <strong>{latestSavedNote.summary_text || "CRM-заметка"}</strong>
+                  <p>{latestSavedNote.note_text}</p>
+                  <small>
+                    {latestSavedNote.follow_up_date
+                      ? `Follow-up: ${formatDateTime(latestSavedNote.follow_up_date)}`
+                      : "Follow-up не назначен"}
+                  </small>
+                  {latestSavedNote.follow_up_reason ? <p>{latestSavedNote.follow_up_reason}</p> : null}
+                </article>
+              ) : (
+                <p className="insight">Финальная CRM-заметка ещё не сохранена.</p>
+              )}
             </section>
           </aside>
         </section>
@@ -643,7 +917,8 @@ export function FocusPanel({
                       {product.category} · {product.margin_level} · {product.risk_level}
                     </p>
                     <small>
-                      Баланс: {formatMoney(product.balance, product.currency)} · Открыт: {formatDateTime(product.opened_at)}
+                      Баланс: {formatMoney(product.balance, product.currency)} · Открыт:{" "}
+                      {formatDateTime(product.opened_at)}
                     </small>
                   </article>
                 ))

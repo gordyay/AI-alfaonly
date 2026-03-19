@@ -261,9 +261,15 @@ export function getActivityActionLabel(value?: string | null): string {
     saved: "Сохранено",
     feedback_recorded: "Решение сохранено",
     decision_recorded: "Решение зафиксировано",
+    summary_generated: "Сводка подготовлена",
+    crm_draft_generated: "AI-черновик CRM подготовлен",
+    crm_note_saved: "CRM сохранена",
+    feedback_saved: "Решение сохранено",
     assistant_answered: "Ассистент ответил",
     script_generated: "Скрипт подготовлен",
-    objection_prepared: "Варианты ответа подготовлены",
+    script_variant_selected: "Выбран вариант скрипта",
+    objection_generated: "Варианты ответа подготовлены",
+    objection_option_selected: "Выбран ответ на возражение",
   };
 
   return labels[value] ?? value.replaceAll("_", " ");

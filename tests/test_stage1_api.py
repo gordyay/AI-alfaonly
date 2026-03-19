@@ -259,11 +259,40 @@ async def test_feedback(client: AsyncClient):
     assert response.status_code == 200
     body = response.json()
     assert body['feedback']['decision'] == 'accepted'
+    assert body['created'] is True
 
     detail_response = await client.get('/client/c1?work_item_id=task:task-2')
     detail = detail_response.json()
     assert any(item['recommendation_id'] == 'rec:communication:conv1' for item in detail['recommendation_feedback'])
-    assert any(item['action'] == 'decision_recorded' for item in detail['activity_log'])
+    assert any(item['action'] == 'feedback_saved' for item in detail['activity_log'])
+
+
+@pytest.mark.anyio
+async def test_feedback_deduplicates_identical_events(client: AsyncClient):
+    payload = {
+        'recommendation_id': 'rec:communication:conv1',
+        'manager_id': 'm1',
+        'recommendation_type': 'manager_work_item',
+        'client_id': 'c1',
+        'conversation_id': 'conv1',
+        'decision': 'accepted',
+        'comment': 'Ок',
+    }
+    first = await client.post('/feedback', json=payload)
+    second = await client.post('/feedback', json=payload)
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert first.json()['created'] is True
+    assert second.json()['created'] is False
+
+    detail_response = await client.get('/client/c1?work_item_id=task:task-2')
+    detail = detail_response.json()
+    matching_actions = [
+        item for item in detail['activity_log']
+        if item['recommendation_id'] == 'rec:communication:conv1' and item['action'] == 'feedback_saved'
+    ]
+    assert len(matching_actions) == 1
 
 
 @pytest.mark.anyio
@@ -310,6 +339,10 @@ async def test_supervisor_dashboard_returns_metrics(client: AsyncClient):
     assert response.status_code == 200
     body = response.json()
     assert body['manager_id'] == 'm1'
-    assert len(body['cards']) >= 4
+    assert len(body['cards']) >= 6
+    assert {'adoption-rate', 'acceptance-rate', 'edited-rate', 'rejected-rate', 'coverage-rate', 'latency-hours'} == {
+        item['id'] for item in body['cards']
+    }
     assert 'decision_breakdown' in body
     assert 'recent_decisions' in body
+    assert body['completion_funnel']

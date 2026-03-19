@@ -15,12 +15,17 @@ from .models import (
     ActivityLogEntry,
     AssistantChatRequest,
     AssistantThreadCreateRequest,
+    CRMDraftRevision,
     CreateCRMNoteRequest,
     CRMNote,
     FeedbackDecision,
     FeedbackRequest,
     GenerateScriptRequest,
+    ObjectionSelectionRequest,
+    ObjectionWorkflowRecord,
     ObjectionWorkflowRequest,
+    ScriptGenerationRecord,
+    ScriptSelectionRequest,
     SummarizeDialogRequest,
     TaskStatus,
 )
@@ -120,6 +125,54 @@ def create_app(
             )
         )
 
+    def resolve_case_work_item(
+        *,
+        client_id: str,
+        manager_id: str,
+        work_item_id: str | None = None,
+        recommendation_id: str | None = None,
+        conversation_id: str | None = None,
+    ):
+        cockpit = cockpit_service.build_manager_cockpit(storage=storage, manager_id=manager_id)
+        client_items = [item for item in cockpit.work_queue if item.client_id == client_id]
+        if work_item_id:
+            matched = next((item for item in client_items if item.id == work_item_id), None)
+            if matched is not None:
+                return matched
+        if recommendation_id:
+            matched = next((item for item in client_items if item.recommendation_id == recommendation_id), None)
+            if matched is not None:
+                return matched
+        if conversation_id:
+            matched = next((item for item in client_items if item.conversation_id == conversation_id), None)
+            if matched is not None:
+                return matched
+        return client_items[0] if client_items else None
+
+    def compute_draft_changed_fields(
+        *,
+        ai_draft,
+        note_text: str,
+        summary_text: str | None,
+        outcome: str,
+        follow_up_date: datetime | None,
+        follow_up_reason: str | None,
+    ) -> list[str]:
+        changed_fields: list[str] = []
+        if ai_draft.crm_note_draft != note_text:
+            changed_fields.append("crm_note_draft")
+        if (ai_draft.contact_summary or None) != (summary_text or None):
+            changed_fields.append("contact_summary")
+        if ai_draft.outcome.value != outcome:
+            changed_fields.append("outcome")
+        ai_follow_up = ai_draft.follow_up_date.isoformat() if ai_draft.follow_up_date else None
+        note_follow_up = follow_up_date.isoformat() if follow_up_date else None
+        if ai_follow_up != note_follow_up:
+            changed_fields.append("follow_up_date")
+        if (ai_draft.follow_up_reason or None) != (follow_up_reason or None):
+            changed_fields.append("follow_up_reason")
+        return changed_fields
+
     def build_case_view(client_id: str, manager_id: str, work_item_id: str | None = None) -> dict:
         cockpit = cockpit_service.build_manager_cockpit(storage=storage, manager_id=manager_id)
         client_work_items = [item for item in cockpit.work_queue if item.client_id == client_id]
@@ -169,11 +222,37 @@ def create_app(
 
         saved_ai_draft = next(
             (
-                note.ai_draft_payload
-                for note in case_crm_notes
-                if note.ai_generated and note.ai_draft_payload is not None
+                revision.draft
+                for revision in storage.list_crm_draft_revisions(
+                    client_id=client_id,
+                    recommendation_id=selected_work_item.recommendation_id if selected_work_item else None,
+                    conversation_id=selected_conversation.id if selected_conversation else None,
+                )
+                if revision.stage == "ai_generated"
             ),
-            None,
+            next(
+                (
+                    note.ai_draft_payload
+                    for note in case_crm_notes
+                    if note.ai_generated and note.ai_draft_payload is not None
+                ),
+                None,
+            ),
+        )
+        script_history = storage.list_script_generations(
+            client_id=client_id,
+            recommendation_id=selected_work_item.recommendation_id if selected_work_item else None,
+            conversation_id=selected_conversation.id if selected_conversation else None,
+        )
+        objection_history = storage.list_objection_workflows(
+            client_id=client_id,
+            recommendation_id=selected_work_item.recommendation_id if selected_work_item else None,
+            conversation_id=selected_conversation.id if selected_conversation else None,
+        )
+        crm_draft_history = storage.list_crm_draft_revisions(
+            client_id=client_id,
+            recommendation_id=selected_work_item.recommendation_id if selected_work_item else None,
+            conversation_id=selected_conversation.id if selected_conversation else None,
         )
         return {
             "cockpit": cockpit,
@@ -186,6 +265,9 @@ def create_app(
             "activity_log": activity_log,
             "follow_ups": follow_ups,
             "saved_ai_draft": saved_ai_draft,
+            "script_history": script_history,
+            "objection_history": objection_history,
+            "crm_draft_history": crm_draft_history,
         }
 
     @app.get("/", include_in_schema=False)
@@ -255,14 +337,24 @@ def create_app(
         conversations = case_view["conversations"]
         selected_conversation = case_view["selected_conversation"]
         propensity = propensity_service.build_client_propensity(storage=storage, client=client)
+        latest_objection = case_view["objection_history"][0] if case_view["objection_history"] else None
         objection_workflow = (
-            objection_service.build_workflow(
-                provider=app.state.ai_provider,
-                client=client,
-                conversation=selected_conversation,
+            {
+                "draft": latest_objection.draft,
+                "model_name": "stored_case_artifact",
+                "generated_at": latest_objection.created_at,
+                "artifact_id": latest_objection.id,
+            }
+            if latest_objection is not None
+            else (
+                objection_service.build_workflow(
+                    provider=app.state.ai_provider,
+                    client=client,
+                    conversation=selected_conversation,
+                )
+                if selected_conversation is not None
+                else None
             )
-            if selected_conversation is not None
-            else None
         )
 
         return {
@@ -279,8 +371,16 @@ def create_app(
             "follow_ups": case_view["follow_ups"],
             "recommendation_feedback": case_view["feedback"],
             "activity_log": case_view["activity_log"],
-            "generated_artifacts": cockpit_service.build_client_artifacts(client, case_view["crm_notes"]),
+            "generated_artifacts": cockpit_service.build_client_artifacts(
+                client,
+                case_view["crm_notes"],
+                script_history=case_view["script_history"],
+                objection_history=case_view["objection_history"],
+            ),
             "saved_ai_draft": case_view["saved_ai_draft"],
+            "script_history": case_view["script_history"],
+            "objection_history": case_view["objection_history"],
+            "crm_draft_history": case_view["crm_draft_history"],
         }
 
     @app.get("/client/{client_id}/activity-log")
@@ -345,6 +445,17 @@ def create_app(
             raise HTTPException(status_code=404, detail="Conversation not found")
 
         recommendation = dialog_service.build_recommendation(client=client, conversation=conversation)
+        work_item = resolve_case_work_item(
+            client_id=client.id,
+            manager_id=payload.manager_id,
+            recommendation_id=payload.recommendation_id,
+            conversation_id=payload.conversation_id,
+        )
+        recommendation_id = (
+            payload.recommendation_id
+            or (work_item.recommendation_id if work_item else None)
+            or f"rec:communication:{payload.conversation_id}"
+        )
         crm_notes = storage.list_client_crm_notes(client.id)
         propensity = propensity_service.build_client_propensity(storage=storage, client=client)
         objection_workflow = objection_service.build_workflow(
@@ -361,31 +472,83 @@ def create_app(
                 recommendation=recommendation,
                 crm_notes=crm_notes,
                 instruction=payload.instruction,
+                contact_goal=payload.contact_goal or (work_item.next_best_action if work_item else None),
                 product_propensities=propensity.items,
                 objection_workflow=objection_workflow.draft,
+            )
+            artifact = storage.add_script_generation(
+                ScriptGenerationRecord(
+                    id=str(uuid4()),
+                    client_id=payload.client_id,
+                    manager_id=payload.manager_id,
+                    recommendation_id=recommendation_id,
+                    conversation_id=payload.conversation_id,
+                    contact_goal=result.draft.contact_goal or payload.contact_goal,
+                    draft=result.draft,
+                    created_at=result.generated_at,
+                )
             )
             log_activity(
                 recommendation_type="sales_script",
                 client_id=payload.client_id,
-                recommendation_id=f"rec:communication:{payload.conversation_id}",
+                recommendation_id=recommendation_id,
                 conversation_id=payload.conversation_id,
                 manager_id=payload.manager_id,
-                action="generated",
+                action="script_generated",
                 payload_excerpt=result.draft.ready_script,
                 context_snapshot=" | ".join(result.draft.grounding_facts),
             )
-            return result
+            return result.model_copy(update={"artifact_id": artifact.id})
         except AIProviderError as exc:
             log_activity(
                 recommendation_type="sales_script",
                 client_id=payload.client_id,
-                recommendation_id=f"rec:communication:{payload.conversation_id}",
+                recommendation_id=recommendation_id,
                 conversation_id=payload.conversation_id,
                 manager_id=payload.manager_id,
                 action="generation_failed",
                 payload_excerpt=str(exc),
             )
             raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    @app.post("/ai/script-selection")
+    async def select_script_variant(payload: ScriptSelectionRequest):
+        record = storage.get_script_generation(payload.artifact_id)
+        if record is None:
+            raise HTTPException(status_code=404, detail="Script artifact not found")
+        if record.manager_id != payload.manager_id:
+            raise HTTPException(status_code=403, detail="Artifact belongs to another manager")
+
+        selected_text = payload.selected_text
+        if selected_text is None:
+            if payload.variant_label == "main":
+                selected_text = record.draft.ready_script
+            else:
+                variant = next(
+                    (item for item in record.draft.alternatives if item.label == payload.variant_label),
+                    None,
+                )
+                selected_text = variant.ready_script if variant else None
+
+        updated = storage.update_script_selection(
+            artifact_id=payload.artifact_id,
+            variant_label=payload.variant_label,
+            selected_text=selected_text,
+        )
+        if updated is None:
+            raise HTTPException(status_code=404, detail="Script artifact not found")
+
+        log_activity(
+            recommendation_type="sales_script",
+            client_id=updated.client_id,
+            recommendation_id=updated.recommendation_id,
+            conversation_id=updated.conversation_id,
+            manager_id=payload.manager_id,
+            action="script_variant_selected",
+            payload_excerpt=payload.variant_label,
+            context_snapshot=selected_text,
+        )
+        return {"artifact": updated}
 
     @app.post("/ai/objection-workflow")
     async def generate_objection_workflow(payload: ObjectionWorkflowRequest):
@@ -398,6 +561,17 @@ def create_app(
         if not conversation:
             raise HTTPException(status_code=404, detail="Conversation not found")
 
+        work_item = resolve_case_work_item(
+            client_id=client.id,
+            manager_id=payload.manager_id,
+            recommendation_id=payload.recommendation_id,
+            conversation_id=payload.conversation_id,
+        )
+        recommendation_id = (
+            payload.recommendation_id
+            or (work_item.recommendation_id if work_item else None)
+            or f"rec:communication:{payload.conversation_id}"
+        )
         try:
             result = objection_service.build_workflow(
                 provider=app.state.ai_provider,
@@ -405,28 +579,75 @@ def create_app(
                 conversation=conversation,
                 objection_text=payload.objection_text,
             )
+            artifact = storage.add_objection_workflow(
+                ObjectionWorkflowRecord(
+                    id=str(uuid4()),
+                    client_id=payload.client_id,
+                    manager_id=payload.manager_id,
+                    recommendation_id=recommendation_id,
+                    conversation_id=payload.conversation_id,
+                    draft=result.draft,
+                    created_at=result.generated_at,
+                )
+            )
             log_activity(
                 recommendation_type="objection_workflow",
                 client_id=payload.client_id,
-                recommendation_id=f"rec:communication:{payload.conversation_id}",
+                recommendation_id=recommendation_id,
                 conversation_id=payload.conversation_id,
                 manager_id=payload.manager_id,
-                action="generated",
+                action="objection_generated",
                 payload_excerpt=result.draft.analysis.objection_label,
                 context_snapshot=" | ".join(result.draft.grounding_facts),
             )
-            return result
+            return result.model_copy(update={"artifact_id": artifact.id})
         except AIProviderError as exc:
             log_activity(
                 recommendation_type="objection_workflow",
                 client_id=payload.client_id,
-                recommendation_id=f"rec:communication:{payload.conversation_id}",
+                recommendation_id=recommendation_id,
                 conversation_id=payload.conversation_id,
                 manager_id=payload.manager_id,
                 action="generation_failed",
                 payload_excerpt=str(exc),
             )
             raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    @app.post("/ai/objection-selection")
+    async def select_objection_option(payload: ObjectionSelectionRequest):
+        record = storage.get_objection_workflow(payload.artifact_id)
+        if record is None:
+            raise HTTPException(status_code=404, detail="Objection artifact not found")
+        if record.manager_id != payload.manager_id:
+            raise HTTPException(status_code=403, detail="Artifact belongs to another manager")
+
+        selected_response = payload.selected_response
+        if selected_response is None:
+            option = next(
+                (item for item in record.draft.handling_options if item.title == payload.option_title),
+                None,
+            )
+            selected_response = option.response if option else None
+
+        updated = storage.update_objection_selection(
+            artifact_id=payload.artifact_id,
+            option_title=payload.option_title,
+            selected_response=selected_response,
+        )
+        if updated is None:
+            raise HTTPException(status_code=404, detail="Objection artifact not found")
+
+        log_activity(
+            recommendation_type="objection_workflow",
+            client_id=updated.client_id,
+            recommendation_id=updated.recommendation_id,
+            conversation_id=updated.conversation_id,
+            manager_id=payload.manager_id,
+            action="objection_option_selected",
+            payload_excerpt=payload.option_title,
+            context_snapshot=selected_response,
+        )
+        return {"artifact": updated}
 
     @app.post("/ai/summarize-dialog")
     async def summarize_dialog(payload: SummarizeDialogRequest):
@@ -440,7 +661,17 @@ def create_app(
             raise HTTPException(status_code=404, detail="Conversation not found")
 
         recommendation = dialog_service.build_recommendation(client=client, conversation=conversation)
-        recommendation_id = f"rec:communication:{payload.conversation_id}"
+        work_item = resolve_case_work_item(
+            client_id=client.id,
+            manager_id=payload.manager_id,
+            recommendation_id=payload.recommendation_id,
+            conversation_id=payload.conversation_id,
+        )
+        recommendation_id = (
+            payload.recommendation_id
+            or (work_item.recommendation_id if work_item else None)
+            or f"rec:communication:{payload.conversation_id}"
+        )
 
         try:
             result = ai_summary_service.summarize_dialog(
@@ -454,6 +685,18 @@ def create_app(
                 summary_text=result.draft.contact_summary,
                 generated_at=result.generated_at,
             )
+            storage.add_crm_draft_revision(
+                CRMDraftRevision(
+                    id=str(uuid4()),
+                    client_id=payload.client_id,
+                    manager_id=payload.manager_id,
+                    recommendation_id=recommendation_id,
+                    conversation_id=payload.conversation_id,
+                    stage="ai_generated",
+                    draft=result.draft,
+                    created_at=result.generated_at,
+                )
+            )
             assistant_kb_service.rebuild_manager_snapshots(storage, dialog_service, client.manager_id)
             log_activity(
                 recommendation_type="mini_summary",
@@ -461,7 +704,7 @@ def create_app(
                 recommendation_id=recommendation_id,
                 conversation_id=payload.conversation_id,
                 manager_id=payload.manager_id,
-                action="generated",
+                action="summary_generated",
                 payload_excerpt=result.draft.contact_summary,
                 context_snapshot=" | ".join(result.draft.grounding_facts),
             )
@@ -471,7 +714,7 @@ def create_app(
                 recommendation_id=recommendation_id,
                 conversation_id=payload.conversation_id,
                 manager_id=payload.manager_id,
-                action="generated",
+                action="crm_draft_generated",
                 payload_excerpt=result.draft.crm_note_draft,
                 context_snapshot=" | ".join(result.draft.grounding_facts),
             )
@@ -522,8 +765,30 @@ def create_app(
             created_at=datetime.now(UTC),
         )
         created = storage.create_crm_note(note)
+        if payload.ai_draft_payload is not None:
+            storage.add_crm_draft_revision(
+                CRMDraftRevision(
+                    id=str(uuid4()),
+                    client_id=payload.client_id,
+                    manager_id=payload.manager_id,
+                    recommendation_id=payload.recommendation_id,
+                    conversation_id=payload.source_conversation_id,
+                    stage="manager_finalized",
+                    changed_fields=compute_draft_changed_fields(
+                        ai_draft=payload.ai_draft_payload,
+                        note_text=payload.note_text,
+                        summary_text=payload.summary_text,
+                        outcome=payload.outcome,
+                        follow_up_date=payload.follow_up_date,
+                        follow_up_reason=payload.follow_up_reason,
+                    ),
+                    draft=payload.ai_draft_payload,
+                    final_note_text=payload.note_text,
+                    created_at=created.created_at,
+                )
+            )
         if payload.recommendation_id and payload.recommendation_decision is not None:
-            feedback = storage.add_feedback(
+            feedback, inserted = storage.add_feedback(
                 FeedbackRequest(
                     recommendation_id=payload.recommendation_id,
                     manager_id=payload.manager_id,
@@ -535,17 +800,18 @@ def create_app(
                     selected_variant=payload.note_text[:240],
                 )
             )
-            log_activity(
-                recommendation_type="manager_work_item_feedback",
-                client_id=payload.client_id,
-                recommendation_id=payload.recommendation_id,
-                conversation_id=payload.source_conversation_id,
-                manager_id=payload.manager_id,
-                action="decision_saved",
-                decision=feedback.decision.value,
-                payload_excerpt=feedback.comment or payload.summary_text or payload.note_text,
-                context_snapshot=payload.note_text[:240],
-            )
+            if inserted:
+                log_activity(
+                    recommendation_type="manager_work_item_feedback",
+                    client_id=payload.client_id,
+                    recommendation_id=payload.recommendation_id,
+                    conversation_id=payload.source_conversation_id,
+                    manager_id=payload.manager_id,
+                    action="feedback_saved",
+                    decision=feedback.decision.value,
+                    payload_excerpt=feedback.comment or payload.summary_text or payload.note_text,
+                    context_snapshot=payload.note_text[:240],
+                )
         assistant_kb_service.rebuild_manager_snapshots(storage, dialog_service, created.manager_id)
         log_activity(
             recommendation_type="crm_note",
@@ -553,7 +819,7 @@ def create_app(
             recommendation_id=payload.recommendation_id,
             conversation_id=payload.source_conversation_id,
             manager_id=payload.manager_id,
-            action="saved",
+            action="crm_note_saved",
             decision=(payload.recommendation_decision.value if payload.recommendation_decision else None),
             payload_excerpt=payload.summary_text or payload.note_text,
             context_snapshot=(payload.follow_up_reason or payload.decision_comment),
@@ -562,21 +828,22 @@ def create_app(
 
     @app.post("/feedback")
     async def feedback(payload: FeedbackRequest):
-        created = storage.add_feedback(payload)
-        if payload.client_id:
+        created, inserted = storage.add_feedback(payload)
+        if payload.client_id and inserted:
             log_activity(
                 recommendation_type=payload.recommendation_type,
                 client_id=payload.client_id,
                 recommendation_id=payload.recommendation_id,
                 conversation_id=payload.conversation_id,
                 manager_id=payload.manager_id,
-                action="decision_recorded",
+                action="feedback_saved",
                 decision=payload.decision.value,
                 payload_excerpt=payload.comment,
                 context_snapshot=payload.selected_variant,
             )
-        assistant_kb_service.rebuild_manager_snapshots(storage, dialog_service, payload.manager_id)
-        return {"feedback": created}
+        if inserted:
+            assistant_kb_service.rebuild_manager_snapshots(storage, dialog_service, payload.manager_id)
+        return {"feedback": created, "created": inserted}
 
     return app
 

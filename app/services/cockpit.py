@@ -161,6 +161,9 @@ class ManagerCockpitService:
         self,
         client: Client,
         crm_notes,
+        *,
+        script_history=None,
+        objection_history=None,
     ) -> list[GeneratedArtifact]:
         artifacts: list[GeneratedArtifact] = []
         if client.ai_summary_text and client.ai_summary_generated_at:
@@ -189,7 +192,33 @@ class ManagerCockpitService:
                 )
             )
 
-        return artifacts
+        for record in script_history or []:
+            artifacts.append(
+                GeneratedArtifact(
+                    id=f"artifact:script:{record.id}",
+                    artifact_type=GeneratedArtifactType.sales_script,
+                    client_id=client.id,
+                    title="Скрипт контакта",
+                    summary=record.selected_text or record.draft.ready_script,
+                    created_at=record.created_at,
+                    source_conversation_id=record.conversation_id,
+                )
+            )
+
+        for record in objection_history or []:
+            artifacts.append(
+                GeneratedArtifact(
+                    id=f"artifact:objection:{record.id}",
+                    artifact_type=GeneratedArtifactType.objection_workflow,
+                    client_id=client.id,
+                    title="Разбор возражения",
+                    summary=record.selected_response or record.draft.next_step,
+                    created_at=record.created_at,
+                    source_conversation_id=record.conversation_id,
+                )
+            )
+
+        return sorted(artifacts, key=lambda item: item.created_at, reverse=True)
 
     def _build_task_item(
         self,

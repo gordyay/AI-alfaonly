@@ -1,5 +1,5 @@
 export type SortMode = "priority" | "due_at";
-export type ViewTab = "summary" | "crm" | "profile" | "portfolio";
+export type ViewTab = "summary" | "script" | "objections" | "crm" | "profile" | "portfolio";
 export type WorkItemType = "task" | "communication" | "opportunity";
 export type RecommendationStatus = "pending" | "accepted" | "rejected" | "edited";
 export type AssistantRole = "user" | "assistant" | "tool";
@@ -169,6 +169,8 @@ export interface ObjectionHandlingOption {
   title: string;
   response: string;
   rationale: string;
+  style?: string | null;
+  tactic?: string | null;
 }
 
 export interface ObjectionWorkflowDraft {
@@ -184,6 +186,7 @@ export interface ObjectionWorkflowResponse {
   draft: ObjectionWorkflowDraft;
   model_name: string;
   generated_at: string;
+  artifact_id?: string | null;
 }
 
 export type AISummaryOutcome =
@@ -215,6 +218,8 @@ export interface SalesScriptVariant {
   label: string;
   manager_talking_points: string[];
   ready_script: string;
+  style?: string | null;
+  tactic?: string | null;
 }
 
 export interface SalesScriptDraft {
@@ -229,6 +234,53 @@ export interface SalesScriptDraft {
   grounding_facts: string[];
   data_gaps: string[];
   alternatives: SalesScriptVariant[];
+}
+
+export interface GenerateScriptResponse {
+  draft: SalesScriptDraft;
+  model_name: string;
+  generated_at: string;
+  artifact_id?: string | null;
+}
+
+export interface ScriptGenerationRecord {
+  id: string;
+  client_id: string;
+  manager_id: string;
+  recommendation_id?: string | null;
+  conversation_id?: string | null;
+  contact_goal?: string | null;
+  selected_variant_label?: string | null;
+  selected_text?: string | null;
+  draft: SalesScriptDraft;
+  created_at: string;
+  selected_at?: string | null;
+}
+
+export interface ObjectionWorkflowRecord {
+  id: string;
+  client_id: string;
+  manager_id: string;
+  recommendation_id?: string | null;
+  conversation_id?: string | null;
+  selected_option_title?: string | null;
+  selected_response?: string | null;
+  draft: ObjectionWorkflowDraft;
+  created_at: string;
+  selected_at?: string | null;
+}
+
+export interface CRMDraftRevision {
+  id: string;
+  client_id: string;
+  manager_id: string;
+  recommendation_id?: string | null;
+  conversation_id?: string | null;
+  stage: string;
+  changed_fields: string[];
+  draft: AISummaryDraft;
+  final_note_text?: string | null;
+  created_at: string;
 }
 
 export interface AssistantCitation {
@@ -372,6 +424,9 @@ export interface ClientDetailResponse {
   activity_log: ActivityLogEntry[];
   generated_artifacts: GeneratedArtifact[];
   saved_ai_draft?: AISummaryDraft | null;
+  script_history: ScriptGenerationRecord[];
+  objection_history: ObjectionWorkflowRecord[];
+  crm_draft_history: CRMDraftRevision[];
 }
 
 export interface ThreadListResponse {
@@ -411,6 +466,13 @@ export interface SupervisorRecentDecision {
   created_at: string;
 }
 
+export interface SupervisorFunnelStage {
+  id: string;
+  label: string;
+  count: number;
+  helper_text?: string | null;
+}
+
 export interface SupervisorDashboardResponse {
   manager_id: string;
   generated_at: string;
@@ -418,4 +480,5 @@ export interface SupervisorDashboardResponse {
   decision_breakdown: SupervisorDecisionBreakdown[];
   product_distribution: SupervisorProductDistribution[];
   recent_decisions: SupervisorRecentDecision[];
+  completion_funnel: SupervisorFunnelStage[];
 }

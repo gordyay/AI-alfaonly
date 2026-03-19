@@ -17,6 +17,7 @@ from .models import (
     AssistantSnapshotType,
     AssistantThread,
     AssistantCitation,
+    CRMDraftRevision,
     CRMNote,
     ChannelType,
     Client,
@@ -28,6 +29,10 @@ from .models import (
     Message,
     Product,
     ProductHolding,
+    ScriptGenerationRecord,
+    SalesScriptDraft,
+    ObjectionWorkflowDraft,
+    ObjectionWorkflowRecord,
     RecommendationStatus,
     RecommendationFeedback,
     Task,
@@ -207,6 +212,46 @@ class SQLiteStorage:
                     created_at TEXT NOT NULL
                 );
 
+                CREATE TABLE IF NOT EXISTS script_generations (
+                    id TEXT PRIMARY KEY,
+                    client_id TEXT NOT NULL,
+                    manager_id TEXT NOT NULL,
+                    recommendation_id TEXT,
+                    conversation_id TEXT,
+                    contact_goal TEXT,
+                    selected_variant_label TEXT,
+                    selected_text TEXT,
+                    draft_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    selected_at TEXT
+                );
+
+                CREATE TABLE IF NOT EXISTS objection_workflows (
+                    id TEXT PRIMARY KEY,
+                    client_id TEXT NOT NULL,
+                    manager_id TEXT NOT NULL,
+                    recommendation_id TEXT,
+                    conversation_id TEXT,
+                    selected_option_title TEXT,
+                    selected_response TEXT,
+                    draft_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    selected_at TEXT
+                );
+
+                CREATE TABLE IF NOT EXISTS crm_draft_revisions (
+                    id TEXT PRIMARY KEY,
+                    client_id TEXT NOT NULL,
+                    manager_id TEXT NOT NULL,
+                    recommendation_id TEXT,
+                    conversation_id TEXT,
+                    stage TEXT NOT NULL,
+                    changed_fields_json TEXT NOT NULL DEFAULT '[]',
+                    draft_json TEXT NOT NULL,
+                    final_note_text TEXT,
+                    created_at TEXT NOT NULL
+                );
+
                 CREATE TABLE IF NOT EXISTS assistant_threads (
                     id TEXT PRIMARY KEY,
                     manager_id TEXT NOT NULL,
@@ -247,6 +292,9 @@ class SQLiteStorage:
                 CREATE INDEX IF NOT EXISTS idx_crm_notes_client_created_at ON crm_notes(client_id, created_at DESC);
                 CREATE INDEX IF NOT EXISTS idx_feedback_manager_recommendation ON recommendation_feedback(manager_id, recommendation_id, created_at DESC);
                 CREATE INDEX IF NOT EXISTS idx_recommendation_log_client_created_at ON recommendation_log(client_id, created_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_script_generations_client_created_at ON script_generations(client_id, created_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_objection_workflows_client_created_at ON objection_workflows(client_id, created_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_crm_draft_revisions_client_created_at ON crm_draft_revisions(client_id, created_at DESC);
                 """
             )
             self._ensure_table_column(connection, "crm_notes", "summary_text", "TEXT")
@@ -286,6 +334,9 @@ class SQLiteStorage:
                 DELETE FROM follow_ups;
                 DELETE FROM recommendation_feedback;
                 DELETE FROM recommendation_log;
+                DELETE FROM script_generations;
+                DELETE FROM objection_workflows;
+                DELETE FROM crm_draft_revisions;
                 DELETE FROM assistant_messages;
                 DELETE FROM assistant_threads;
                 DELETE FROM assistant_kb_snapshots;
@@ -725,6 +776,207 @@ class SQLiteStorage:
 
         return note
 
+    def add_crm_draft_revision(self, revision: CRMDraftRevision) -> CRMDraftRevision:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO crm_draft_revisions (
+                    id, client_id, manager_id, recommendation_id, conversation_id, stage, changed_fields_json, draft_json, final_note_text, created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    revision.id,
+                    revision.client_id,
+                    revision.manager_id,
+                    revision.recommendation_id,
+                    revision.conversation_id,
+                    revision.stage,
+                    json.dumps(revision.changed_fields, ensure_ascii=False),
+                    revision.draft.model_dump_json(),
+                    revision.final_note_text,
+                    revision.created_at.isoformat(),
+                ),
+            )
+            connection.commit()
+        return revision
+
+    def list_crm_draft_revisions(
+        self,
+        *,
+        client_id: str,
+        recommendation_id: str | None = None,
+        conversation_id: str | None = None,
+    ) -> list[CRMDraftRevision]:
+        query = ["SELECT * FROM crm_draft_revisions WHERE client_id = ?"]
+        params: list[str] = [client_id]
+        if recommendation_id is not None and conversation_id is not None:
+            query.append("AND (recommendation_id = ? OR conversation_id = ?)")
+            params.extend([recommendation_id, conversation_id])
+        elif recommendation_id is not None:
+            query.append("AND recommendation_id = ?")
+            params.append(recommendation_id)
+        elif conversation_id is not None:
+            query.append("AND conversation_id = ?")
+            params.append(conversation_id)
+        query.append("ORDER BY created_at DESC")
+        with self._connect() as connection:
+            rows = connection.execute("\n".join(query), params).fetchall()
+        return [self._map_crm_draft_revision(row) for row in rows]
+
+    def add_script_generation(self, record: ScriptGenerationRecord) -> ScriptGenerationRecord:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO script_generations (
+                    id, client_id, manager_id, recommendation_id, conversation_id, contact_goal, selected_variant_label, selected_text, draft_json, created_at, selected_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    record.id,
+                    record.client_id,
+                    record.manager_id,
+                    record.recommendation_id,
+                    record.conversation_id,
+                    record.contact_goal,
+                    record.selected_variant_label,
+                    record.selected_text,
+                    record.draft.model_dump_json(),
+                    record.created_at.isoformat(),
+                    record.selected_at.isoformat() if record.selected_at else None,
+                ),
+            )
+            connection.commit()
+        return record
+
+    def list_script_generations(
+        self,
+        *,
+        client_id: str,
+        recommendation_id: str | None = None,
+        conversation_id: str | None = None,
+    ) -> list[ScriptGenerationRecord]:
+        query = ["SELECT * FROM script_generations WHERE client_id = ?"]
+        params: list[str] = [client_id]
+        if recommendation_id is not None and conversation_id is not None:
+            query.append("AND (recommendation_id = ? OR conversation_id = ?)")
+            params.extend([recommendation_id, conversation_id])
+        elif recommendation_id is not None:
+            query.append("AND recommendation_id = ?")
+            params.append(recommendation_id)
+        elif conversation_id is not None:
+            query.append("AND conversation_id = ?")
+            params.append(conversation_id)
+        query.append("ORDER BY created_at DESC")
+        with self._connect() as connection:
+            rows = connection.execute("\n".join(query), params).fetchall()
+        return [self._map_script_generation(row) for row in rows]
+
+    def get_script_generation(self, artifact_id: str) -> ScriptGenerationRecord | None:
+        with self._connect() as connection:
+            row = connection.execute("SELECT * FROM script_generations WHERE id = ?", (artifact_id,)).fetchone()
+        return self._map_script_generation(row) if row else None
+
+    def update_script_selection(
+        self,
+        *,
+        artifact_id: str,
+        variant_label: str,
+        selected_text: str | None,
+    ) -> ScriptGenerationRecord | None:
+        with self._connect() as connection:
+            row = connection.execute("SELECT id FROM script_generations WHERE id = ?", (artifact_id,)).fetchone()
+            if row is None:
+                return None
+            selected_at = utc_now()
+            connection.execute(
+                """
+                UPDATE script_generations
+                SET selected_variant_label = ?, selected_text = ?, selected_at = ?
+                WHERE id = ?
+                """,
+                (variant_label, selected_text, selected_at.isoformat(), artifact_id),
+            )
+            connection.commit()
+        return self.get_script_generation(artifact_id)
+
+    def add_objection_workflow(self, record: ObjectionWorkflowRecord) -> ObjectionWorkflowRecord:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO objection_workflows (
+                    id, client_id, manager_id, recommendation_id, conversation_id, selected_option_title, selected_response, draft_json, created_at, selected_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    record.id,
+                    record.client_id,
+                    record.manager_id,
+                    record.recommendation_id,
+                    record.conversation_id,
+                    record.selected_option_title,
+                    record.selected_response,
+                    record.draft.model_dump_json(),
+                    record.created_at.isoformat(),
+                    record.selected_at.isoformat() if record.selected_at else None,
+                ),
+            )
+            connection.commit()
+        return record
+
+    def list_objection_workflows(
+        self,
+        *,
+        client_id: str,
+        recommendation_id: str | None = None,
+        conversation_id: str | None = None,
+    ) -> list[ObjectionWorkflowRecord]:
+        query = ["SELECT * FROM objection_workflows WHERE client_id = ?"]
+        params: list[str] = [client_id]
+        if recommendation_id is not None and conversation_id is not None:
+            query.append("AND (recommendation_id = ? OR conversation_id = ?)")
+            params.extend([recommendation_id, conversation_id])
+        elif recommendation_id is not None:
+            query.append("AND recommendation_id = ?")
+            params.append(recommendation_id)
+        elif conversation_id is not None:
+            query.append("AND conversation_id = ?")
+            params.append(conversation_id)
+        query.append("ORDER BY created_at DESC")
+        with self._connect() as connection:
+            rows = connection.execute("\n".join(query), params).fetchall()
+        return [self._map_objection_workflow(row) for row in rows]
+
+    def get_objection_workflow(self, artifact_id: str) -> ObjectionWorkflowRecord | None:
+        with self._connect() as connection:
+            row = connection.execute("SELECT * FROM objection_workflows WHERE id = ?", (artifact_id,)).fetchone()
+        return self._map_objection_workflow(row) if row else None
+
+    def update_objection_selection(
+        self,
+        *,
+        artifact_id: str,
+        option_title: str,
+        selected_response: str | None,
+    ) -> ObjectionWorkflowRecord | None:
+        with self._connect() as connection:
+            row = connection.execute("SELECT id FROM objection_workflows WHERE id = ?", (artifact_id,)).fetchone()
+            if row is None:
+                return None
+            selected_at = utc_now()
+            connection.execute(
+                """
+                UPDATE objection_workflows
+                SET selected_option_title = ?, selected_response = ?, selected_at = ?
+                WHERE id = ?
+                """,
+                (option_title, selected_response, selected_at.isoformat(), artifact_id),
+            )
+            connection.commit()
+        return self.get_objection_workflow(artifact_id)
+
     def update_client_ai_summary(self, client_id: str, summary_text: str, generated_at: datetime | None = None) -> None:
         with self._connect() as connection:
             connection.execute(
@@ -741,7 +993,14 @@ class SQLiteStorage:
             )
             connection.commit()
 
-    def add_feedback(self, payload: FeedbackRequest) -> RecommendationFeedback:
+    def add_feedback(self, payload: FeedbackRequest) -> tuple[RecommendationFeedback, bool]:
+        latest = self._get_latest_feedback(
+            manager_id=payload.manager_id,
+            recommendation_id=payload.recommendation_id,
+        )
+        if latest and self._feedback_payload_matches(latest, payload):
+            return latest, False
+
         item = RecommendationFeedback(
             id=str(uuid4()),
             recommendation_id=payload.recommendation_id,
@@ -778,7 +1037,7 @@ class SQLiteStorage:
             )
             connection.commit()
 
-        return item
+        return item, True
 
     def list_feedback(
         self,
@@ -828,26 +1087,13 @@ class SQLiteStorage:
         if not recommendation_ids:
             return {}
 
-        placeholders = ",".join("?" for _ in recommendation_ids)
-        params = [manager_id, *recommendation_ids]
-        with self._connect() as connection:
-            rows = connection.execute(
-                f"""
-                SELECT recommendation_id, decision
-                FROM recommendation_feedback
-                WHERE manager_id = ?
-                  AND recommendation_id IN ({placeholders})
-                ORDER BY created_at DESC
-                """,
-                params,
-            ).fetchall()
-
+        feedback_items = self.list_feedback(manager_id=manager_id)
         status_map: dict[str, RecommendationStatus] = {}
-        for row in rows:
-            recommendation_id = row["recommendation_id"]
-            if recommendation_id in status_map:
+        allowed_ids = set(recommendation_ids)
+        for item in feedback_items:
+            if item.recommendation_id not in allowed_ids or item.recommendation_id in status_map:
                 continue
-            status_map[recommendation_id] = RecommendationStatus(row["decision"])
+            status_map[item.recommendation_id] = RecommendationStatus(item.decision)
         return status_map
 
     def add_activity_log(self, entry: ActivityLogEntry) -> ActivityLogEntry:
@@ -890,21 +1136,23 @@ class SQLiteStorage:
             ).fetchall()
 
         return [
-            ActivityLogEntry(
-                id=row["id"],
-                recommendation_type=row["recommendation_type"],
-                client_id=row["client_id"],
-                recommendation_id=row["recommendation_id"] if "recommendation_id" in row.keys() else None,
-                conversation_id=row["conversation_id"],
-                manager_id=row["manager_id"],
-                action=row["action"],
-                decision=row["decision"] if "decision" in row.keys() else None,
-                payload_excerpt=row["payload_excerpt"],
-                context_snapshot=row["context_snapshot"] if "context_snapshot" in row.keys() else None,
-                created_at=datetime.fromisoformat(row["created_at"]),
-            )
+            self._map_activity_log(row)
             for row in rows
         ]
+
+    def list_manager_activity_logs(self, manager_id: str) -> list[ActivityLogEntry]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT *
+                FROM recommendation_log
+                WHERE manager_id = ?
+                ORDER BY created_at DESC
+                """,
+                (manager_id,),
+            ).fetchall()
+
+        return [self._map_activity_log(row) for row in rows]
 
     def create_assistant_thread(self, thread: AssistantThread) -> AssistantThread:
         with self._connect() as connection:
@@ -1129,6 +1377,31 @@ class SQLiteStorage:
             row = connection.execute(query, params).fetchone()
         return int(row["count"]) if row else 0
 
+    def _get_latest_feedback(self, *, manager_id: str, recommendation_id: str) -> RecommendationFeedback | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT *
+                FROM recommendation_feedback
+                WHERE manager_id = ? AND recommendation_id = ?
+                ORDER BY created_at DESC
+                LIMIT 1
+                """,
+                (manager_id, recommendation_id),
+            ).fetchone()
+        return self._map_feedback(row) if row else None
+
+    @staticmethod
+    def _feedback_payload_matches(existing: RecommendationFeedback, payload: FeedbackRequest) -> bool:
+        return (
+            existing.recommendation_type == payload.recommendation_type
+            and existing.client_id == payload.client_id
+            and existing.conversation_id == payload.conversation_id
+            and existing.decision == payload.decision
+            and (existing.comment or None) == (payload.comment or None)
+            and (existing.selected_variant or None) == (payload.selected_variant or None)
+        )
+
     @staticmethod
     def _group_client_product_rows(product_rows: list[sqlite3.Row]) -> dict[str, list[sqlite3.Row]]:
         grouped: dict[str, list[sqlite3.Row]] = {}
@@ -1264,6 +1537,22 @@ class SQLiteStorage:
         )
 
     @staticmethod
+    def _map_activity_log(row: sqlite3.Row) -> ActivityLogEntry:
+        return ActivityLogEntry(
+            id=row["id"],
+            recommendation_type=row["recommendation_type"],
+            client_id=row["client_id"],
+            recommendation_id=row["recommendation_id"] if "recommendation_id" in row.keys() else None,
+            conversation_id=row["conversation_id"],
+            manager_id=row["manager_id"],
+            action=row["action"],
+            decision=row["decision"] if "decision" in row.keys() else None,
+            payload_excerpt=row["payload_excerpt"],
+            context_snapshot=row["context_snapshot"] if "context_snapshot" in row.keys() else None,
+            created_at=datetime.fromisoformat(row["created_at"]),
+        )
+
+    @staticmethod
     def _map_conversation_insights(row: sqlite3.Row) -> ConversationInsights:
         return ConversationInsights(
             tone_label=row["tone_label"],
@@ -1322,6 +1611,52 @@ class SQLiteStorage:
             source_updated_at=SQLiteStorage._parse_datetime(row["source_updated_at"]),
             created_at=datetime.fromisoformat(row["created_at"]),
             updated_at=datetime.fromisoformat(row["updated_at"]),
+        )
+
+    @staticmethod
+    def _map_script_generation(row: sqlite3.Row) -> ScriptGenerationRecord:
+        return ScriptGenerationRecord(
+            id=row["id"],
+            client_id=row["client_id"],
+            manager_id=row["manager_id"],
+            recommendation_id=row["recommendation_id"],
+            conversation_id=row["conversation_id"],
+            contact_goal=row["contact_goal"],
+            selected_variant_label=row["selected_variant_label"],
+            selected_text=row["selected_text"],
+            draft=SalesScriptDraft.model_validate_json(row["draft_json"]),
+            created_at=datetime.fromisoformat(row["created_at"]),
+            selected_at=SQLiteStorage._parse_datetime(row["selected_at"]),
+        )
+
+    @staticmethod
+    def _map_objection_workflow(row: sqlite3.Row) -> ObjectionWorkflowRecord:
+        return ObjectionWorkflowRecord(
+            id=row["id"],
+            client_id=row["client_id"],
+            manager_id=row["manager_id"],
+            recommendation_id=row["recommendation_id"],
+            conversation_id=row["conversation_id"],
+            selected_option_title=row["selected_option_title"],
+            selected_response=row["selected_response"],
+            draft=ObjectionWorkflowDraft.model_validate_json(row["draft_json"]),
+            created_at=datetime.fromisoformat(row["created_at"]),
+            selected_at=SQLiteStorage._parse_datetime(row["selected_at"]),
+        )
+
+    @staticmethod
+    def _map_crm_draft_revision(row: sqlite3.Row) -> CRMDraftRevision:
+        return CRMDraftRevision(
+            id=row["id"],
+            client_id=row["client_id"],
+            manager_id=row["manager_id"],
+            recommendation_id=row["recommendation_id"],
+            conversation_id=row["conversation_id"],
+            stage=row["stage"],
+            changed_fields=json.loads(row["changed_fields_json"] or "[]"),
+            draft=AISummaryDraft.model_validate_json(row["draft_json"]),
+            final_note_text=row["final_note_text"],
+            created_at=datetime.fromisoformat(row["created_at"]),
         )
 
     @staticmethod

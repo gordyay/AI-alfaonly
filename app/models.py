@@ -344,6 +344,8 @@ class SalesScriptVariant(BaseModel):
     label: str
     manager_talking_points: List[str] = Field(default_factory=list)
     ready_script: str
+    style: Optional[str] = None
+    tactic: Optional[str] = None
 
 
 class SalesScriptDraft(BaseModel):
@@ -372,6 +374,8 @@ class ObjectionHandlingOption(BaseModel):
     title: str
     response: str
     rationale: str
+    style: Optional[str] = None
+    tactic: Optional[str] = None
 
 
 class ObjectionWorkflowDraft(BaseModel):
@@ -387,6 +391,7 @@ class SummarizeDialogRequest(BaseModel):
     client_id: str
     conversation_id: str
     manager_id: str = "m1"
+    recommendation_id: Optional[str] = None
 
 
 class GenerateScriptRequest(BaseModel):
@@ -394,6 +399,8 @@ class GenerateScriptRequest(BaseModel):
     conversation_id: str
     manager_id: str = "m1"
     instruction: Optional[str] = None
+    contact_goal: Optional[str] = None
+    recommendation_id: Optional[str] = None
 
 
 class ObjectionWorkflowRequest(BaseModel):
@@ -401,6 +408,7 @@ class ObjectionWorkflowRequest(BaseModel):
     conversation_id: str
     manager_id: str = "m1"
     objection_text: Optional[str] = None
+    recommendation_id: Optional[str] = None
 
 
 class SummarizeDialogResponse(BaseModel):
@@ -417,6 +425,7 @@ class GenerateScriptResponse(BaseModel):
     draft: SalesScriptDraft
     model_name: str
     generated_at: datetime
+    artifact_id: Optional[str] = None
 
 
 class ObjectionWorkflowResponse(BaseModel):
@@ -425,6 +434,61 @@ class ObjectionWorkflowResponse(BaseModel):
     draft: ObjectionWorkflowDraft
     model_name: str
     generated_at: datetime
+    artifact_id: Optional[str] = None
+
+
+class ScriptSelectionRequest(BaseModel):
+    artifact_id: str
+    manager_id: str = "m1"
+    variant_label: str
+    selected_text: Optional[str] = None
+
+
+class ObjectionSelectionRequest(BaseModel):
+    artifact_id: str
+    manager_id: str = "m1"
+    option_title: str
+    selected_response: Optional[str] = None
+
+
+class ScriptGenerationRecord(BaseModel):
+    id: str
+    client_id: str
+    manager_id: str
+    recommendation_id: Optional[str] = None
+    conversation_id: Optional[str] = None
+    contact_goal: Optional[str] = None
+    selected_variant_label: Optional[str] = None
+    selected_text: Optional[str] = None
+    draft: SalesScriptDraft
+    created_at: datetime
+    selected_at: Optional[datetime] = None
+
+
+class ObjectionWorkflowRecord(BaseModel):
+    id: str
+    client_id: str
+    manager_id: str
+    recommendation_id: Optional[str] = None
+    conversation_id: Optional[str] = None
+    selected_option_title: Optional[str] = None
+    selected_response: Optional[str] = None
+    draft: ObjectionWorkflowDraft
+    created_at: datetime
+    selected_at: Optional[datetime] = None
+
+
+class CRMDraftRevision(BaseModel):
+    id: str
+    client_id: str
+    manager_id: str
+    recommendation_id: Optional[str] = None
+    conversation_id: Optional[str] = None
+    stage: str
+    changed_fields: List[str] = Field(default_factory=list)
+    draft: AISummaryDraft
+    final_note_text: Optional[str] = None
+    created_at: datetime
 
 
 class AssistantCitation(BaseModel):
@@ -625,6 +689,13 @@ class SupervisorProductDistribution(BaseModel):
     count: int
 
 
+class SupervisorFunnelStage(BaseModel):
+    id: str
+    label: str
+    count: int
+    helper_text: Optional[str] = None
+
+
 class SupervisorRecentDecision(BaseModel):
     recommendation_id: str
     recommendation_type: str
@@ -644,3 +715,4 @@ class SupervisorDashboardResponse(BaseModel):
     decision_breakdown: List[SupervisorDecisionBreakdown] = Field(default_factory=list)
     product_distribution: List[SupervisorProductDistribution] = Field(default_factory=list)
     recent_decisions: List[SupervisorRecentDecision] = Field(default_factory=list)
+    completion_funnel: List[SupervisorFunnelStage] = Field(default_factory=list)

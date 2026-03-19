@@ -29,6 +29,7 @@ class AIScriptService:
         recommendation: DialogRecommendation | None,
         crm_notes: list[CRMNote],
         instruction: str | None,
+        contact_goal: str | None = None,
         product_propensities: list[ProductPropensityItem] | None = None,
         objection_workflow: ObjectionWorkflowDraft | None = None,
     ) -> dict[str, Any]:
@@ -102,7 +103,8 @@ class AIScriptService:
             "objection_workflow": objection_workflow.model_dump(mode="json") if objection_workflow else None,
             "script_job": {
                 "mode": mode,
-                "contact_goal": recommendation.next_best_action if recommendation else "Поддержать следующий осмысленный шаг",
+                "contact_goal": contact_goal
+                or (recommendation.next_best_action if recommendation else "Поддержать следующий осмысленный шаг"),
                 "focus_product": top_propensities[0].product_name if top_propensities else None,
                 "preferred_tone": self._resolve_tone(conversation),
             },
@@ -117,6 +119,7 @@ class AIScriptService:
         recommendation: DialogRecommendation | None,
         crm_notes: list[CRMNote],
         instruction: str | None,
+        contact_goal: str | None = None,
         product_propensities: list[ProductPropensityItem] | None = None,
         objection_workflow: ObjectionWorkflowDraft | None = None,
     ) -> GenerateScriptResponse:
@@ -126,6 +129,7 @@ class AIScriptService:
             recommendation=recommendation,
             crm_notes=crm_notes,
             instruction=instruction,
+            contact_goal=contact_goal,
             product_propensities=product_propensities,
             objection_workflow=objection_workflow,
         )

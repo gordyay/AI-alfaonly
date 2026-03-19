@@ -7,10 +7,12 @@ interface SupervisorPanelProps {
 
 function getMetricLabel(id: string, fallback: string): string {
   const labels: Record<string, string> = {
-    "usage-rate": "Использование рекомендаций",
-    "acceptance-rate": "Доля принятых рекомендаций",
-    "high-priority-coverage": "Покрытие срочных кейсов",
-    "time-saved": "Сэкономленное время",
+    "adoption-rate": "Adoption",
+    "acceptance-rate": "Acceptance",
+    "edited-rate": "Edited",
+    "rejected-rate": "Rejected",
+    "coverage-rate": "Coverage",
+    "latency-hours": "Latency",
   };
 
   return labels[id] ?? fallback;
@@ -22,10 +24,12 @@ function getMetricHelperText(id: string, fallback?: string | null): string | nul
   }
 
   const labels: Record<string, string> = {
-    "usage-rate": fallback.replace("work items", "кейсов"),
-    "acceptance-rate": "Показывает, по скольким рекомендациям менеджер принял явное решение.",
-    "high-priority-coverage": fallback.replaceAll("high-priority", "срочных"),
-    "time-saved": "Оценка строится по сохранённым AI-черновикам CRM и использованным рекомендациям.",
+    "adoption-rate": fallback,
+    "acceptance-rate": fallback,
+    "edited-rate": fallback,
+    "rejected-rate": fallback,
+    "coverage-rate": fallback.replaceAll("high-priority", "срочных"),
+    "latency-hours": fallback,
   };
 
   return labels[id] ?? fallback;
@@ -57,6 +61,24 @@ export function SupervisorPanel({ dashboard }: SupervisorPanelProps) {
       </div>
 
       <div className="supervisor-grid">
+        <section className="content-card">
+          <h3>Completion funnel</h3>
+          <div className="stack-list">
+            {dashboard.completion_funnel.length ? (
+              dashboard.completion_funnel.map((stage) => (
+                <article className="stack-card" key={stage.id}>
+                  <strong>
+                    {stage.label} · {stage.count}
+                  </strong>
+                  <p>{stage.helper_text || "Подробность не указана."}</p>
+                </article>
+              ))
+            ) : (
+              <p className="insight">Funnel появится после первых действий по кейсам.</p>
+            )}
+          </div>
+        </section>
+
         <section className="content-card">
           <h3>Разбор решений</h3>
           <div className="stack-list">

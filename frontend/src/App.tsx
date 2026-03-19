@@ -15,7 +15,9 @@ import type {
   AssistantThread,
   AssistantThreadDetail,
   ClientDetailResponse,
+  GenerateScriptResponse,
   ManagerCockpit,
+  ObjectionWorkflowResponse,
   RecommendationStatus,
   SortMode,
   SupervisorDashboardResponse,
@@ -169,6 +171,14 @@ export function App() {
   const [aiSaving, setAiSaving] = useState(false);
   const [aiStatus, setAiStatus] = useState<UiStatus>(null);
   const [aiSaveStatus, setAiSaveStatus] = useState<UiStatus>(null);
+  const [scriptGoal, setScriptGoal] = useState("");
+  const [scriptLoading, setScriptLoading] = useState(false);
+  const [scriptSelecting, setScriptSelecting] = useState(false);
+  const [scriptStatus, setScriptStatus] = useState<UiStatus>(null);
+  const [objectionInput, setObjectionInput] = useState("");
+  const [objectionLoading, setObjectionLoading] = useState(false);
+  const [objectionSelecting, setObjectionSelecting] = useState(false);
+  const [objectionStatus, setObjectionStatus] = useState<UiStatus>(null);
   const [feedbackDecision, setFeedbackDecision] = useState<RecommendationStatus | null>(null);
   const [feedbackComment, setFeedbackComment] = useState("");
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
@@ -189,6 +199,8 @@ export function App() {
   const selectedConversation = selectedDetail
     ? getConversationForWorkItem(selectedDetail.conversations, selectedWorkItem)
     : null;
+  const latestScriptArtifact = selectedDetail?.script_history?.[0] ?? null;
+  const latestObjectionArtifact = selectedDetail?.objection_history?.[0] ?? null;
   const filteredWorkQueue = filterWorkQueue(workQueue, deferredQuery, queueFilters);
   const filteredSections = groupWorkQueue(filteredWorkQueue);
   const productOptions = [
@@ -233,9 +245,12 @@ export function App() {
     {
       id: "prepare",
       title: "Подготовить артефакт",
-      description: aiDraft ? "Сводка и запись в CRM готовы к проверке." : "Подготовьте сводку, запись в CRM или спросите помощника.",
-      done: Boolean(aiDraft),
-      active: Boolean(selectedWorkItem) && Boolean(savedFeedbackDecision) && !aiDraft,
+      description:
+        aiDraft || latestScriptArtifact || latestObjectionArtifact
+          ? "Сценарий, objection flow или CRM draft готовы к проверке."
+          : "Подготовьте script, objection flow или CRM-черновик по кейсу.",
+      done: Boolean(aiDraft || latestScriptArtifact || latestObjectionArtifact),
+      active: Boolean(selectedWorkItem) && Boolean(savedFeedbackDecision) && !aiDraft && !latestScriptArtifact && !latestObjectionArtifact,
     },
     {
       id: "save",
@@ -311,6 +326,8 @@ export function App() {
       setAiDraft(null);
       setAiStatus(null);
       setAiSaveStatus(null);
+      setScriptStatus(null);
+      setObjectionStatus(null);
     });
 
     const detail = await loadClientDetail(nextClientId, item.id);
@@ -389,6 +406,17 @@ export function App() {
       setAiDraft(cloneDraft(actionResult.draft));
       setActiveTab("crm");
       setAiStatus({ type: "success", text: "Черновик для CRM подготовлен через помощника." });
+    }
+    if (actionResult.sales_script_draft) {
+      setActiveTab("script");
+      setScriptStatus({ type: "success", text: "Ассистент подготовил скрипт. Выберите и сохраните вариант в центре кейса." });
+    }
+    if (actionResult.objection_workflow_draft) {
+      setActiveTab("objections");
+      setObjectionStatus({
+        type: "success",
+        text: "Ассистент подготовил objection flow. Зафиксируйте выбранный ответ в центре кейса.",
+      });
     }
   }
 
@@ -469,6 +497,135 @@ export function App() {
       setAiStatus({ type: "error", text: error instanceof Error ? error.message : "Не удалось сгенерировать черновик." });
     } finally {
       setAiLoading(false);
+    }
+  }
+
+  async function handleGenerateScript() {
+    if (!selectedDetail || !selectedConversation || !selectedWorkItem) {
+      setScriptStatus({ type: "error", text: "Для кейса не выбрана коммуникация." });
+      return;
+    }
+
+    setScriptLoading(true);
+    setScriptStatus({ type: "loading", text: "Готовим скрипт по выбранному кейсу..." });
+
+    try {
+      const response = await apiPost<
+        GenerateScriptResponse,
+        { client_id: string; conversation_id: string; manager_id: string; contact_goal: string | null; recommendation_id: string }
+      >("/ai/generate-script", {
+        client_id: selectedDetail.client.id,
+        conversation_id: selectedConversation.id,
+        manager_id: managerId,
+        contact_goal: scriptGoal || selectedWorkItem.next_best_action,
+        recommendation_id: selectedWorkItem.recommendation_id,
+      });
+
+      await reloadClientDetail(selectedDetail.client.id, selectedWorkItem.id);
+      await loadCockpit(selectedWorkItem.id, selectedDetail.client.id);
+      setActiveTab("script");
+      setScriptStatus({
+        type: "success",
+        text: `Скрипт сохранён в историю кейса (${formatDateTime(response.generated_at)}).`,
+      });
+    } catch (error) {
+      setScriptStatus({ type: "error", text: error instanceof Error ? error.message : "Не удалось подготовить скрипт." });
+    } finally {
+      setScriptLoading(false);
+    }
+  }
+
+  async function handleSelectScriptVariant(variantLabel: string, selectedText: string) {
+    if (!latestScriptArtifact || !selectedDetail || !selectedWorkItem) {
+      return;
+    }
+
+    setScriptSelecting(true);
+    setScriptStatus({ type: "loading", text: "Фиксируем выбранный вариант скрипта..." });
+
+    try {
+      await apiPost<unknown, Record<string, string>>("/ai/script-selection", {
+        artifact_id: latestScriptArtifact.id,
+        manager_id: managerId,
+        variant_label: variantLabel,
+        selected_text: selectedText,
+      });
+      await reloadClientDetail(selectedDetail.client.id, selectedWorkItem.id);
+      await loadSupervisorDashboard();
+      setScriptStatus({ type: "success", text: "Выбранный вариант скрипта сохранён в кейсе." });
+    } catch (error) {
+      setScriptStatus({
+        type: "error",
+        text: error instanceof Error ? error.message : "Не удалось сохранить вариант скрипта.",
+      });
+    } finally {
+      setScriptSelecting(false);
+    }
+  }
+
+  async function handleGenerateObjectionWorkflow() {
+    if (!selectedDetail || !selectedConversation || !selectedWorkItem) {
+      setObjectionStatus({ type: "error", text: "Для кейса не выбрана коммуникация." });
+      return;
+    }
+
+    setObjectionLoading(true);
+    setObjectionStatus({ type: "loading", text: "Готовим варианты отработки возражения..." });
+
+    try {
+      const response = await apiPost<
+        ObjectionWorkflowResponse,
+        { client_id: string; conversation_id: string; manager_id: string; objection_text: string | null; recommendation_id: string }
+      >("/ai/objection-workflow", {
+        client_id: selectedDetail.client.id,
+        conversation_id: selectedConversation.id,
+        manager_id: managerId,
+        objection_text: objectionInput || null,
+        recommendation_id: selectedWorkItem.recommendation_id,
+      });
+
+      await reloadClientDetail(selectedDetail.client.id, selectedWorkItem.id);
+      await loadCockpit(selectedWorkItem.id, selectedDetail.client.id);
+      setActiveTab("objections");
+      setObjectionStatus({
+        type: "success",
+        text: `Варианты ответа сохранены (${formatDateTime(response.generated_at)}).`,
+      });
+    } catch (error) {
+      setObjectionStatus({
+        type: "error",
+        text: error instanceof Error ? error.message : "Не удалось подготовить objection workflow.",
+      });
+    } finally {
+      setObjectionLoading(false);
+    }
+  }
+
+  async function handleSelectObjectionOption(optionTitle: string, selectedResponse: string) {
+    if (!latestObjectionArtifact || !selectedDetail || !selectedWorkItem) {
+      return;
+    }
+
+    setObjectionSelecting(true);
+    setObjectionStatus({ type: "loading", text: "Фиксируем выбранный ответ..." });
+
+    try {
+      await apiPost<unknown, Record<string, string>>("/ai/objection-selection", {
+        artifact_id: latestObjectionArtifact.id,
+        manager_id: managerId,
+        option_title: optionTitle,
+        selected_response: selectedResponse,
+      });
+      await reloadClientDetail(selectedDetail.client.id, selectedWorkItem.id);
+      await loadSupervisorDashboard();
+      setObjectionStatus({ type: "success", text: "Выбранный вариант ответа сохранён." });
+    } catch (error) {
+      setObjectionStatus({
+        type: "error",
+        text: error instanceof Error ? error.message : "Не удалось сохранить вариант ответа.",
+      });
+    } finally {
+      setObjectionSelecting(false);
     }
   }
 
@@ -576,6 +733,10 @@ export function App() {
     setSelectedClientId(null);
     setSelectedWorkItemId(null);
     setAiDraft(null);
+    setScriptGoal("");
+    setScriptStatus(null);
+    setObjectionInput("");
+    setObjectionStatus(null);
     setFilterQuery("");
     setQueueFilters(DEFAULT_QUEUE_FILTERS);
     loadCockpit().catch(() => undefined);
@@ -598,6 +759,13 @@ export function App() {
       setAiDraft((current) => current ?? cloneDraft(detail.saved_ai_draft));
     }
   }, [clientDetails, selectedClientId, selectedWorkItemId]);
+
+  useEffect(() => {
+    setScriptGoal(selectedWorkItem?.next_best_action || "");
+    setObjectionInput("");
+    setScriptStatus(null);
+    setObjectionStatus(null);
+  }, [selectedWorkItem?.id]);
 
   useEffect(() => {
     if (!selectedDetail || !selectedWorkItem) {
@@ -729,6 +897,28 @@ export function App() {
               }}
               onUpdateDraft={(draft) => {
                 setAiDraft(draft);
+              }}
+              scriptGoal={scriptGoal}
+              onScriptGoalChange={setScriptGoal}
+              scriptLoading={scriptLoading}
+              scriptSelecting={scriptSelecting}
+              scriptStatus={scriptStatus}
+              onGenerateScript={() => {
+                handleGenerateScript().catch(() => undefined);
+              }}
+              onSelectScriptVariant={(variantLabel, selectedText) => {
+                handleSelectScriptVariant(variantLabel, selectedText).catch(() => undefined);
+              }}
+              objectionInput={objectionInput}
+              onObjectionInputChange={setObjectionInput}
+              objectionLoading={objectionLoading}
+              objectionSelecting={objectionSelecting}
+              objectionStatus={objectionStatus}
+              onGenerateObjectionWorkflow={() => {
+                handleGenerateObjectionWorkflow().catch(() => undefined);
+              }}
+              onSelectObjectionOption={(optionTitle, selectedResponse) => {
+                handleSelectObjectionOption(optionTitle, selectedResponse).catch(() => undefined);
               }}
               feedbackDecision={feedbackDecision}
               savedFeedbackDecision={savedFeedbackDecision}

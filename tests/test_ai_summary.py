@@ -479,14 +479,14 @@ async def test_ai_summarize_dialog_returns_structured_draft(ai_env: AITestEnv):
     assert ai_env.provider.contexts[0]["client"]["id"] == "c1"
     assert ai_env.provider.contexts[0]["conversation"]["id"] == conversation_id
 
-    refreshed_detail = await ai_env.client.get("/client/c1")
+    refreshed_detail = await ai_env.client.get("/client/c1?work_item_id=task:task-2")
     assert refreshed_detail.status_code == 200
     assert refreshed_detail.json()["client"]["ai_summary_text"] == body["draft"]["contact_summary"]
 
     activity_log_response = await ai_env.client.get("/client/c1/activity-log")
     assert activity_log_response.status_code == 200
     items = activity_log_response.json()["items"]
-    assert {("mini_summary", "generated"), ("crm_note_draft", "generated")}.issubset(
+    assert {("mini_summary", "summary_generated"), ("crm_note_draft", "crm_draft_generated")}.issubset(
         {(item["recommendation_type"], item["action"]) for item in items}
     )
 
@@ -566,22 +566,25 @@ async def test_generate_draft_then_save_crm_note_persists_ai_metadata(ai_env: AI
     refreshed_detail = await ai_env.client.get("/client/c1?work_item_id=task:task-9")
     assert refreshed_detail.status_code == 200
     latest_note = refreshed_detail.json()["crm_notes"][0]
+    latest_revision = refreshed_detail.json()["crm_draft_history"][0]
     assert latest_note["summary_text"] == draft["contact_summary"]
     assert latest_note["source_conversation_id"] == conversation_id
     assert latest_note["ai_generated"] is True
     assert latest_note["ai_draft_payload"]["contact_summary"] == draft["contact_summary"]
     assert refreshed_detail.json()["saved_ai_draft"]["crm_note_draft"] == draft["crm_note_draft"]
+    assert latest_revision["stage"] == "manager_finalized"
+    assert latest_revision["changed_fields"] == []
 
     activity_log_response = await ai_env.client.get("/client/c1/activity-log")
     assert activity_log_response.status_code == 200
     activity_pairs = {(item["recommendation_type"], item["action"]) for item in activity_log_response.json()["items"]}
-    assert ("crm_note", "saved") in activity_pairs
+    assert ("crm_note", "crm_note_saved") in activity_pairs
 
 
 @pytest.mark.anyio
 async def test_ai_generate_script_returns_structured_draft(ai_env: AITestEnv):
-    detail_response = await ai_env.client.get("/client/c1")
-    conversation_id = detail_response.json()["conversations"][0]["id"]
+    detail_response = await ai_env.client.get("/client/c1?work_item_id=task:task-2")
+    conversation_id = detail_response.json()["selected_conversation_id"]
 
     response = await ai_env.client.post(
         "/ai/generate-script",
@@ -597,12 +600,17 @@ async def test_ai_generate_script_returns_structured_draft(ai_env: AITestEnv):
     assert body["draft"]["channel"] == "chat"
     assert body["draft"]["ready_script"].startswith("Иван")
     assert body["draft"]["grounding_facts"]
+    assert body["artifact_id"]
     assert ai_env.provider.script_contexts
     assert ai_env.provider.script_contexts[0]["instruction"] == "Подготовь короткий скрипт продажи без давления."
 
+    refreshed_detail = await ai_env.client.get("/client/c1?work_item_id=task:task-2")
+    assert refreshed_detail.status_code == 200
+    assert refreshed_detail.json()["script_history"][0]["id"] == body["artifact_id"]
+
     activity_log_response = await ai_env.client.get("/client/c1/activity-log")
     assert activity_log_response.status_code == 200
-    assert ("sales_script", "generated") in {
+    assert ("sales_script", "script_generated") in {
         (item["recommendation_type"], item["action"]) for item in activity_log_response.json()["items"]
     }
 
@@ -626,6 +634,11 @@ async def test_objection_workflow_response_contains_grounding_facts(ai_env: AITe
     body = response.json()
     assert body["draft"]["grounding_facts"]
     assert "data_gaps" in body["draft"]
+    assert body["artifact_id"]
+
+    refreshed_detail = await ai_env.client.get("/client/c2")
+    assert refreshed_detail.status_code == 200
+    assert refreshed_detail.json()["objection_history"][0]["id"] == body["artifact_id"]
 
 
 @pytest.mark.anyio
@@ -637,3 +650,47 @@ async def test_ai_generate_script_returns_404_for_unknown_conversation(ai_env: A
 
     assert response.status_code == 404
     assert response.json()["detail"] == "Conversation not found"
+
+
+@pytest.mark.anyio
+async def test_script_selection_and_objection_selection_are_persisted(ai_env: AITestEnv):
+    detail_response = await ai_env.client.get("/client/c1?work_item_id=task:task-2")
+    conversation_id = detail_response.json()["selected_conversation_id"]
+
+    script_response = await ai_env.client.post(
+        "/ai/generate-script",
+        json={"client_id": "c1", "conversation_id": conversation_id},
+    )
+    assert script_response.status_code == 200
+    script_artifact_id = script_response.json()["artifact_id"]
+    await ai_env.client.post(
+        "/ai/script-selection",
+        json={
+            "artifact_id": script_artifact_id,
+            "manager_id": "m1",
+            "variant_label": "main",
+            "selected_text": script_response.json()["draft"]["ready_script"],
+        },
+    )
+
+    objection_response = await ai_env.client.post(
+        "/ai/objection-workflow",
+        json={"client_id": "c1", "conversation_id": conversation_id, "objection_text": "Не хочу рисковать"},
+    )
+    assert objection_response.status_code == 200
+    objection_artifact_id = objection_response.json()["artifact_id"]
+    first_option = objection_response.json()["draft"]["handling_options"][0]
+    await ai_env.client.post(
+        "/ai/objection-selection",
+        json={
+            "artifact_id": objection_artifact_id,
+            "manager_id": "m1",
+            "option_title": first_option["title"],
+            "selected_response": first_option["response"],
+        },
+    )
+
+    refreshed_detail = await ai_env.client.get("/client/c1?work_item_id=task:task-2")
+    assert refreshed_detail.status_code == 200
+    assert refreshed_detail.json()["script_history"][0]["selected_variant_label"] == "main"
+    assert refreshed_detail.json()["objection_history"][0]["selected_option_title"] == first_option["title"]
