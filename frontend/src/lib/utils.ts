@@ -192,13 +192,13 @@ export function groupWorkQueue(items: WorkItem[]): CockpitSection[] {
     {
       id: "urgent-communications",
       title: "Срочные коммуникации",
-      subtitle: "Кейсы, где нужно ответить или вернуться с follow-up.",
+      subtitle: "Кейсы, где нужно ответить или вернуться с повторным контактом.",
       item_type: "communication",
     },
     {
       id: "product-opportunities",
       title: "Коммерческие возможности",
-      subtitle: "Opportunity-слой с явным продуктовым следующим шагом.",
+      subtitle: "Кейсы с явным продуктовым следующим шагом.",
       item_type: "opportunity",
     },
   ];
@@ -216,7 +216,7 @@ export function getFocusPropensityLabel(propensity?: ProductPropensityResponse |
   if (!topItem) {
     return "Нужно собрать больше данных";
   }
-  return `${topItem.product_name} · ${topItem.score}`;
+  return `${topItem.product_name} · приоритет ${topItem.score}`;
 }
 
 export function getRecommendationTypeLabel(value?: string | null): string {

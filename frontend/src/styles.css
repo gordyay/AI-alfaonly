@@ -171,6 +171,11 @@ textarea:focus {
   margin-top: 20px;
 }
 
+.hero__copy {
+  position: relative;
+  z-index: 1;
+}
+
 .hero__stats {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -462,6 +467,8 @@ textarea:focus {
 }
 
 .queue-focus-banner {
+  width: 100%;
+  text-align: left;
   display: grid;
   gap: 4px;
   padding: 12px 14px;
@@ -546,6 +553,11 @@ textarea:focus {
 .badge--accent {
   background: var(--accent-soft);
   color: var(--accent-deep);
+}
+
+.badge--subtle {
+  background: rgba(19, 20, 24, 0.04);
+  color: var(--muted);
 }
 
 .search-field,
@@ -682,6 +694,19 @@ textarea:focus {
 .work-item-card__summary {
   margin: 0 0 6px;
   color: var(--muted);
+}
+
+.work-item-card__summary--primary {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.work-item-card__summary--secondary {
+  display: -webkit-box;
+  margin-bottom: 2px;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .work-item-card__meta {
@@ -1048,5 +1073,92 @@ textarea:focus {
   .tour-card__actions,
   .tour-card__actions-right {
     flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 640px) {
+  .app-shell {
+    width: min(100vw - 16px, 1720px);
+    margin: 8px auto 18px;
+  }
+
+  .hero {
+    gap: 14px;
+    padding: 16px;
+  }
+
+  .hero::after {
+    width: 150px;
+    height: 150px;
+    inset: auto -20px -34px auto;
+  }
+
+  .hero h1 {
+    max-width: none;
+    font-size: clamp(1.9rem, 9vw, 2.6rem);
+  }
+
+  .hero__text {
+    display: -webkit-box;
+    margin: 0;
+    overflow: hidden;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+  }
+
+  .hero__controls {
+    margin-top: 12px;
+  }
+
+  .hero__controls .ghost-button,
+  .onboarding-panel--collapsed .ghost-button,
+  .onboarding-panel--collapsed .primary-button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .hero__stats {
+    gap: 10px;
+  }
+
+  .stat-card {
+    padding: 14px;
+  }
+
+  .stat-card__value {
+    margin-top: 6px;
+    font-size: 1.5rem;
+  }
+
+  .onboarding-panel {
+    margin-top: 10px;
+    padding: 14px;
+  }
+
+  .queue-summary-card {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .work-item-card {
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .work-item-card__score,
+  .work-item-card__avatar {
+    min-width: 40px;
+    min-height: 40px;
+    width: 40px;
+    height: 40px;
+  }
+
+  .work-item-card h3 {
+    margin-bottom: 6px;
+    font-size: 0.96rem;
+  }
+
+  .work-item-card__summary--secondary {
+    -webkit-line-clamp: 1;
   }
 }

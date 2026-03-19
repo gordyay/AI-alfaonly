@@ -192,9 +192,9 @@ class AIScriptService:
             f"Канал контакта: {conversation.channel.value}, тон: {self._resolve_tone(conversation)}.",
         ]
         if recommendation is not None:
-            facts.append(f"Next best action: {recommendation.next_best_action}")
+            facts.append(f"Рекомендуемый следующий шаг: {recommendation.next_best_action}")
         if product_propensities:
-            facts.append(f"Топ-продукт по propensity: {product_propensities[0].product_name}")
+            facts.append(f"Наиболее подходящий продукт: {product_propensities[0].product_name}")
         if objection_workflow is not None:
             facts.append(f"Текущее возражение: {objection_workflow.analysis.objection_label}")
         return facts[:5]
@@ -208,9 +208,9 @@ class AIScriptService:
     ) -> list[str]:
         gaps: list[str] = []
         if not client.ai_summary_text:
-            gaps.append("Нет свежего AI summary по клиенту, поэтому скрипт опирается на raw dialogue context.")
+            gaps.append("Нет свежей краткой сводки по клиенту, поэтому сценарий опирается только на историю диалога.")
         if not product_propensities:
-            gaps.append("Не рассчитан product propensity, продуктовый фокус выбран эвристически.")
+            gaps.append("Продуктовый фокус не рассчитан автоматически, поэтому он выбран по общим сигналам кейса.")
         if not conversation.insights or not conversation.insights.action_hints:
-            gaps.append("Нет action hints в conversation insights, тональность выбрана по общему правилу.")
+            gaps.append("Нет явных подсказок по подаче, поэтому тональность выбрана по общему правилу.")
         return gaps

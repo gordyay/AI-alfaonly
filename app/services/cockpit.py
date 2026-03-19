@@ -127,7 +127,7 @@ class ManagerCockpitService:
             CockpitSection(
                 id="urgent-communications",
                 title="Срочные коммуникации",
-                subtitle="Клиенты, которым нужно ответить или вернуться с follow-up.",
+                subtitle="Клиенты, которым нужно ответить или вернуться с повторным контактом.",
                 item_type=WorkItemType.communication,
                 items=communication_items,
             ),
@@ -172,7 +172,7 @@ class ManagerCockpitService:
                     id=f"artifact:summary:{client.id}",
                     artifact_type=GeneratedArtifactType.summary,
                     client_id=client.id,
-                    title="AI summary контакта",
+                    title="Краткая сводка контакта",
                     summary=client.ai_summary_text,
                     created_at=client.ai_summary_generated_at,
                 )
@@ -395,7 +395,7 @@ class ManagerCockpitService:
             priority_label=self._priority_label(score),
             why=self._build_opportunity_reasons(client=client, conversation=conversation, breakdown=breakdown),
             next_best_action="Подготовить персонализированное предложение и согласовать следующий шаг",
-            expected_benefit="Перевести интерес клиента в конкретный follow-up с продуктовым оффером.",
+            expected_benefit="Перевести интерес клиента в конкретный следующий шаг с продуктовым предложением.",
             factor_breakdown=breakdown,
             recommendation_id=f"rec:opportunity:{client.id}:{conversation.id}",
             ai_context_note=self._build_ai_context_note(conversation=conversation, task=None),
@@ -578,10 +578,10 @@ class ManagerCockpitService:
     def _opportunity_title(self, conversation: Conversation) -> str:
         insights = conversation.insights
         if insights and insights.interest_tags:
-            return f"Opportunity: {insights.interest_tags[0]}"
+            return f"Возможность: {insights.interest_tags[0].replace('_', ' ')}"
         if insights and insights.mentioned_product_codes:
-            return f"Opportunity: продукт {insights.mentioned_product_codes[0]}"
-        return "Opportunity: следующий продуктовый шаг"
+            return f"Возможность: продукт {insights.mentioned_product_codes[0].upper()}"
+        return "Возможность: следующий продуктовый шаг"
 
     @staticmethod
     def _opportunity_summary(client: Client, conversation: Conversation) -> str:
@@ -616,11 +616,11 @@ class ManagerCockpitService:
         if conversation and conversation.insights:
             insights = conversation.insights
             if insights.action_hints:
-                notes.append(f"Action hints: {', '.join(insights.action_hints)}")
+                notes.append(f"Подсказки по подаче: {', '.join(insights.action_hints)}")
             if insights.objection_tags:
-                notes.append(f"Objections: {', '.join(insights.objection_tags)}")
+                notes.append(f"Возражения: {', '.join(insights.objection_tags)}")
             if insights.preferred_follow_up_format:
-                notes.append(f"Preferred format: {insights.preferred_follow_up_format}")
+                notes.append(f"Предпочтительный формат: {insights.preferred_follow_up_format}")
         if task and task.business_goal:
-            notes.append(f"Task goal: {task.business_goal}")
+            notes.append(f"Цель задачи: {task.business_goal}")
         return "; ".join(notes) if notes else None

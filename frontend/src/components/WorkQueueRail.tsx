@@ -23,6 +23,7 @@ interface WorkQueueRailProps {
   loading: boolean;
   selectedWorkItemId?: string | null;
   selectedWorkItemTitle?: string | null;
+  onJumpToFocus: () => void;
   filterValue: string;
   onFilterChange: (value: string) => void;
   onSelectWorkItem: (item: WorkItem) => void;
@@ -30,6 +31,10 @@ interface WorkQueueRailProps {
   filters: WorkQueueFilters;
   productOptions: FilterOption[];
   onChangeQueueFilter: (name: keyof WorkQueueFilters, value: string) => void;
+}
+
+function getCompactSummary(item: WorkItem) {
+  return item.summary || item.expected_benefit || "Описание кейса пока не заполнено.";
 }
 
 function sortItems(items: WorkItem[], sortMode: SortMode): WorkItem[] {
@@ -88,6 +93,7 @@ export function WorkQueueRail({
   loading,
   selectedWorkItemId,
   selectedWorkItemTitle,
+  onJumpToFocus,
   filterValue,
   onFilterChange,
   onSelectWorkItem,
@@ -140,7 +146,7 @@ export function WorkQueueRail({
       <div className="panel__header panel__header--stack">
         <div className="queue-header">
           <div>
-            <p className="panel__eyebrow">Рабочий triage</p>
+            <p className="panel__eyebrow">Рабочая очередь</p>
             <h2>Полная очередь кейсов</h2>
           </div>
           <div className="queue-summary-card">
@@ -151,10 +157,10 @@ export function WorkQueueRail({
         </div>
 
         {selectedWorkItemTitle ? (
-          <div className="queue-focus-banner">
+          <button className="queue-focus-banner" type="button" onClick={onJumpToFocus}>
             <strong>Сейчас открыт кейс:</strong>
             <span>{selectedWorkItemTitle}</span>
-          </div>
+          </button>
         ) : null}
 
         <label className="search-field">
@@ -222,17 +228,17 @@ export function WorkQueueRail({
                         {getWorkItemTypeLabel(item.item_type)} · {getRecommendationStatusLabel(item.recommendation_status)}
                       </p>
                       <h3>{item.title}</h3>
-                      <p className="work-item-card__summary">{item.client_name}</p>
-                      <p className="work-item-card__summary">{item.summary}</p>
+                      <p className="work-item-card__summary work-item-card__summary--primary">{item.client_name}</p>
+                      <p className="work-item-card__summary work-item-card__summary--secondary">{getCompactSummary(item)}</p>
                       <div className="chip-row chip-row--compact">
                         <span className="badge">{getPriorityLabel(item.priority_label)}</span>
                         {item.product_name ? <span className="badge badge--accent">{item.product_name}</span> : null}
                         {item.channel ? <span className="badge">{getChannelLabel(item.channel)}</span> : null}
-                        {item.client_churn_risk ? <span className="badge">{getChurnRiskLabel(item.client_churn_risk)}</span> : null}
+                        {item.client_churn_risk ? <span className="badge badge--subtle">{getChurnRiskLabel(item.client_churn_risk)}</span> : null}
                       </div>
                       {item.why.length ? (
                         <div className="chip-row chip-row--compact">
-                          {item.why.slice(0, 2).map((reason) => (
+                          {item.why.slice(0, 1).map((reason) => (
                             <span className="badge queue-reason-badge" key={reason}>
                               {reason}
                             </span>
@@ -240,7 +246,6 @@ export function WorkQueueRail({
                         </div>
                       ) : null}
                       <div className="work-item-card__meta">
-                        <span>{item.expected_benefit}</span>
                         <span>{formatDueLabel(item.due_at)}</span>
                       </div>
                     </div>

@@ -40,6 +40,16 @@ MESSAGE_PREVIEW_LIMIT = 300
 
 
 class AssistantKnowledgeService:
+    @staticmethod
+    def _priority_label(value: str | None) -> str:
+        labels = {
+            "urgent": "срочно",
+            "high": "высокий приоритет",
+            "medium": "средний приоритет",
+            "low": "низкий приоритет",
+        }
+        return labels.get(value or "", value or "не указан")
+
     def ensure_snapshots(self, storage: SQLiteStorage, dialog_service: DialogPriorityService) -> None:
         manager_ids = sorted({client.manager_id for client in storage.list_clients()})
         if not manager_ids:
@@ -155,7 +165,7 @@ class AssistantKnowledgeService:
                     manager_id=manager_id,
                     client_id=client.id,
                     snapshot_type=AssistantSnapshotType.propensity_overview,
-                    title=f"{client.full_name} — propensity",
+                    title=f"{client.full_name} — продуктовый фокус",
                     content_text=self._build_propensity_overview(propensity),
                     source_updated_at=now,
                     created_at=now,
@@ -321,14 +331,14 @@ class AssistantKnowledgeService:
         if recommendation is None:
             return "Рекомендация для диалога пока не рассчитана."
         content = (
-            f"Приоритет {recommendation.priority_score} ({recommendation.priority_label}). "
+            f"Приоритет {recommendation.priority_score} ({self._priority_label(recommendation.priority_label)}). "
             f"Почему: {', '.join(recommendation.why)}. "
-            f"Next best action: {recommendation.next_best_action}. "
-            f"Факторы: T_wait={recommendation.factor_breakdown.t_wait}, "
-            f"C_value={recommendation.factor_breakdown.c_value}, "
-            f"U_comm={recommendation.factor_breakdown.u_comm}, "
-            f"P_sale={recommendation.factor_breakdown.p_sale}, "
-            f"R_churn={recommendation.factor_breakdown.r_churn}."
+            f"Следующий шаг: {recommendation.next_best_action}. "
+            f"Факторы: срочность={recommendation.factor_breakdown.t_wait}, "
+            f"ценность клиента={recommendation.factor_breakdown.c_value}, "
+            f"вовлечённость={recommendation.factor_breakdown.u_comm}, "
+            f"коммерческий потенциал={recommendation.factor_breakdown.p_sale}, "
+            f"риск потери клиента={recommendation.factor_breakdown.r_churn}."
         )
         return self._clamp(content, SNAPSHOT_LIMITS[AssistantSnapshotType.recommendation_overview])
 
@@ -350,9 +360,9 @@ class AssistantKnowledgeService:
     def _build_propensity_overview(self, propensity) -> str:
         top_items = propensity.items[:3]
         if not top_items:
-            return "Продуктовый propensity не рассчитан."
+            return "Продуктовый фокус пока не рассчитан."
         content = " | ".join(
-            f"{item.product_name}: score={item.score}; reasons={', '.join(item.reasons[:2])}; next={item.next_best_action}"
+            f"{item.product_name}: приоритет={item.score}; причины={', '.join(item.reasons[:2])}; следующий шаг={item.next_best_action}"
             for item in top_items
         )
         return self._clamp(content, SNAPSHOT_LIMITS[AssistantSnapshotType.propensity_overview])

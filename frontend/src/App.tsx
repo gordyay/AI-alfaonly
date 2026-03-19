@@ -1,4 +1,4 @@
-import { startTransition, useDeferredValue, useEffect, useState } from "react";
+import { startTransition, useDeferredValue, useEffect, useRef, useState } from "react";
 import { apiGet, apiPost } from "./lib/api";
 import {
   cloneDraft,
@@ -193,6 +193,8 @@ export function App() {
   const [assistantSending, setAssistantSending] = useState(false);
   const [assistantStatus, setAssistantStatus] = useState<UiStatus>(null);
   const [assistantInput, setAssistantInput] = useState("");
+  const [pendingFocusJump, setPendingFocusJump] = useState(false);
+  const focusPanelRef = useRef<HTMLDivElement | null>(null);
 
   const workQueue = cockpit?.work_queue ?? [];
   const selectedDetailKey = selectedClientId ? getDetailCacheKey(selectedClientId, selectedWorkItemId) : null;
@@ -337,6 +339,13 @@ export function App() {
       setAiSaveStatus(null);
       setScriptStatus(null);
       setObjectionStatus(null);
+      setAssistantSelectedThreadId("draft");
+      setAssistantThreadDetail({
+        thread: createDraftThread(managerId, item.client_name),
+        messages: [],
+      });
+      setAssistantInput("");
+      setAssistantStatus(null);
     });
 
     const detail = await loadClientDetail(nextClientId, item.id);
@@ -424,7 +433,7 @@ export function App() {
       setActiveTab("objections");
       setObjectionStatus({
         type: "success",
-        text: "Ассистент подготовил objection flow. Зафиксируйте выбранный ответ в центре кейса.",
+        text: "Ассистент подготовил разбор возражения. Зафиксируйте выбранный ответ в центре кейса.",
       });
     }
   }
@@ -604,7 +613,7 @@ export function App() {
     } catch (error) {
       setObjectionStatus({
         type: "error",
-        text: error instanceof Error ? error.message : "Не удалось подготовить objection workflow.",
+        text: error instanceof Error ? error.message : "Не удалось подготовить разбор возражения.",
       });
     } finally {
       setObjectionLoading(false);
@@ -775,6 +784,23 @@ export function App() {
   }, [selectedWorkItem?.id]);
 
   useEffect(() => {
+    if (!pendingFocusJump || cockpitLoading || detailLoading) {
+      return;
+    }
+
+    if (!window.matchMedia("(max-width: 1080px)").matches) {
+      setPendingFocusJump(false);
+      return;
+    }
+
+    focusPanelRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+    setPendingFocusJump(false);
+  }, [pendingFocusJump, cockpitLoading, detailLoading, selectedWorkItem?.id]);
+
+  useEffect(() => {
     if (!selectedDetail || !selectedWorkItem) {
       setFeedbackDecision(null);
       setFeedbackComment("");
@@ -855,9 +881,13 @@ export function App() {
             loading={cockpitLoading}
             selectedWorkItemId={selectedWorkItemId}
             selectedWorkItemTitle={selectedWorkItem?.title ?? null}
+            onJumpToFocus={() => {
+              focusPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+            }}
             filterValue={filterQuery}
             onFilterChange={setFilterQuery}
             onSelectWorkItem={(item) => {
+              setPendingFocusJump(true);
               selectWorkItem(item).catch(() => undefined);
             }}
             sortMode={sortMode}
@@ -869,7 +899,7 @@ export function App() {
           />
         </div>
 
-        <div className="workspace-main" data-tour="focus">
+        <div className="workspace-main" data-tour="focus" ref={focusPanelRef}>
           {cockpitLoading || detailLoading ? (
             <section className="panel focus-panel focus-panel--empty">
               <p className="panel__eyebrow">Загрузка</p>

@@ -28,6 +28,13 @@ interface UiStatus {
   text: string;
 }
 
+interface VisibleActivityEntry {
+  id: string;
+  title: string;
+  text: string;
+  createdAt: string;
+}
+
 interface FocusPanelProps {
   detail?: ClientDetailResponse | null;
   workItem?: WorkItem | null;
@@ -172,6 +179,41 @@ export function FocusPanel({
   const isFeedbackDirty =
     (feedbackDecision || null) !== (savedFeedbackDecision || null) ||
     feedbackComment.trim() !== savedFeedbackComment.trim();
+  const canSaveCRM = Boolean(aiDraft && savedFeedbackDecision);
+  const hasFeedbackInHistory = recentAuditEntries.some((item) => item.action === "feedback_saved");
+  const hasCRMInHistory = recentAuditEntries.some((item) => item.action === "crm_note_saved");
+  const visibleActivityEntries: VisibleActivityEntry[] = [
+    ...recentAuditEntries.map((item) => ({
+      id: item.id,
+      title: `${getRecommendationTypeLabel(item.recommendation_type)} · ${getActivityActionLabel(item.action)}${
+        item.decision ? ` · ${getRecommendationStatusLabel(item.decision)}` : ""
+      }`,
+      text: item.payload_excerpt || "Описание действия не заполнено.",
+      createdAt: item.created_at,
+    })),
+  ];
+
+  if (currentFeedback && !hasFeedbackInHistory) {
+    visibleActivityEntries.push({
+      id: `feedback-derived-${currentFeedback.recommendation_id}-${currentFeedback.created_at}`,
+      title: `Рекомендация менеджеру · Решение сохранено · ${getRecommendationStatusLabel(currentFeedback.decision)}`,
+      text: currentFeedback.comment || "Комментарий не добавлен.",
+      createdAt: currentFeedback.created_at,
+    });
+  }
+
+  if (latestSavedNote && !hasCRMInHistory) {
+    visibleActivityEntries.push({
+      id: `crm-derived-${latestSavedNote.id}`,
+      title: "CRM-заметка · Сохранено",
+      text: latestSavedNote.summary_text || latestSavedNote.note_text || "Запись сохранена без пояснения.",
+      createdAt: latestSavedNote.created_at,
+    });
+  }
+
+  visibleActivityEntries.sort(
+    (left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
+  );
   const feedbackButtonLabel = feedbackSubmitting
     ? "Сохраняем решение..."
     : savedFeedbackDecision
@@ -310,8 +352,8 @@ export function FocusPanel({
             <section className="content-card">
               <h3>Центр действий по кейсу</h3>
               <p className="insight">
-                Сначала выберите артефакт в центре кейса, затем отдельно сохраните лучший вариант. Это убирает
-                случайные accept и оставляет чистую историю решений.
+                Шаги можно проходить в удобном порядке, но цикл считается завершённым только после двух действий:
+                решение зафиксировано и итог сохранён в CRM.
               </p>
               <div className="button-row">
                 <button className="ghost-button" type="button" onClick={() => onChangeTab("script")}>
@@ -338,8 +380,8 @@ export function FocusPanel({
             <section className="content-card">
               <h3>Решение по рекомендации</h3>
               <p className="insight">
-                Выбор и сохранение разделены: сначала статус, затем отдельный save. Это и есть single source of truth
-                для supervisor метрик.
+                Выбор и сохранение разделены: сначала статус, затем отдельное сохранение. Так история решений и
+                сводка по менеджеру остаются согласованными.
               </p>
               <div className="button-row">
                 <button
@@ -400,16 +442,12 @@ export function FocusPanel({
             <section className="content-card">
               <h3>История действий</h3>
               <div className="stack-list">
-                {recentAuditEntries.length ? (
-                  recentAuditEntries.slice(0, 6).map((item) => (
+                {visibleActivityEntries.length ? (
+                  visibleActivityEntries.slice(0, 6).map((item) => (
                     <article className="stack-card" key={item.id}>
-                      <strong>
-                        {getRecommendationTypeLabel(item.recommendation_type)} ·{" "}
-                        {getActivityActionLabel(item.action)}
-                        {item.decision ? ` · ${getRecommendationStatusLabel(item.decision)}` : ""}
-                      </strong>
-                      <p>{item.payload_excerpt || "Краткое описание действия не было сохранено."}</p>
-                      <small>{formatDateTime(item.created_at)}</small>
+                      <strong>{item.title}</strong>
+                      <p>{item.text}</p>
+                      <small>{formatDateTime(item.createdAt)}</small>
                     </article>
                   ))
                 ) : (
@@ -669,20 +707,27 @@ export function FocusPanel({
                   <p className="panel__eyebrow">CRM-заметка</p>
                   <h3>Черновик ИИ и финальная версия менеджера</h3>
                 </div>
-              <div className="button-row">
+                <div className="button-row">
                   <button className="ghost-button" type="button" onClick={onGenerateSummary} disabled={!aiEnabled || aiLoading}>
                     {aiLoading ? "Генерируем..." : "Собрать черновик"}
                   </button>
                   <button className="ghost-button" type="button" onClick={onCopyCRM} disabled={!aiDraft?.crm_note_draft}>
                     Копировать текст
                   </button>
-                  <button className="primary-button" type="button" onClick={onSaveSummary} disabled={!aiDraft || aiSaving}>
+                  <button className="primary-button" type="button" onClick={onSaveSummary} disabled={!canSaveCRM || aiSaving}>
                     {aiSaving ? "Сохраняем..." : "Сохранить в CRM"}
                   </button>
                 </div>
-            </div>
+              </div>
 
             {!aiEnabled ? <StatusMessage compact type="error" message={aiUnavailableMessage} /> : null}
+            {aiDraft && !savedFeedbackDecision ? (
+              <StatusMessage
+                compact
+                type="loading"
+                message="Сначала зафиксируйте решение по кейсу, затем сохраните итог в CRM."
+              />
+            ) : null}
             <StatusMessage type={aiStatus?.type} message={aiStatus?.text} />
             <StatusMessage compact type={aiSaveStatus?.type} message={aiSaveStatus?.text} />
 

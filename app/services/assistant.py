@@ -516,7 +516,7 @@ class AssistantService:
                 id=str(uuid4()),
                 thread_id=thread_id,
                 role=AssistantMessageRole.assistant,
-                content="У выбранного кейса нет привязанной коммуникации, поэтому objection workflow собрать нельзя.",
+                content="У выбранного кейса нет привязанной коммуникации, поэтому разбор возражения сейчас собрать нельзя.",
                 citations=[],
                 used_context=[],
                 created_at=utc_now(),
@@ -544,7 +544,7 @@ class AssistantService:
             id=str(uuid4()),
             thread_id=thread_id,
             role=AssistantMessageRole.assistant,
-            content=f"Собрал objection workflow по клиенту {client.full_name}.",
+            content=f"Собрал разбор возражения по клиенту {client.full_name}.",
             citations=used_context[:2],
             used_context=used_context,
             action_payload=AssistantMessageActionPayload(
