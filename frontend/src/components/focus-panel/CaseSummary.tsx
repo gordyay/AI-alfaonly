@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef, type UIEvent } from "react";
 import {
   formatDateTime,
   getActivityActionLabel,
@@ -55,6 +56,9 @@ export function CaseSummary({
     (interaction?.is_text_based ? interaction : null) ??
     detail.interactions.find((item) => item.is_text_based) ??
     null;
+  const messageThreadRef = useRef<HTMLDivElement | null>(null);
+  const previousThreadKeyRef = useRef<string | null>(null);
+  const shouldStickToBottomRef = useRef(true);
   const visibleActivityEntries: VisibleActivityEntry[] = recentAuditEntries.map((item) => ({
     id: item.id,
     title: `${getRecommendationTypeLabel(item.recommendation_type)} · ${getActivityActionLabel(item.action)}${
@@ -93,6 +97,27 @@ export function CaseSummary({
         ? "Обновить решение"
         : "Решение сохранено"
       : "Зафиксировать решение";
+  const threadKey = replyInteraction?.id ?? interaction?.id ?? workItem.id;
+
+  useLayoutEffect(() => {
+    const threadElement = messageThreadRef.current;
+    if (!threadElement) {
+      return;
+    }
+
+    const threadChanged = previousThreadKeyRef.current !== threadKey;
+    if (threadChanged || shouldStickToBottomRef.current) {
+      threadElement.scrollTop = threadElement.scrollHeight;
+      shouldStickToBottomRef.current = true;
+    }
+    previousThreadKeyRef.current = threadKey;
+  }, [threadKey, timelineItems.length]);
+
+  function handleThreadScroll(event: UIEvent<HTMLDivElement>) {
+    const threadElement = event.currentTarget;
+    const distanceToBottom = threadElement.scrollHeight - threadElement.scrollTop - threadElement.clientHeight;
+    shouldStickToBottomRef.current = distanceToBottom <= 32;
+  }
 
   return (
     <div className="overview-stack">
@@ -101,7 +126,7 @@ export function CaseSummary({
           <h3>Лента кейса</h3>
         </div>
 
-        <div className="message-thread message-thread--case">
+        <div className="message-thread message-thread--case" ref={messageThreadRef} onScroll={handleThreadScroll}>
           {timelineItems.length ? (
             timelineItems.map((event) =>
               event.event_type === "chat_message" ? (
@@ -141,7 +166,7 @@ export function CaseSummary({
       </section>
 
       {replyInteraction ? (
-        <section className="content-card reply-target-block">
+        <section className="content-card reply-target-block" data-tour="case-reply">
           <CaseReplyComposer
             interaction={replyInteraction}
             replyDraftText={replyDraftText}

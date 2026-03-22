@@ -4,14 +4,13 @@ test("manager can review a work item and save feedback loop state", async ({ pag
   await page.goto("/");
 
   await expect(page.getByRole("heading", { name: "Очередь кейсов" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Сводка по использованию и качеству решений" })).not.toBeVisible();
-  await expect(page.getByRole("heading", { name: "Помощь по текущему кейсу" })).not.toBeVisible();
+  await expect(page.getByRole("heading", { name: "Метрики использования" })).not.toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Помощник по кейсу" })).not.toBeVisible();
 
   const firstItem = page.locator(".work-item-card").first();
   await expect(firstItem).toBeVisible();
   await firstItem.click();
 
-  await expect(page.locator(".case-workspace-bar").getByText("Case Workspace")).toBeVisible();
   await expect(page.locator(".focus-panel__header h2")).toBeVisible();
   await page.getByRole("button", { name: "Принять" }).click();
   await page.getByPlaceholder("Коротко зафиксируйте причину").fill("Берем кейс в работу через case workspace.");
@@ -21,7 +20,7 @@ test("manager can review a work item and save feedback loop state", async ({ pag
   await page.getByRole("button", { name: "Аналитика" }).click();
 
   const supervisorPanel = page.locator(".supervisor-panel");
-  await expect(supervisorPanel.getByRole("heading", { name: "Сводка по использованию и качеству решений" })).toBeVisible();
+  await expect(supervisorPanel.getByRole("heading", { name: "Метрики использования" })).toBeVisible();
   await expect(supervisorPanel.getByText("Показать аналитику")).toBeVisible();
 });
 
@@ -39,25 +38,25 @@ test("search empty state is explicit and recoverable", async ({ page }) => {
 test("assistant opens only on demand", async ({ page }) => {
   await page.goto("/");
 
-  await expect(page.getByRole("heading", { name: "Помощь по текущему кейсу" })).not.toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Помощник по кейсу" })).not.toBeVisible();
   await page.locator(".work-item-card").first().click();
   await page.getByRole("button", { name: "Помощник" }).click();
 
-  await expect(page.getByRole("heading", { name: "AI по кейсу" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Помощник по кейсу" })).toBeVisible();
   await page.getByRole("button", { name: "Закрыть" }).click();
-  await expect(page.getByRole("heading", { name: "AI по кейсу" })).not.toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Помощник по кейсу" })).not.toBeVisible();
 });
 
 test("manager can send a reply from chat history and see it in history and CRM", async ({ page }) => {
   await page.goto("/");
 
   await page.locator(".work-item-card").first().click();
-  await expect(page.getByRole("heading", { name: "История взаимодействий" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Лента кейса" })).toBeVisible();
 
   const replyText = "Подтверждаю, сегодня до 18:00 пришлю короткое сравнение и следующий шаг.";
   await page.locator(".reply-composer textarea").fill(replyText);
   await page.getByRole("button", { name: "Отправить клиенту" }).click();
-  await expect(page.locator(".interaction-focus-card .message-thread")).toContainText(replyText);
+  await expect(page.locator(".message-thread--case")).toContainText(replyText);
 
   await page.locator(".focus-panel__tabs").getByRole("button", { name: "CRM", exact: true }).click();
   await expect(page.getByText("Исходящее сообщение клиенту")).toBeVisible();
@@ -65,11 +64,14 @@ test("manager can send a reply from chat history and see it in history and CRM",
 });
 
 test("guided tour can move across inbox, case, assistant and analytics from a case page", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem("alfa_only_guided_tour_seen", "true");
+  });
   await page.goto("/");
   const tour = page.getByLabel("Экскурсия по экрану");
 
   await page.locator(".work-item-card").first().click();
-  await expect(page.locator(".case-workspace-bar").getByText("Case Workspace")).toBeVisible();
+  await expect(page.locator(".focus-panel__header h2")).toBeVisible();
 
   await page.getByRole("button", { name: "Тур" }).click();
   await expect(tour.getByRole("heading", { name: "Верхняя навигация" })).toBeVisible();
@@ -80,22 +82,46 @@ test("guided tour can move across inbox, case, assistant and analytics from a ca
   await expect(page.locator("main").getByRole("heading", { name: "Очередь кейсов" })).toBeVisible();
 
   await page.getByRole("button", { name: "Далее" }).click();
-  await expect(tour.getByRole("heading", { name: "Быстрый переход в кейс" })).toBeVisible();
-  await expect(page.getByText("Выбранный кейс", { exact: true })).toBeVisible();
+  await expect(tour.getByRole("heading", { name: "Поиск и фильтры" })).toBeVisible();
+  await expect(page.getByPlaceholder("Клиент, кейс или продукт")).toBeVisible();
+
+  await page.getByRole("button", { name: "Далее" }).click();
+  await expect(tour.getByRole("heading", { name: "Выбранный кейс" })).toBeVisible();
+  await expect(page.locator("[data-tour='queue-selected-item']")).toBeVisible();
 
   await page.getByRole("button", { name: "Далее" }).click();
   await expect(tour.getByRole("heading", { name: "Работа по кейсу" })).toBeVisible();
-  await expect(page.locator(".case-workspace-bar").getByText("Case Workspace")).toBeVisible();
+  await expect(page.locator(".focus-panel__header h2")).toBeVisible();
+
+  await page.getByRole("button", { name: "Далее" }).click();
+  await expect(tour.getByRole("heading", { name: "Сводка по кейсу" })).toBeVisible();
+  await expect(page.locator("[data-tour='case-summary-strip']")).toBeVisible();
+
+  await page.getByRole("button", { name: "Далее" }).click();
+  await expect(tour.getByRole("heading", { name: "Навигация внутри кейса" })).toBeVisible();
+  await expect(page.locator("[data-tour='case-tabs']")).toBeVisible();
+
+  await page.getByRole("button", { name: "Далее" }).click();
+  await expect(tour.getByRole("heading", { name: "Ответ клиенту" })).toBeVisible();
+  await expect(page.locator("[data-tour='case-reply']")).toBeVisible();
+
+  await page.getByRole("button", { name: "Далее" }).click();
+  await expect(tour.getByRole("heading", { name: "Сценарий контакта" })).toBeVisible();
+  await expect(page.locator("[data-tour='case-actions-script']")).toBeVisible();
+
+  await page.getByRole("button", { name: "Далее" }).click();
+  await expect(tour.getByRole("heading", { name: "Черновик CRM" })).toBeVisible();
+  await expect(page.locator("[data-tour='case-crm']")).toBeVisible();
 
   await page.getByRole("button", { name: "Далее" }).click();
   await expect(tour.getByRole("heading", { name: "Помощник по запросу" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "AI по кейсу" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Помощник по кейсу" })).toBeVisible();
 
   await page.getByRole("button", { name: "Далее" }).click();
   await expect(tour.getByRole("heading", { name: "Отдельная аналитика" })).toBeVisible();
-  await expect(page.locator(".analytics-intro").getByRole("heading", { name: "Метрики использования" })).toBeVisible();
+  await expect(page.locator(".supervisor-panel").getByRole("heading", { name: "Метрики использования" })).toBeVisible();
 
   await page.getByRole("button", { name: "Завершить" }).click();
-  await expect(page.locator(".case-workspace-bar").getByText("Case Workspace")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "AI по кейсу" })).not.toBeVisible();
+  await expect(page.locator(".focus-panel__header h2")).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Помощник по кейсу" })).not.toBeVisible();
 });

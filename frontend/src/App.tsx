@@ -51,12 +51,68 @@ const INBOX_TOUR_STEP: GuidedTourStep = {
   note: "Выберите карточку, чтобы открыть рабочее место.",
 };
 
+const QUEUE_TOOLBAR_TOUR_STEP: GuidedTourStep = {
+  id: "queue-toolbar",
+  selector: "[data-tour='queue-toolbar']",
+  title: "Поиск и фильтры",
+  description: "Сначала сузьте очередь: найдите клиента, задайте тип кейса, срочность и нужный продукт.",
+  note: "Это самый быстрый способ сократить поток до нескольких приоритетных кейсов.",
+};
+
+const SELECTED_QUEUE_ITEM_TOUR_STEP: GuidedTourStep = {
+  id: "queue-selected-item",
+  selector: "[data-tour='queue-selected-item']",
+  title: "Выбранный кейс",
+  description: "В очереди сохраняется текущий контекст: видно, какой кейс открыт, его приоритет и краткую суть.",
+  note: "Возвращайтесь сюда, чтобы быстро переключаться между задачами, не теряя выбранный кейс.",
+};
+
 const CASE_TOUR_STEP: GuidedTourStep = {
   id: "focus",
   selector: "[data-tour='focus']",
   title: "Работа по кейсу",
   description: "Здесь принимается решение и готовится запись в CRM.",
   note: "Вкладки сгруппированы по задаче.",
+};
+
+const CASE_SUMMARY_TOUR_STEP: GuidedTourStep = {
+  id: "case-summary-strip",
+  selector: "[data-tour='case-summary-strip']",
+  title: "Сводка по кейсу",
+  description: "Верхняя лента собирает короткую выжимку: что важно сейчас, какой следующий шаг, продукт и срок контакта.",
+  note: "Начинайте разбор кейса отсюда, чтобы быстро понять контекст до чтения всей истории.",
+};
+
+const CASE_TABS_TOUR_STEP: GuidedTourStep = {
+  id: "case-tabs",
+  selector: "[data-tour='case-tabs']",
+  title: "Навигация внутри кейса",
+  description: "Переключение между обзором, действиями, CRM и профилем клиента вынесено в отдельную полосу.",
+  note: "Обзор нужен для решения, действия для генерации материалов, CRM для фиксации результата.",
+};
+
+const CASE_REPLY_TOUR_STEP: GuidedTourStep = {
+  id: "case-reply",
+  selector: "[data-tour='case-reply']",
+  title: "Ответ клиенту",
+  description: "Здесь собирается и отправляется сообщение клиенту: вручную, из скрипта, из разбора возражения или через помощника.",
+  note: "Отправка сразу обновляет историю кейса и CRM, поэтому финальный текст лучше проверить здесь.",
+};
+
+const CASE_ACTIONS_SCRIPT_TOUR_STEP: GuidedTourStep = {
+  id: "case-actions-script",
+  selector: "[data-tour='case-actions-script']",
+  title: "Сценарий контакта",
+  description: "Во вкладке действий собирается скрипт разговора с целью контакта, вариантами подачи и опорными тезисами.",
+  note: "Используйте этот блок перед звонком или перепиской, когда нужно быстро собрать рабочий сценарий.",
+};
+
+const CASE_CRM_TOUR_STEP: GuidedTourStep = {
+  id: "case-crm",
+  selector: "[data-tour='case-crm']",
+  title: "Черновик CRM",
+  description: "Во вкладке CRM формируется итог контакта: сводка, ключевые пункты, текст заметки и следующий follow-up.",
+  note: "Сначала зафиксируйте решение по рекомендации, затем сохраните финальную запись в CRM.",
 };
 
 const ASSISTANT_TOUR_STEP: GuidedTourStep = {
@@ -170,13 +226,6 @@ export function App() {
     [currentFeedback, selectedWorkItem?.recommendation_status],
   );
   const effectiveSavedFeedbackDecision = feedbackEnabled ? (savedFeedbackDecision ?? null) : null;
-  const savedCRMNote = useMemo(
-    () =>
-      selectedDetail?.crm_notes.find((note) => note.recommendation_id === selectedWorkItem?.recommendation_id) ??
-      selectedDetail?.crm_notes[0] ??
-      null,
-    [selectedDetail, selectedWorkItem?.recommendation_id],
-  );
   const aiEnabled = health?.ai.available ?? false;
   const aiUnavailableMessage = health?.ai.reason ?? "AI-функции временно недоступны.";
 
@@ -219,11 +268,30 @@ export function App() {
           assistantOpen: false,
         },
       });
-    const showCase = () =>
+    const showCaseOverview = () =>
       dispatch({
         type: "patch",
         patch: {
           mode: "case",
+          activeTab: "overview",
+          assistantOpen: false,
+        },
+      });
+    const showCaseActions = () =>
+      dispatch({
+        type: "patch",
+        patch: {
+          mode: "case",
+          activeTab: "actions",
+          assistantOpen: false,
+        },
+      });
+    const showCaseCRM = () =>
+      dispatch({
+        type: "patch",
+        patch: {
+          mode: "case",
+          activeTab: "crm",
           assistantOpen: false,
         },
       });
@@ -232,6 +300,7 @@ export function App() {
         type: "patch",
         patch: {
           mode: "case",
+          activeTab: "overview",
           assistantOpen: true,
         },
       });
@@ -253,12 +322,40 @@ export function App() {
         ...INBOX_TOUR_STEP,
         prepare: showInbox,
       },
+      {
+        ...QUEUE_TOOLBAR_TOUR_STEP,
+        prepare: showInbox,
+      },
     ];
 
     if (selectedWorkItem) {
       steps.push({
+        ...SELECTED_QUEUE_ITEM_TOUR_STEP,
+        prepare: showInbox,
+      });
+      steps.push({
         ...CASE_TOUR_STEP,
-        prepare: showCase,
+        prepare: showCaseOverview,
+      });
+      steps.push({
+        ...CASE_SUMMARY_TOUR_STEP,
+        prepare: showCaseOverview,
+      });
+      steps.push({
+        ...CASE_TABS_TOUR_STEP,
+        prepare: showCaseOverview,
+      });
+      steps.push({
+        ...CASE_REPLY_TOUR_STEP,
+        prepare: showCaseOverview,
+      });
+      steps.push({
+        ...CASE_ACTIONS_SCRIPT_TOUR_STEP,
+        prepare: showCaseActions,
+      });
+      steps.push({
+        ...CASE_CRM_TOUR_STEP,
+        prepare: showCaseCRM,
       });
 
       if (assistantEnabled) {
@@ -358,32 +455,6 @@ export function App() {
     loadAssistantThreadsEvent().catch(() => undefined);
   }, [assistant.assistantThreadDetail, screenState.assistantOpen, screenState.managerId, assistantEnabled]);
 
-  const openTourEvent = useEffectEvent(() => {
-    openTour();
-  });
-
-  useEffect(() => {
-    if (autoOpenedTourRef.current) {
-      return;
-    }
-
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    if (window.localStorage.getItem(TOUR_SEEN_STORAGE_KEY) === "true") {
-      autoOpenedTourRef.current = true;
-      return;
-    }
-
-    if (!health || cockpitLoading || !cockpit || !tourSteps.length) {
-      return;
-    }
-
-    autoOpenedTourRef.current = true;
-    openTourEvent();
-  }, [cockpit, cockpitLoading, health, openTourEvent, tourSteps.length]);
-
   useEffect(() => {
     if (!selectedDetail || screenState.aiDraft) {
       return;
@@ -476,6 +547,32 @@ export function App() {
       },
     });
   }
+
+  const openTourEvent = useEffectEvent(() => {
+    openTour();
+  });
+
+  useEffect(() => {
+    if (autoOpenedTourRef.current) {
+      return;
+    }
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    if (window.localStorage.getItem(TOUR_SEEN_STORAGE_KEY) === "true") {
+      autoOpenedTourRef.current = true;
+      return;
+    }
+
+    if (!health || cockpitLoading || !cockpit || !tourSteps.length) {
+      return;
+    }
+
+    autoOpenedTourRef.current = true;
+    openTourEvent();
+  }, [cockpit, cockpitLoading, health, tourSteps.length]);
 
   function closeTour() {
     const tourOrigin = tourOriginRef.current;

@@ -50,7 +50,7 @@ export function CaseCRM({
 
   return (
     <section className="focus-layout focus-layout--crm">
-      <section className="content-card">
+      <section className="content-card" data-tour="case-crm">
         <div className="section-title">
           <h3>CRM</h3>
           <div className="button-row">

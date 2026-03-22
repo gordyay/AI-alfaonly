@@ -172,7 +172,7 @@ export function FocusPanel({
         {workItem.business_goal ? <span className="badge badge--accent">{workItem.business_goal}</span> : null}
       </div>
 
-      <section className="summary-strip">
+      <section className="summary-strip" data-tour="case-summary-strip">
         <article className="summary-card summary-card--feature">
           <span>Коротко</span>
           <strong>{getMiniSummaryCopy({ detailSummary: client.ai_summary_text, workItem, draft: aiDraft })}</strong>
@@ -193,7 +193,7 @@ export function FocusPanel({
         </article>
       </section>
 
-      <div className="focus-panel__tabs">
+      <div className="focus-panel__tabs" data-tour="case-tabs">
         {TABS.map((tab) => (
           <button
             className={`context-tab${tab.id === activeTab ? " is-active" : ""}`}

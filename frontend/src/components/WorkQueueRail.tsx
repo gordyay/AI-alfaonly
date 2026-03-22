@@ -167,7 +167,7 @@ export function WorkQueueRail({
           </p>
         </div>
 
-        <div className="queue-toolbar">
+        <div className="queue-toolbar" data-tour="queue-toolbar">
           <div className="queue-toolbar__top">
             <label className="search-field queue-search-field">
               <span>Поиск</span>
@@ -226,6 +226,7 @@ export function WorkQueueRail({
                 {sortItems(section.items, sortMode).map((item) => (
                   <button
                     className={`work-item-card${item.id === selectedWorkItemId ? " is-active" : ""}`}
+                    data-tour={item.id === selectedWorkItemId ? "queue-selected-item" : undefined}
                     key={item.id}
                     ref={(node) => {
                       itemRefs.current[item.id] = node;

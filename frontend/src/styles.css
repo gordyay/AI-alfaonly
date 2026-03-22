@@ -82,7 +82,10 @@ textarea:focus {
 .panel {
   border: 1px solid var(--border);
   box-shadow: var(--shadow);
-  backdrop-filter: blur(18px);
+}
+
+.panel {
+  background: rgba(255, 255, 255, 0.98);
 }
 
 .hero {
@@ -93,6 +96,7 @@ textarea:focus {
   gap: 24px;
   padding: 24px;
   border-radius: var(--radius-xl);
+  backdrop-filter: blur(18px);
   background:
     linear-gradient(135deg, rgba(19, 20, 24, 0.98), rgba(35, 36, 40, 0.96)),
     linear-gradient(90deg, rgba(239, 49, 36, 0.16), transparent);
@@ -952,8 +956,11 @@ textarea:focus {
 .reply-composer {
   position: relative;
   isolation: isolate;
-  background: linear-gradient(145deg, rgba(239, 49, 36, 0.06), rgba(255, 255, 255, 1));
+  background:
+    linear-gradient(145deg, rgba(239, 49, 36, 0.06), rgba(255, 255, 255, 0.98)),
+    rgba(255, 255, 255, 1);
   border-color: rgba(239, 49, 36, 0.14);
+  overflow: hidden;
 }
 
 .reply-composer__meta {
@@ -1037,8 +1044,13 @@ textarea:focus {
 }
 
 .message-thread--case {
-  max-height: none;
-  overflow: visible;
+  max-height: 460px;
+  overflow: auto;
+}
+
+.content-card--history .message-thread--case {
+  max-height: 460px;
+  overflow: auto;
 }
 
 .message-bubble {

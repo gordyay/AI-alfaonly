@@ -28,7 +28,7 @@ export function CaseAction({
 
     return (
       <section className="focus-layout">
-        <section className="content-card">
+        <section className="content-card" data-tour="case-actions-script">
           <div className="section-title">
             <h3>Сценарий контакта</h3>
             <div className="button-row">
@@ -157,7 +157,7 @@ export function CaseAction({
 
   return (
     <section className="focus-layout">
-      <section className="content-card">
+      <section className="content-card" data-tour="case-actions-objection">
         <div className="section-title">
           <h3>Разбор возражения</h3>
           <div className="button-row">

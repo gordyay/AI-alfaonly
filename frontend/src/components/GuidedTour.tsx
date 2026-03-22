@@ -52,26 +52,65 @@ export function GuidedTour({ open, steps, onClose, onComplete }: GuidedTourProps
       return;
     }
 
-    activeStep.prepare?.();
+    let cancelled = false;
+    let frameId: number | null = null;
 
     const updateRect = () => {
+      if (cancelled) {
+        return true;
+      }
+
       const element = document.querySelector(activeStep.spotlightSelector ?? activeStep.selector);
       if (element instanceof HTMLElement) {
         element.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+        setTargetRect(element.getBoundingClientRect());
+        return true;
       }
 
       setTargetRect(getStepRect(activeStep));
+      return false;
     };
 
-    updateRect();
-    const frameId = window.requestAnimationFrame(updateRect);
-    window.addEventListener("resize", updateRect);
-    window.addEventListener("scroll", updateRect, true);
+    const scheduleRectUpdate = (attempt = 0) => {
+      if (cancelled) {
+        return;
+      }
+
+      const foundTarget = updateRect();
+      if (foundTarget || attempt >= 24) {
+        return;
+      }
+
+      frameId = window.requestAnimationFrame(() => {
+        scheduleRectUpdate(attempt + 1);
+      });
+    };
+
+    activeStep.prepare?.();
+    scheduleRectUpdate();
+
+    const handleViewportChange = () => {
+      scheduleRectUpdate();
+    };
+    const observer = new MutationObserver(() => {
+      scheduleRectUpdate();
+    });
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
+
+    window.addEventListener("resize", handleViewportChange);
+    window.addEventListener("scroll", handleViewportChange, true);
 
     return () => {
-      window.cancelAnimationFrame(frameId);
-      window.removeEventListener("resize", updateRect);
-      window.removeEventListener("scroll", updateRect, true);
+      cancelled = true;
+      if (frameId !== null) {
+        window.cancelAnimationFrame(frameId);
+      }
+      observer.disconnect();
+      window.removeEventListener("resize", handleViewportChange);
+      window.removeEventListener("scroll", handleViewportChange, true);
     };
   }, [open, activeStep]);
 
