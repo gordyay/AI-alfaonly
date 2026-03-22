@@ -26,12 +26,10 @@ interface AssistantPanelProps {
 }
 
 const QUICK_ACTIONS = [
-  "Сделай сводку диалога",
-  "Собери CRM-заметку",
-  "Подготовь скрипт продажи",
-  "Как отработать возражение?",
-  "Подготовь мягкое напоминание",
-  "Что важно по клиенту?",
+  "Сводка",
+  "CRM-заметка",
+  "Скрипт",
+  "Возражение",
 ];
 
 function renderSalesScriptDraft(draft: SalesScriptDraft) {
@@ -200,15 +198,15 @@ export function AssistantPanel({
       <header className="assistant-panel__header">
         <div>
           <p className="panel__eyebrow">Помощник</p>
-          <h2>Помощь по текущему кейсу</h2>
+          <h2>AI по кейсу</h2>
         </div>
         <button className="ghost-button" type="button" onClick={onCreateThread}>
-          Новый диалог
+          Новый чат
         </button>
       </header>
 
       <p className="assistant-panel__scope">
-        Контекст: <strong>{selectedClientName || "общий контекст менеджера"}</strong>
+        Кейс: <strong>{selectedClientName || "общий контекст"}</strong>
       </p>
       {!aiEnabled ? <StatusMessage type="error" message={aiUnavailableMessage} /> : null}
       <StatusMessage type={status?.type} message={status?.text} />
@@ -228,8 +226,8 @@ export function AssistantPanel({
           ))
         ) : (
           <div className="empty-state empty-state--small">
-            <strong>{loading ? "Загружаем диалоги" : "Пока нет сохранённых диалогов"}</strong>
-            <p>Создайте новый диалог или задайте вопрос по открытому кейсу.</p>
+            <strong>{loading ? "Загружаем чаты" : "Чатов пока нет"}</strong>
+            <p>Создайте новый чат или задайте вопрос.</p>
           </div>
         )}
       </div>
@@ -254,7 +252,7 @@ export function AssistantPanel({
         ) : (
           <div className="empty-state empty-state--small">
             <strong>Ассистент готов</strong>
-            <p>История появится здесь после первого запроса.</p>
+            <p>История появится после первого запроса.</p>
           </div>
         )}
       </div>
@@ -269,7 +267,7 @@ export function AssistantPanel({
         <textarea
           value={inputValue}
           onChange={(event) => onInputChange(event.target.value)}
-          placeholder="Спросите про клиента, текст сообщения, разбор возражения или следующий шаг"
+          placeholder="Спросите про клиента, сообщение или следующий шаг"
           rows={4}
           disabled={!aiEnabled}
         />

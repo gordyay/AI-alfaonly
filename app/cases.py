@@ -20,7 +20,7 @@ def log_activity(
     decision: str | None = None,
     payload_excerpt: str | None = None,
     context_snapshot: str | None = None,
-) -> None:
+) -> ActivityLogEntry:
     excerpt = None
     if payload_excerpt:
         excerpt = " ".join(payload_excerpt.split())
@@ -30,21 +30,21 @@ def log_activity(
         context = " ".join(context_snapshot.split())
         context = context[:320]
 
-    runtime.storage.add_activity_log(
-        ActivityLogEntry(
-            id=str(uuid4()),
-            recommendation_type=recommendation_type,
-            client_id=client_id,
-            recommendation_id=recommendation_id,
-            conversation_id=conversation_id,
-            manager_id=manager_id,
-            action=action,
-            decision=decision,
-            payload_excerpt=excerpt,
-            context_snapshot=context,
-            created_at=datetime.now(UTC),
-        )
+    entry = ActivityLogEntry(
+        id=str(uuid4()),
+        recommendation_type=recommendation_type,
+        client_id=client_id,
+        recommendation_id=recommendation_id,
+        conversation_id=conversation_id,
+        manager_id=manager_id,
+        action=action,
+        decision=decision,
+        payload_excerpt=excerpt,
+        context_snapshot=context,
+        created_at=datetime.now(UTC),
     )
+    runtime.storage.add_activity_log(entry)
+    return entry
 
 
 def work_item_matches_note(work_item: Any, note: CRMNote) -> bool:

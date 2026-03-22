@@ -35,6 +35,8 @@ async def create_crm_note(request: Request, payload: CreateCRMNoteRequest):
         source_conversation_id=payload.source_conversation_id,
         ai_generated=payload.ai_generated,
         ai_draft_payload=payload.ai_draft_payload,
+        note_type=payload.note_type,
+        outbound_message_text=payload.outbound_message_text,
         created_at=datetime.now(UTC),
     )
     created = runtime.storage.create_crm_note(note)

@@ -320,6 +320,54 @@ async def test_crm_note_can_close_feedback_loop(client: AsyncClient):
 
 
 @pytest.mark.anyio
+async def test_client_reply_creates_message_activity_and_crm_note(client: AsyncClient):
+    response = await client.post(
+        '/client/reply',
+        json={
+            'client_id': 'c1',
+            'conversation_id': 'conv1',
+            'manager_id': 'm1',
+            'recommendation_id': 'rec:communication:conv1',
+            'source': 'script',
+            'text': 'Подготовил короткий ответ по тарифу и пришлю детали сегодня до 18:00.',
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body['message']['sender'] == 'manager'
+    assert body['crm_note']['note_type'] == 'outbound_reply'
+    assert body['crm_note']['outbound_message_text'] == body['message']['text']
+    assert body['activity_log_entry']['action'] == 'client_reply_sent'
+
+    detail_response = await client.get('/client/c1?work_item_id=task:task-2')
+    assert detail_response.status_code == 200
+    detail = detail_response.json()
+    conversation = next(item for item in detail['conversations'] if item['id'] == 'conv1')
+    assert conversation['messages'][-1]['text'] == body['message']['text']
+    assert any(note['note_type'] == 'outbound_reply' for note in detail['crm_notes'])
+    assert any(item['action'] == 'client_reply_sent' for item in detail['activity_log'])
+
+
+@pytest.mark.anyio
+async def test_client_reply_rejects_non_chat_conversation(client: AsyncClient):
+    response = await client.post(
+        '/client/reply',
+        json={
+            'client_id': 'c2',
+            'conversation_id': 'conv2',
+            'manager_id': 'm1',
+            'text': 'Подтверждаю звонок и отправляю детали.',
+        },
+    )
+    assert response.status_code == 409
+
+    detail_response = await client.get('/client/c2')
+    detail = detail_response.json()
+    conversation = next(item for item in detail['conversations'] if item['id'] == 'conv2')
+    assert all(message['text'] != 'Подтверждаю звонок и отправляю детали.' for message in conversation['messages'])
+
+
+@pytest.mark.anyio
 async def test_supervisor_dashboard_returns_metrics(client: AsyncClient):
     feedback_response = await client.post(
         '/feedback',

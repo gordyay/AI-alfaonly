@@ -5,6 +5,7 @@ import type {
   ClientDetailResponse,
   Conversation,
   RecommendationStatus,
+  ReplySource,
   ViewTab,
   WorkItem,
 } from "../../types";
@@ -35,11 +36,22 @@ export interface CaseSummaryProps extends FocusCaseBaseProps {
   feedbackSubmitting: boolean;
   feedbackStatus?: UiStatus;
   assistantSending: boolean;
+  replyDraftText: string;
+  replySource: ReplySource;
+  replySending: boolean;
+  replyStatus?: UiStatus;
+  canPrefillReplyFromScript: boolean;
+  canPrefillReplyFromObjection: boolean;
   onChangeTab: (tab: ViewTab) => void;
   onFeedbackCommentChange: (value: string) => void;
   onFeedbackDecisionChange: (decision: RecommendationStatus) => void;
   onSubmitFeedback: () => void;
   onQuickAssistantAction: (message: string) => void;
+  onReplyDraftChange: (value: string) => void;
+  onPrefillReplyFromScript: () => void;
+  onPrefillReplyFromObjection: () => void;
+  onClearReplyDraft: () => void;
+  onSendReply: () => void;
 }
 
 export interface CaseActionProps extends FocusCaseBaseProps {

@@ -1,11 +1,28 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+from uuid import uuid4
+
 from fastapi import APIRouter, HTTPException, Query, Request
 
-from ..cases import build_case_view
+from ..cases import build_case_view, log_activity
+from ..models import CRMNote, CRMNoteType, ClientReplyRequest, ClientReplyResponse, Message
 from ..router_support import get_runtime
 
 router = APIRouter()
+
+
+def _get_client_and_conversation(runtime, client_id: str, conversation_id: str):
+    client = runtime.storage.get_client(client_id)
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+
+    conversations = runtime.storage.list_client_conversations(client_id)
+    conversation = next((item for item in conversations if item.id == conversation_id), None)
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    return client, conversation
 
 
 @router.get("/client/{client_id}/propensity")
@@ -80,6 +97,68 @@ async def get_client(request: Request, client_id: str, work_item_id: str | None 
         "objection_history": case_view["objection_history"],
         "crm_draft_history": case_view["crm_draft_history"],
     }
+
+
+@router.post("/client/reply")
+async def reply_to_client(request: Request, payload: ClientReplyRequest):
+    runtime = get_runtime(request)
+    client, conversation = _get_client_and_conversation(runtime, payload.client_id, payload.conversation_id)
+
+    if conversation.channel.value != "chat":
+        raise HTTPException(status_code=409, detail="Reply send is supported only for chat conversations")
+
+    normalized_text = " ".join(payload.text.split())
+    if not normalized_text:
+        raise HTTPException(status_code=422, detail="Reply text must not be empty")
+
+    created_at = datetime.now(UTC)
+    message = runtime.storage.create_message(
+        Message(
+            id=str(uuid4()),
+            conversation_id=conversation.id,
+            sender="manager",
+            text=normalized_text,
+            created_at=created_at,
+        )
+    )
+    crm_note = runtime.storage.create_crm_note(
+        CRMNote(
+            id=str(uuid4()),
+            client_id=client.id,
+            manager_id=payload.manager_id,
+            recommendation_id=payload.recommendation_id,
+            note_text=normalized_text,
+            outcome="outbound_reply",
+            channel=conversation.channel,
+            summary_text="Исходящее сообщение клиенту",
+            source_conversation_id=conversation.id,
+            ai_generated=False,
+            note_type=CRMNoteType.outbound_reply,
+            outbound_message_text=normalized_text,
+            created_at=created_at,
+        )
+    )
+    activity_log_entry = log_activity(
+        runtime,
+        recommendation_type="client_reply",
+        client_id=client.id,
+        recommendation_id=payload.recommendation_id,
+        conversation_id=conversation.id,
+        manager_id=payload.manager_id,
+        action="client_reply_sent",
+        payload_excerpt=normalized_text,
+        context_snapshot=f"source={payload.source.value} channel={conversation.channel.value}",
+    )
+    runtime.assistant_kb_service.rebuild_manager_snapshots(
+        runtime.storage,
+        runtime.dialog_service,
+        payload.manager_id,
+    )
+    return ClientReplyResponse(
+        message=message,
+        crm_note=crm_note,
+        activity_log_entry=activity_log_entry,
+    )
 
 
 @router.get("/client/{client_id}/activity-log")

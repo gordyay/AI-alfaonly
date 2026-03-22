@@ -22,19 +22,34 @@ interface WorkQueueRailProps {
   visibleItems: number;
   loading: boolean;
   selectedWorkItemId?: string | null;
-  selectedWorkItemTitle?: string | null;
-  onJumpToFocus: () => void;
   filterValue: string;
   onFilterChange: (value: string) => void;
   onSelectWorkItem: (item: WorkItem) => void;
   sortMode: SortMode;
+  onToggleSort: () => void;
   filters: WorkQueueFilters;
   productOptions: FilterOption[];
   onChangeQueueFilter: (name: keyof WorkQueueFilters, value: string) => void;
 }
 
+const SORT_LABELS: Record<SortMode, string> = {
+  priority: "По важности",
+  due_at: "По сроку",
+};
+
 function getCompactSummary(item: WorkItem) {
-  return item.summary || item.expected_benefit || "Описание кейса пока не заполнено.";
+  return item.summary || item.expected_benefit || "";
+}
+
+function getVisibleBadges(item: WorkItem) {
+  return [
+    { label: getPriorityLabel(item.priority_label), className: "" },
+    item.product_name ? { label: item.product_name, className: " badge--accent" } : null,
+    item.channel ? { label: getChannelLabel(item.channel), className: "" } : null,
+    !item.channel && item.client_churn_risk
+      ? { label: getChurnRiskLabel(item.client_churn_risk), className: " badge--subtle" }
+      : null,
+  ].filter(Boolean) as Array<{ label: string; className: string }>;
 }
 
 function sortItems(items: WorkItem[], sortMode: SortMode): WorkItem[] {
@@ -92,12 +107,11 @@ export function WorkQueueRail({
   visibleItems,
   loading,
   selectedWorkItemId,
-  selectedWorkItemTitle,
-  onJumpToFocus,
   filterValue,
   onFilterChange,
   onSelectWorkItem,
   sortMode,
+  onToggleSort,
   filters,
   productOptions,
   onChangeQueueFilter,
@@ -145,46 +159,54 @@ export function WorkQueueRail({
     <section className="panel rail-panel">
       <div className="panel__header panel__header--stack">
         <div className="queue-header">
-          <div>
+          <div className="queue-header__copy">
             <p className="panel__eyebrow">Рабочая очередь</p>
-            <h2>Полная очередь кейсов</h2>
+            <div>
+              <h2>Очередь кейсов</h2>
+            </div>
           </div>
           <div className="queue-summary-card">
             <strong>{visibleItems}</strong>
-            <span>{loading && totalItems === 0 ? "обновляем очередь" : `из ${totalItems} кейсов в текущем фокусе`}</span>
-            <small>{sortMode === "priority" ? "Сортировка по приоритету" : "Сортировка по сроку"}</small>
+            <div className="queue-summary-card__copy">
+              <span>{loading && totalItems === 0 ? "обновляем" : `из ${totalItems} в списке`}</span>
+              <small>{sortMode === "priority" ? "по важности" : "по сроку"}</small>
+            </div>
           </div>
         </div>
 
-        {selectedWorkItemTitle ? (
-          <button className="queue-focus-banner" type="button" onClick={onJumpToFocus}>
-            <strong>Сейчас открыт кейс:</strong>
-            <span>{selectedWorkItemTitle}</span>
-          </button>
-        ) : null}
+        <div className="queue-toolbar">
+          <div className="queue-toolbar__top">
+            <label className="search-field queue-search-field">
+              <span>Поиск</span>
+              <input
+                type="search"
+                value={filterValue}
+                onChange={(event) => onFilterChange(event.target.value)}
+                placeholder="Клиент, кейс или продукт"
+              />
+            </label>
 
-        <label className="search-field">
-          <span>Поиск по клиенту, кейсу, цели или продукту</span>
-          <input
-            type="search"
-            value={filterValue}
-            onChange={(event) => onFilterChange(event.target.value)}
-            placeholder="Например, премиум карта, ликвидность или Елена Смирнова"
-          />
-        </label>
+            <div className="queue-toolbar__actions">
+              <button className="ghost-button queue-sort-button" type="button" onClick={onToggleSort}>
+                Сортировка: {SORT_LABELS[sortMode]}
+              </button>
+              <button
+                className={`ghost-button${showAdvancedFilters ? " is-selected" : ""}`}
+                type="button"
+                onClick={() => setShowAdvancedFilters((current) => !current)}
+              >
+                {showAdvancedFilters ? "Скрыть фильтры" : "Еще фильтры"}
+              </button>
+            </div>
+          </div>
 
-        <div className="queue-filter-grid">{renderControls(primaryControls)}</div>
+          <div className="queue-filter-grid queue-filter-grid--primary">{renderControls(primaryControls)}</div>
 
-        <div className="button-row">
-          <button className="ghost-button" type="button" onClick={() => setShowAdvancedFilters((current) => !current)}>
-            {showAdvancedFilters ? "Скрыть дополнительные фильтры" : "Показать дополнительные фильтры"}
-          </button>
+          {showAdvancedFilters ? <div className="queue-filter-grid queue-filter-grid--secondary">{renderControls(secondaryControls)}</div> : null}
         </div>
-
-        {showAdvancedFilters ? <div className="queue-filter-grid">{renderControls(secondaryControls)}</div> : null}
       </div>
 
-      <div className="rail-sections">
+      <div className="rail-sections" data-tour-spotlight="queue">
         {loading && totalItems === 0 ? (
           <div className="queue-skeleton-list" aria-hidden="true">
             {Array.from({ length: 4 }).map((_, index) => (
@@ -229,25 +251,17 @@ export function WorkQueueRail({
                       </p>
                       <h3>{item.title}</h3>
                       <p className="work-item-card__summary work-item-card__summary--primary">{item.client_name}</p>
-                      <p className="work-item-card__summary work-item-card__summary--secondary">{getCompactSummary(item)}</p>
-                      <div className="chip-row chip-row--compact">
-                        <span className="badge">{getPriorityLabel(item.priority_label)}</span>
-                        {item.product_name ? <span className="badge badge--accent">{item.product_name}</span> : null}
-                        {item.channel ? <span className="badge">{getChannelLabel(item.channel)}</span> : null}
-                        {item.client_churn_risk ? <span className="badge badge--subtle">{getChurnRiskLabel(item.client_churn_risk)}</span> : null}
-                      </div>
-                      {item.why.length ? (
-                        <div className="chip-row chip-row--compact">
-                          {item.why.slice(0, 1).map((reason) => (
-                            <span className="badge queue-reason-badge" key={reason}>
-                              {reason}
-                            </span>
-                          ))}
-                        </div>
+                      {getCompactSummary(item) ? (
+                        <p className="work-item-card__summary work-item-card__summary--secondary">{getCompactSummary(item)}</p>
                       ) : null}
-                      <div className="work-item-card__meta">
-                        <span>{formatDueLabel(item.due_at)}</span>
+                      <div className="chip-row chip-row--compact">
+                        {getVisibleBadges(item).map((badge) => (
+                          <span className={`badge${badge.className}`} key={`${item.id}-${badge.label}`}>
+                            {badge.label}
+                          </span>
+                        ))}
                       </div>
+                      <div className="work-item-card__meta">{formatDueLabel(item.due_at)}</div>
                     </div>
                   </button>
                 ))}
@@ -256,8 +270,8 @@ export function WorkQueueRail({
           ))
         ) : (
           <div className="empty-state empty-state--small">
-            <strong>Очередь по текущему фильтру пуста</strong>
-            <p>Сбросьте часть фильтров или уберите текстовый поиск, чтобы вернуть кейсы в работу.</p>
+            <strong>Ничего не найдено</strong>
+            <p>Ослабьте фильтры или очистите поиск.</p>
           </div>
         )}
       </div>

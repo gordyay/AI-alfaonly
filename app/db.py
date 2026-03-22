@@ -19,6 +19,7 @@ from .models import (
     AssistantCitation,
     CRMDraftRevision,
     CRMNote,
+    CRMNoteType,
     ChannelType,
     Client,
     Conversation,
@@ -173,6 +174,9 @@ class SQLiteStorage:
                     source_conversation_id TEXT,
                     ai_generated INTEGER NOT NULL DEFAULT 0,
                     ai_draft_payload_json TEXT,
+                    follow_up_reason TEXT,
+                    note_type TEXT NOT NULL DEFAULT 'crm_summary',
+                    outbound_message_text TEXT,
                     created_at TEXT NOT NULL
                 );
 
@@ -304,6 +308,9 @@ class SQLiteStorage:
             self._ensure_table_column(connection, "crm_notes", "recommendation_id", "TEXT")
             self._ensure_table_column(connection, "crm_notes", "recommendation_decision", "TEXT")
             self._ensure_table_column(connection, "crm_notes", "decision_comment", "TEXT")
+            self._ensure_table_column(connection, "crm_notes", "follow_up_reason", "TEXT")
+            self._ensure_table_column(connection, "crm_notes", "note_type", "TEXT NOT NULL DEFAULT 'crm_summary'")
+            self._ensure_table_column(connection, "crm_notes", "outbound_message_text", "TEXT")
             self._ensure_table_column(connection, "clients", "ai_summary_text", "TEXT")
             self._ensure_table_column(connection, "clients", "ai_summary_generated_at", "TEXT")
             self._ensure_table_column(connection, "tasks", "business_goal", "TEXT")
@@ -440,6 +447,24 @@ class SQLiteStorage:
                 messages,
             )
             connection.commit()
+
+    def create_message(self, message: Message) -> Message:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO messages (id, conversation_id, sender, text, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    message.id,
+                    message.conversation_id,
+                    message.sender,
+                    message.text,
+                    message.created_at.isoformat(),
+                ),
+            )
+            connection.commit()
+        return message
 
     def insert_conversation_insights(self, insights: list[tuple]) -> None:
         with self._connect() as connection:
@@ -725,9 +750,10 @@ class SQLiteStorage:
                 """
                 INSERT INTO crm_notes (
                     id, client_id, manager_id, task_id, recommendation_id, recommendation_decision, decision_comment, note_text, outcome, channel,
-                    follow_up_date, summary_text, source_conversation_id, ai_generated, ai_draft_payload_json, created_at
+                    follow_up_date, summary_text, source_conversation_id, ai_generated, ai_draft_payload_json, follow_up_reason,
+                    note_type, outbound_message_text, created_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     note.id,
@@ -745,6 +771,9 @@ class SQLiteStorage:
                     note.source_conversation_id,
                     int(note.ai_generated),
                     note.ai_draft_payload.model_dump_json() if note.ai_draft_payload else None,
+                    note.follow_up_reason,
+                    note.note_type.value,
+                    note.outbound_message_text,
                     note.created_at.isoformat(),
                 ),
             )
@@ -1518,6 +1547,9 @@ class SQLiteStorage:
             ai_draft_payload=AISummaryDraft.model_validate_json(row["ai_draft_payload_json"])
             if "ai_draft_payload_json" in row.keys() and row["ai_draft_payload_json"]
             else None,
+            follow_up_reason=row["follow_up_reason"] if "follow_up_reason" in row.keys() else None,
+            note_type=CRMNoteType(row["note_type"]) if "note_type" in row.keys() and row["note_type"] else CRMNoteType.crm_summary,
+            outbound_message_text=row["outbound_message_text"] if "outbound_message_text" in row.keys() else None,
             created_at=datetime.fromisoformat(row["created_at"]),
         )
 

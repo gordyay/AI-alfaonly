@@ -5,10 +5,14 @@ import { getErrorText } from "../lib/ui";
 import type {
   AssistantActionResult,
   ClientDetailResponse,
+  ClientReplyResponse,
   Conversation,
   GenerateScriptResponse,
   ManagerCockpit,
   ObjectionWorkflowResponse,
+  ObjectionWorkflowRecord,
+  ReplySource,
+  ScriptGenerationRecord,
   SummarizeDialogResponse,
   WorkItem,
 } from "../types";
@@ -32,8 +36,8 @@ interface UseCaseWorkflowActionsOptions {
   selectedDetail: ClientDetailResponse | null;
   selectedWorkItem: WorkItem | null;
   selectedConversation: Conversation | null;
-  latestScriptArtifact: { id: string } | null;
-  latestObjectionArtifact: { id: string } | null;
+  latestScriptArtifact: ScriptGenerationRecord | null;
+  latestObjectionArtifact: ObjectionWorkflowRecord | null;
   savedFeedbackDecision: WorkItem["recommendation_status"] | null;
   workQueue: WorkItem[];
   loadCockpit: () => Promise<ManagerCockpit>;
@@ -41,6 +45,22 @@ interface UseCaseWorkflowActionsOptions {
   reloadClientDetail: (clientId: string, workItemId?: string | null) => Promise<ClientDetailResponse>;
   loadSupervisorDashboard: () => Promise<unknown>;
   prepareAssistantDraftThread: (clientName?: string | null) => void;
+}
+
+function getReplyTextFromScript(record: ScriptGenerationRecord | null): string | null {
+  if (!record) {
+    return null;
+  }
+
+  return record.selected_text || record.draft.follow_up_message || record.draft.ready_script || null;
+}
+
+function getReplyTextFromObjection(record: ObjectionWorkflowRecord | null): string | null {
+  if (!record?.selected_response) {
+    return null;
+  }
+
+  return record.selected_response;
 }
 
 export function useCaseWorkflowActions({
@@ -131,7 +151,7 @@ export function useCaseWorkflowActions({
       dispatch({
         type: "patch",
         patch: {
-          activeTab: "script",
+          activeTab: "actions",
           scriptStatus: {
             type: "success",
             text: "Ассистент подготовил скрипт. Выберите и сохраните вариант в центре кейса.",
@@ -143,7 +163,7 @@ export function useCaseWorkflowActions({
       dispatch({
         type: "patch",
         patch: {
-          activeTab: "objections",
+          activeTab: "actions",
           objectionStatus: {
             type: "success",
             text: "Ассистент подготовил разбор возражения. Зафиксируйте выбранный ответ в центре кейса.",
@@ -251,7 +271,7 @@ export function useCaseWorkflowActions({
       dispatch({
         type: "patch",
         patch: {
-          activeTab: "script",
+          activeTab: "actions",
           scriptStatus: {
             type: "success",
             text: `Скрипт сохранён в историю кейса (${formatDateTime(response.generated_at)}).`,
@@ -357,7 +377,7 @@ export function useCaseWorkflowActions({
       dispatch({
         type: "patch",
         patch: {
-          activeTab: "objections",
+          activeTab: "actions",
           objectionStatus: {
             type: "success",
             text: `Варианты ответа сохранены (${formatDateTime(response.generated_at)}).`,
@@ -567,6 +587,126 @@ export function useCaseWorkflowActions({
     }
   }
 
+  function handlePrefillReplyFromScript() {
+    const nextText = getReplyTextFromScript(latestScriptArtifact);
+    dispatch({
+      type: "patch",
+      patch: nextText
+        ? {
+            replyDraftText: nextText,
+            replySource: "script",
+            replyStatus: { type: "success", text: "Текст из сценария подставлен в ответ клиенту." },
+          }
+        : {
+            replyStatus: { type: "error", text: "Сначала выберите или соберите сценарий контакта." },
+          },
+    });
+  }
+
+  function handlePrefillReplyFromObjection() {
+    const nextText = getReplyTextFromObjection(latestObjectionArtifact);
+    dispatch({
+      type: "patch",
+      patch: nextText
+        ? {
+            replyDraftText: nextText,
+            replySource: "objection",
+            replyStatus: { type: "success", text: "Ответ на возражение подставлен в сообщение клиенту." },
+          }
+        : {
+            replyStatus: { type: "error", text: "Сначала зафиксируйте выбранный ответ на возражение." },
+          },
+    });
+  }
+
+  async function handleSendReply() {
+    if (!selectedDetail || !selectedConversation || !selectedWorkItem) {
+      dispatch({
+        type: "patch",
+        patch: {
+          replyStatus: { type: "error", text: "Для кейса не выбрана коммуникация с клиентом." },
+        },
+      });
+      return;
+    }
+
+    if (selectedConversation.channel !== "chat") {
+      dispatch({
+        type: "patch",
+        patch: {
+          replyStatus: { type: "error", text: "В этой версии отправка доступна только для chat-диалогов." },
+        },
+      });
+      return;
+    }
+
+    if (!state.replyDraftText.trim()) {
+      dispatch({
+        type: "patch",
+        patch: {
+          replyStatus: { type: "error", text: "Сначала подготовьте текст ответа клиенту." },
+        },
+      });
+      return;
+    }
+
+    dispatch({
+      type: "patch",
+      patch: {
+        replySending: true,
+        replyStatus: { type: "loading", text: "Отправляем ответ клиенту и сохраняем в CRM..." },
+      },
+    });
+
+    try {
+      const response = await apiPost<
+        ClientReplyResponse,
+        {
+          client_id: string;
+          conversation_id: string;
+          manager_id: string;
+          recommendation_id: string;
+          source: ReplySource;
+          text: string;
+        }
+      >("/client/reply", {
+        client_id: selectedDetail.client.id,
+        conversation_id: selectedConversation.id,
+        manager_id: state.managerId,
+        recommendation_id: selectedWorkItem.recommendation_id,
+        source: state.replySource,
+        text: state.replyDraftText,
+      });
+
+      await reloadClientDetail(selectedDetail.client.id, selectedWorkItem.id);
+      dispatch({
+        type: "patch",
+        patch: {
+          replyDraftText: "",
+          replySource: "manual",
+          replyStatus: {
+            type: "success",
+            text: `Сообщение отправлено. Чат с клиентом и CRM обновлены (${formatDateTime(response.message.created_at)}).`,
+          },
+        },
+      });
+    } catch (error) {
+      dispatch({
+        type: "patch",
+        patch: {
+          replyStatus: { type: "error", text: getErrorText(error, "Не удалось отправить ответ клиенту.") },
+        },
+      });
+    } finally {
+      dispatch({
+        type: "patch",
+        patch: {
+          replySending: false,
+        },
+      });
+    }
+  }
+
   return {
     selectWorkItem,
     applyCockpitSelection,
@@ -579,5 +719,8 @@ export function useCaseWorkflowActions({
     handleSaveSummary,
     handleRecordFeedback,
     handleCopyCRM,
+    handlePrefillReplyFromScript,
+    handlePrefillReplyFromObjection,
+    handleSendReply,
   };
 }

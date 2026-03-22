@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 export interface GuidedTourStep {
   id: string;
@@ -6,6 +6,9 @@ export interface GuidedTourStep {
   title: string;
   description: string;
   note: string;
+  spotlightSelector?: string;
+  spotlightPadding?: number;
+  prepare?: () => void;
 }
 
 interface GuidedTourProps {
@@ -20,7 +23,7 @@ function getStepRect(step?: GuidedTourStep): DOMRect | null {
     return null;
   }
 
-  const element = document.querySelector(step.selector);
+  const element = document.querySelector(step.spotlightSelector ?? step.selector);
   if (!(element instanceof HTMLElement)) {
     return null;
   }
@@ -31,6 +34,8 @@ function getStepRect(step?: GuidedTourStep): DOMRect | null {
 export function GuidedTour({ open, steps, onClose, onComplete }: GuidedTourProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
+  const [cardHeight, setCardHeight] = useState(272);
+  const cardRef = useRef<HTMLElement | null>(null);
 
   const activeStep = steps[activeIndex];
 
@@ -47,34 +52,82 @@ export function GuidedTour({ open, steps, onClose, onComplete }: GuidedTourProps
       return;
     }
 
-    const element = document.querySelector(activeStep.selector);
-    if (element instanceof HTMLElement) {
-      element.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
-    }
+    activeStep.prepare?.();
 
     const updateRect = () => {
+      const element = document.querySelector(activeStep.spotlightSelector ?? activeStep.selector);
+      if (element instanceof HTMLElement) {
+        element.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+      }
+
       setTargetRect(getStepRect(activeStep));
     };
 
     updateRect();
+    const frameId = window.requestAnimationFrame(updateRect);
     window.addEventListener("resize", updateRect);
     window.addEventListener("scroll", updateRect, true);
 
     return () => {
+      window.cancelAnimationFrame(frameId);
       window.removeEventListener("resize", updateRect);
       window.removeEventListener("scroll", updateRect, true);
     };
   }, [open, activeStep]);
 
+  useLayoutEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const updateCardHeight = () => {
+      const nextHeight = cardRef.current?.getBoundingClientRect().height;
+      if (nextHeight) {
+        setCardHeight(nextHeight);
+      }
+    };
+
+    updateCardHeight();
+    window.addEventListener("resize", updateCardHeight);
+
+    return () => {
+      window.removeEventListener("resize", updateCardHeight);
+    };
+  }, [open, activeIndex]);
+
+  const spotlightRect = useMemo(() => {
+    if (!targetRect) {
+      return null;
+    }
+
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const padding = activeStep?.spotlightPadding ?? 12;
+    const margin = 8;
+    const top = Math.max(margin, targetRect.top - padding);
+    const left = Math.max(margin, targetRect.left - padding);
+    const right = Math.min(viewportWidth - margin, targetRect.right + padding);
+    const bottom = Math.min(viewportHeight - margin, targetRect.bottom + padding);
+
+    return {
+      top,
+      left,
+      right,
+      bottom,
+      width: Math.max(0, right - left),
+      height: Math.max(0, bottom - top),
+    };
+  }, [activeStep?.spotlightPadding, targetRect]);
+
   const cardStyle = useMemo(() => {
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
     const width = Math.min(360, viewportWidth - 32);
-    const estimatedHeight = 272;
     const gap = 20;
     const margin = 16;
+    const height = cardHeight;
 
-    if (!targetRect) {
+    if (!spotlightRect) {
       return {
         top: 24,
         left: 24,
@@ -84,50 +137,50 @@ export function GuidedTour({ open, steps, onClose, onComplete }: GuidedTourProps
 
     if (viewportWidth <= 1080) {
       return {
-        top: viewportHeight - estimatedHeight - margin,
+        top: viewportHeight - height - margin,
         left: margin,
         width,
       };
     }
 
     const clampTop = (value: number) =>
-      Math.min(viewportHeight - estimatedHeight - margin, Math.max(margin, value));
+      Math.min(viewportHeight - height - margin, Math.max(margin, value));
     const clampLeft = (value: number) =>
       Math.min(viewportWidth - width - margin, Math.max(margin, value));
 
-    const rightSpace = viewportWidth - targetRect.right - margin;
-    const leftSpace = targetRect.left - margin;
-    const bottomSpace = viewportHeight - targetRect.bottom - margin;
-    const topSpace = targetRect.top - margin;
+    const rightSpace = viewportWidth - spotlightRect.right - margin;
+    const leftSpace = spotlightRect.left - margin;
+    const bottomSpace = viewportHeight - spotlightRect.bottom - margin;
+    const topSpace = spotlightRect.top - margin;
 
     if (rightSpace >= width + gap) {
       return {
-        top: clampTop(targetRect.top),
-        left: targetRect.right + gap,
+        top: clampTop(spotlightRect.top),
+        left: spotlightRect.right + gap,
         width,
       };
     }
 
     if (leftSpace >= width + gap) {
       return {
-        top: clampTop(targetRect.top),
-        left: targetRect.left - width - gap,
+        top: clampTop(spotlightRect.top),
+        left: spotlightRect.left - width - gap,
         width,
       };
     }
 
-    if (bottomSpace >= estimatedHeight + gap) {
+    if (bottomSpace >= height + gap) {
       return {
-        top: targetRect.bottom + gap,
-        left: clampLeft(targetRect.left),
+        top: spotlightRect.bottom + gap,
+        left: clampLeft(spotlightRect.left),
         width,
       };
     }
 
-    if (topSpace >= estimatedHeight + gap) {
+    if (topSpace >= height + gap) {
       return {
-        top: Math.max(margin, targetRect.top - estimatedHeight - gap),
-        left: clampLeft(targetRect.left),
+        top: Math.max(margin, spotlightRect.top - height - gap),
+        left: clampLeft(spotlightRect.left),
         width,
       };
     }
@@ -137,7 +190,7 @@ export function GuidedTour({ open, steps, onClose, onComplete }: GuidedTourProps
       left: clampLeft(viewportWidth - width - margin),
       width,
     };
-  }, [targetRect]);
+  }, [cardHeight, spotlightRect]);
 
   if (!open || !activeStep) {
     return null;
@@ -145,19 +198,43 @@ export function GuidedTour({ open, steps, onClose, onComplete }: GuidedTourProps
 
   return (
     <div className="tour-overlay" role="dialog" aria-modal="true" aria-label="Экскурсия по экрану">
-      {targetRect ? (
-        <div
-          className="tour-overlay__spotlight"
-          style={{
-            top: Math.max(8, targetRect.top - 8),
-            left: Math.max(8, targetRect.left - 8),
-            width: Math.min(window.innerWidth - 16, targetRect.width + 16),
-            height: Math.min(window.innerHeight - 16, targetRect.height + 16),
-          }}
-        />
-      ) : null}
+      {spotlightRect ? (
+        <>
+          <div className="tour-overlay__scrim" style={{ inset: "0 0 auto 0", height: spotlightRect.top }} />
+          <div
+            className="tour-overlay__scrim"
+            style={{
+              top: spotlightRect.top,
+              left: 0,
+              width: spotlightRect.left,
+              height: spotlightRect.height,
+            }}
+          />
+          <div
+            className="tour-overlay__scrim"
+            style={{
+              top: spotlightRect.top,
+              left: spotlightRect.right,
+              right: 0,
+              height: spotlightRect.height,
+            }}
+          />
+          <div className="tour-overlay__scrim" style={{ inset: `${spotlightRect.bottom}px 0 0 0` }} />
+          <div
+            className="tour-overlay__spotlight"
+            style={{
+              top: spotlightRect.top,
+              left: spotlightRect.left,
+              width: spotlightRect.width,
+              height: spotlightRect.height,
+            }}
+          />
+        </>
+      ) : (
+        <div className="tour-overlay__scrim" style={{ inset: 0 }} />
+      )}
 
-      <aside className="tour-card" style={cardStyle}>
+      <aside className="tour-card" ref={cardRef} style={cardStyle}>
         <p className="panel__eyebrow">Шаг {activeIndex + 1} из {steps.length}</p>
         <h2>{activeStep.title}</h2>
         <p>{activeStep.description}</p>

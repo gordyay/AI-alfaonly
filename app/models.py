@@ -53,6 +53,11 @@ class AISummaryOutcome(str, Enum):
     closed_no_action = "closed_no_action"
 
 
+class CRMNoteType(str, Enum):
+    crm_summary = "crm_summary"
+    outbound_reply = "outbound_reply"
+
+
 class AssistantMessageRole(str, Enum):
     user = "user"
     assistant = "assistant"
@@ -83,6 +88,13 @@ class ObjectionType(str, Enum):
     complexity = "complexity"
     no_need = "no_need"
     other = "other"
+
+
+class ReplySource(str, Enum):
+    manual = "manual"
+    script = "script"
+    objection = "objection"
+    assistant = "assistant"
 
 
 class Product(BaseModel):
@@ -600,6 +612,8 @@ class CRMNote(BaseModel):
     source_conversation_id: Optional[str] = None
     ai_generated: bool = False
     ai_draft_payload: Optional[AISummaryDraft] = None
+    note_type: CRMNoteType = CRMNoteType.crm_summary
+    outbound_message_text: Optional[str] = None
     created_at: datetime
 
 
@@ -655,6 +669,23 @@ class CreateCRMNoteRequest(BaseModel):
     source_conversation_id: Optional[str] = None
     ai_generated: bool = False
     ai_draft_payload: Optional[AISummaryDraft] = None
+    note_type: CRMNoteType = CRMNoteType.crm_summary
+    outbound_message_text: Optional[str] = None
+
+
+class ClientReplyRequest(BaseModel):
+    client_id: str
+    conversation_id: str
+    manager_id: str = "m1"
+    text: str
+    recommendation_id: Optional[str] = None
+    source: ReplySource = ReplySource.manual
+
+
+class ClientReplyResponse(BaseModel):
+    message: Message
+    crm_note: CRMNote
+    activity_log_entry: ActivityLogEntry
 
 
 class FeedbackRequest(BaseModel):

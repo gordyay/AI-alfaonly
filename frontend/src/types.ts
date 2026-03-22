@@ -1,8 +1,10 @@
 export type SortMode = "priority" | "due_at";
-export type ViewTab = "summary" | "script" | "objections" | "crm" | "profile" | "portfolio";
+export type AppMode = "inbox" | "case" | "analytics";
+export type ViewTab = "overview" | "actions" | "crm" | "client";
 export type WorkItemType = "task" | "communication" | "opportunity";
 export type RecommendationStatus = "pending" | "accepted" | "rejected" | "edited";
 export type AssistantRole = "user" | "assistant" | "tool";
+export type ReplySource = "manual" | "script" | "objection" | "assistant";
 
 export interface WorkItemFactorBreakdown {
   urgency: number;
@@ -358,7 +360,15 @@ export interface CRMNote {
   source_conversation_id?: string | null;
   ai_generated: boolean;
   ai_draft_payload?: AISummaryDraft | null;
+  note_type?: "crm_summary" | "outbound_reply";
+  outbound_message_text?: string | null;
   created_at: string;
+}
+
+export interface ClientReplyResponse {
+  message: Message;
+  crm_note: CRMNote;
+  activity_log_entry: ActivityLogEntry;
 }
 
 export interface GeneratedArtifact {

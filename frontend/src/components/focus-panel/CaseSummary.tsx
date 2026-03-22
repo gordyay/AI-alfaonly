@@ -5,6 +5,7 @@ import {
   getRecommendationStatusLabel,
   getRecommendationTypeLabel,
 } from "../../lib/utils";
+import { CaseReplyComposer } from "./CaseReplyComposer";
 import { StatusMessage } from "../StatusMessage";
 import { getRecentAuditEntries, type CaseSummaryProps, type VisibleActivityEntry } from "./types";
 
@@ -22,11 +23,22 @@ export function CaseSummary({
   feedbackSubmitting,
   feedbackStatus,
   assistantSending,
+  replyDraftText,
+  replySource,
+  replySending,
+  replyStatus,
+  canPrefillReplyFromScript,
+  canPrefillReplyFromObjection,
   onChangeTab,
   onFeedbackCommentChange,
   onFeedbackDecisionChange,
   onSubmitFeedback,
   onQuickAssistantAction,
+  onReplyDraftChange,
+  onPrefillReplyFromScript,
+  onPrefillReplyFromObjection,
+  onClearReplyDraft,
+  onSendReply,
 }: CaseSummaryProps) {
   const { client } = detail;
   const currentFeedback = detail.recommendation_feedback.find(
@@ -80,9 +92,9 @@ export function CaseSummary({
       : "Зафиксировать решение";
 
   return (
-    <div className="focus-layout">
-      <section className="content-card">
-        <h3>История контакта</h3>
+    <div className="overview-stack">
+      <section className="content-card content-card--history">
+        <h3>Чат с клиентом</h3>
         <div className="message-thread">
           {conversation?.messages.length ? (
             conversation.messages.map((message) => (
@@ -99,16 +111,30 @@ export function CaseSummary({
             ))
           ) : (
             <div className="empty-state empty-state--small">
-              <strong>Коммуникация не найдена</strong>
-              <p>Для этого кейса нет привязанной истории сообщений.</p>
+              <strong>Истории сообщений нет</strong>
+              <p>Для кейса не найден диалог.</p>
             </div>
           )}
         </div>
+        <CaseReplyComposer
+          conversation={conversation}
+          replyDraftText={replyDraftText}
+          replySource={replySource}
+          replySending={replySending}
+          replyStatus={replyStatus}
+          canPrefillFromScript={canPrefillReplyFromScript}
+          canPrefillFromObjection={canPrefillReplyFromObjection}
+          onReplyDraftChange={onReplyDraftChange}
+          onPrefillFromScript={onPrefillReplyFromScript}
+          onPrefillFromObjection={onPrefillReplyFromObjection}
+          onClearReplyDraft={onClearReplyDraft}
+          onSendReply={onSendReply}
+        />
       </section>
 
-      <aside className="content-stack">
+      <div className="overview-grid">
         <section className="content-card">
-          <h3>Почему этот кейс в фокусе</h3>
+          <h3>Почему в фокусе</h3>
           <p className="insight">{workItem.expected_benefit}</p>
           <div className="chip-row">
             {workItem.why.map((reason) => (
@@ -128,41 +154,36 @@ export function CaseSummary({
         </section>
 
         <section className="content-card">
-          <h3>Решение и следующий шаг</h3>
+          <h3>Следующий шаг</h3>
           <div className="stack-list">
             <article className="stack-card">
-              <strong>Бизнес-цель кейса</strong>
-              <p>{workItem.business_goal || "Нужно закрыть точный следующий шаг без потери темпа."}</p>
+              <strong>Цель</strong>
+              <p>{workItem.business_goal || "Закрыть ближайший следующий шаг."}</p>
             </article>
             <article className="stack-card">
-              <strong>Рекомендуемое действие</strong>
+              <strong>Действие</strong>
               <p>{workItem.next_best_action}</p>
             </article>
             <article className="stack-card">
-              <strong>Продуктовый фокус</strong>
-              <p>
-                {workItem.product_name ||
-                  "Явный продукт не выделен, фокус идёт по кейсу и следующему действию."}
-              </p>
+              <strong>Продукт</strong>
+              <p>{workItem.product_name || "Не выделен"}</p>
             </article>
           </div>
         </section>
+      </div>
 
+      <div className="overview-grid">
         <section className="content-card">
-          <h3>Центр действий по кейсу</h3>
-          <p className="insight">
-            Шаги можно проходить в удобном порядке, но цикл считается завершённым только после двух действий:
-            решение зафиксировано и итог сохранён в CRM.
-          </p>
+          <h3>Быстрые переходы</h3>
           <div className="button-row">
-            <button className="ghost-button" type="button" onClick={() => onChangeTab("script")}>
-              Открыть сценарий
+            <button className="ghost-button" type="button" onClick={() => onChangeTab("actions")}>
+              Действия
             </button>
-            <button className="ghost-button" type="button" onClick={() => onChangeTab("objections")}>
-              Открыть возражения
+            <button className="ghost-button" type="button" onClick={() => onChangeTab("client")}>
+              Клиент
             </button>
             <button className="ghost-button" type="button" onClick={() => onChangeTab("crm")}>
-              Открыть CRM
+              CRM
             </button>
             {assistantEnabled ? (
               <button
@@ -171,7 +192,7 @@ export function CaseSummary({
                 onClick={() => onQuickAssistantAction("Подскажи следующий шаг по текущему кейсу")}
                 disabled={!aiEnabled || assistantSending}
               >
-                {!aiEnabled ? "AI недоступен" : assistantSending ? "Готовим..." : "Спросить ассистента"}
+                {!aiEnabled ? "AI недоступен" : assistantSending ? "Готовим..." : "Следующий шаг"}
               </button>
             ) : null}
           </div>
@@ -181,10 +202,6 @@ export function CaseSummary({
         {feedbackEnabled ? (
           <section className="content-card">
             <h3>Решение по рекомендации</h3>
-            <p className="insight">
-              Выбор и сохранение разделены: сначала статус, затем отдельное сохранение. Так история решений и
-              сводка по менеджеру остаются согласованными.
-            </p>
             <div className="button-row">
               <button
                 className={`ghost-button${feedbackDecision === "accepted" ? " is-selected" : ""}`}
@@ -212,12 +229,12 @@ export function CaseSummary({
               </button>
             </div>
             <label className="field">
-              <span>Комментарий к решению</span>
+              <span>Комментарий</span>
               <textarea
                 rows={3}
                 value={feedbackComment}
                 onChange={(event) => onFeedbackCommentChange(event.target.value)}
-                placeholder="Почему рекомендация принята, доработана или отклонена"
+                placeholder="Коротко зафиксируйте причину"
               />
             </label>
             <button
@@ -240,24 +257,24 @@ export function CaseSummary({
             ) : null}
           </section>
         ) : null}
+      </div>
 
-        <section className="content-card">
-          <h3>История действий</h3>
-          <div className="stack-list">
-            {visibleActivityEntries.length ? (
-              visibleActivityEntries.slice(0, 6).map((item) => (
-                <article className="stack-card" key={item.id}>
-                  <strong>{item.title}</strong>
-                  <p>{item.text}</p>
-                  <small>{formatDateTime(item.createdAt)}</small>
-                </article>
-              ))
-            ) : (
-              <p className="insight">Решения и действия по этой рекомендации пока не зафиксированы.</p>
-            )}
-          </div>
-        </section>
-      </aside>
+      <section className="content-card">
+        <h3>История действий</h3>
+        <div className="stack-list">
+          {visibleActivityEntries.length ? (
+            visibleActivityEntries.slice(0, 6).map((item) => (
+              <article className="stack-card" key={item.id}>
+                <strong>{item.title}</strong>
+                <p>{item.text}</p>
+                <small>{formatDateTime(item.createdAt)}</small>
+              </article>
+            ))
+          ) : (
+            <p className="insight">Решения и действия по этой рекомендации пока не зафиксированы.</p>
+          )}
+        </div>
+      </section>
     </div>
   );
 }

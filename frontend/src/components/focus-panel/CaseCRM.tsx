@@ -19,6 +19,13 @@ function getCRMRevisionStageLabel(stage: string): string {
   return labels[stage] ?? stage.replaceAll("_", " ");
 }
 
+function getCRMNoteTitle(noteType?: string | null) {
+  if (noteType === "outbound_reply") {
+    return "Исходящее сообщение клиенту";
+  }
+  return "CRM-заметка";
+}
+
 export function CaseCRM({
   detail,
   conversation,
@@ -46,7 +53,7 @@ export function CaseCRM({
         <div className="section-title">
           <div>
             <p className="panel__eyebrow">CRM-заметка</p>
-            <h3>Черновик ИИ и финальная версия менеджера</h3>
+            <h3>Черновик и финальная версия</h3>
           </div>
           <div className="button-row">
             <button className="ghost-button" type="button" onClick={onGenerateSummary} disabled={!aiEnabled || aiLoading}>
@@ -75,7 +82,7 @@ export function CaseCRM({
         {aiDraft ? (
           <div className="form-stack">
             <label className="field">
-              <span>Краткая сводка</span>
+              <span>Сводка</span>
               <textarea
                 rows={4}
                 value={aiDraft.contact_summary}
@@ -93,13 +100,13 @@ export function CaseCRM({
                     </span>
                   ))
                 ) : (
-                  <span className="badge">Ключевые пункты не выделены</span>
+                  <span className="badge">Пункты не выделены</span>
                 )}
               </div>
             </div>
 
             <div className="field">
-              <span>На чём основана сводка</span>
+              <span>Основания</span>
               <div className="stack-list">
                 {aiDraft.grounding_facts.length ? (
                   aiDraft.grounding_facts.map((fact) => (
@@ -108,7 +115,7 @@ export function CaseCRM({
                     </article>
                   ))
                 ) : (
-                  <span className="badge">Основания пока не собраны</span>
+                  <span className="badge">Основания не собраны</span>
                 )}
               </div>
             </div>
@@ -146,7 +153,7 @@ export function CaseCRM({
             </label>
 
             <label className="field">
-              <span>Черновик CRM-заметки</span>
+              <span>Текст CRM</span>
               <textarea
                 rows={8}
                 value={aiDraft.crm_note_draft}
@@ -199,8 +206,8 @@ export function CaseCRM({
           </div>
         ) : (
           <div className="empty-state empty-state--small">
-            <strong>Черновик ещё не создан</strong>
-            <p>Соберите черновик по текущему кейсу, затем проверьте текст и сохраните итог в CRM.</p>
+            <strong>Черновика пока нет</strong>
+            <p>Соберите текст по текущему кейсу.</p>
           </div>
         )}
       </section>
@@ -223,7 +230,7 @@ export function CaseCRM({
                 </article>
               ))
             ) : (
-              <p className="insight">История появится после первой AI-сводки или сохранения CRM.</p>
+              <p className="insight">История появится после первой сводки.</p>
             )}
           </div>
         </section>
@@ -232,8 +239,8 @@ export function CaseCRM({
           <h3>Последний финальный результат</h3>
           {latestSavedNote ? (
             <article className="stack-card">
-              <strong>{latestSavedNote.summary_text || "CRM-заметка"}</strong>
-              <p>{latestSavedNote.note_text}</p>
+              <strong>{latestSavedNote.summary_text || getCRMNoteTitle(latestSavedNote.note_type)}</strong>
+              <p>{latestSavedNote.outbound_message_text || latestSavedNote.note_text}</p>
               <small>
                 {latestSavedNote.follow_up_date
                   ? `Следующий контакт: ${formatDateTime(latestSavedNote.follow_up_date)}`
@@ -242,7 +249,7 @@ export function CaseCRM({
               {latestSavedNote.follow_up_reason ? <p>{latestSavedNote.follow_up_reason}</p> : null}
             </article>
           ) : (
-            <p className="insight">Финальная CRM-заметка ещё не сохранена.</p>
+            <p className="insight">Финальная CRM-заметка не сохранена.</p>
           )}
           {conversation?.channel ? <p className="insight">Канал контакта: {conversation.channel}</p> : null}
         </section>

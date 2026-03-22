@@ -41,6 +41,15 @@ interface FocusPanelProps {
   objectionStatus?: UiStatus;
   onGenerateObjectionWorkflow: () => void;
   onSelectObjectionOption: (optionTitle: string, selectedResponse: string) => void;
+  replyDraftText: string;
+  replySource: "manual" | "script" | "objection" | "assistant";
+  replySending: boolean;
+  replyStatus?: UiStatus;
+  onReplyDraftChange: (value: string) => void;
+  onPrefillReplyFromScript: () => void;
+  onPrefillReplyFromObjection: () => void;
+  onClearReplyDraft: () => void;
+  onSendReply: () => void;
   feedbackDecision?: RecommendationStatus | null;
   savedFeedbackDecision?: RecommendationStatus | null;
   feedbackComment: string;
@@ -54,12 +63,10 @@ interface FocusPanelProps {
 }
 
 const TABS: Array<{ id: ViewTab; label: string }> = [
-  { id: "summary", label: "Сводка" },
-  { id: "script", label: "Сценарий" },
-  { id: "objections", label: "Возражения" },
+  { id: "overview", label: "Обзор" },
+  { id: "actions", label: "Действия" },
   { id: "crm", label: "CRM" },
-  { id: "profile", label: "Профиль" },
-  { id: "portfolio", label: "Портфель" },
+  { id: "client", label: "Клиент" },
 ];
 
 export function FocusPanel({
@@ -96,6 +103,15 @@ export function FocusPanel({
   objectionStatus,
   onGenerateObjectionWorkflow,
   onSelectObjectionOption,
+  replyDraftText,
+  replySource,
+  replySending,
+  replyStatus,
+  onReplyDraftChange,
+  onPrefillReplyFromScript,
+  onPrefillReplyFromObjection,
+  onClearReplyDraft,
+  onSendReply,
   feedbackDecision,
   savedFeedbackDecision,
   feedbackComment,
@@ -110,17 +126,16 @@ export function FocusPanel({
   if (!detail || !workItem) {
     return (
       <section className="panel focus-panel focus-panel--empty">
-        <p className="panel__eyebrow">Рабочее окно менеджера</p>
-        <h2>Фокус на день</h2>
-        <p>
-          Выберите задачу, коммуникацию или возможность в левой колонке. Основной кейс откроется здесь
-          вместе с объяснением приоритета, записью в CRM и контекстом клиента.
-        </p>
+        <p className="panel__eyebrow">Кейс</p>
+        <h2>Выберите кейс</h2>
+        <p>Детали появятся здесь.</p>
       </section>
     );
   }
 
   const { client } = detail;
+  const latestScriptArtifact = detail.script_history[0] ?? null;
+  const latestObjectionArtifact = detail.objection_history[0] ?? null;
   const nextContact =
     workItem.due_at || conversation?.insights?.next_contact_due_at || client.next_contact_due_at || null;
 
@@ -131,42 +146,43 @@ export function FocusPanel({
           <p className="panel__eyebrow">Фокусный кейс</p>
           <h2>{workItem.title}</h2>
           <p className="focus-panel__subtitle">
-            {client.full_name} · {getWorkItemTypeLabel(workItem.item_type)} ·{" "}
-            {getRecommendationStatusLabel(workItem.recommendation_status)}
+            {client.full_name} · {getRecommendationStatusLabel(workItem.recommendation_status)} ·{" "}
+            {getWorkItemTypeLabel(workItem.item_type)}
           </p>
         </div>
         <div className="focus-panel__score">
-          <span>Оценка приоритета</span>
+          <span>Приоритет</span>
           <strong>{workItem.priority_score}</strong>
         </div>
       </header>
 
       <div className="chip-row">
-        {client.tags.map((tag) => (
+        {client.tags.slice(0, 4).map((tag) => (
           <span className="badge" key={tag}>
             {tag}
           </span>
         ))}
+        {client.tags.length > 4 ? <span className="badge badge--subtle">+{client.tags.length - 4}</span> : null}
         {workItem.business_goal ? <span className="badge badge--accent">{workItem.business_goal}</span> : null}
       </div>
 
       <section className="summary-strip">
         <article className="summary-card summary-card--feature">
-          <span>Мини-сводка</span>
+          <span>Коротко</span>
           <strong>{getMiniSummaryCopy({ detailSummary: client.ai_summary_text, workItem, draft: aiDraft })}</strong>
         </article>
         <article className="summary-card">
-          <span>Следующее действие</span>
+          <span>Следующий шаг</span>
           <strong>{workItem.next_best_action}</strong>
         </article>
         {propensityEnabled ? (
           <article className="summary-card">
-            <span>Лучший продукт</span>
+            <span>Продукт</span>
             <strong>{getFocusPropensityLabel(detail.product_propensity)}</strong>
           </article>
         ) : null}
         <article className="summary-card">
-          <span>Следующий контакт</span>
+          <span>Контакт</span>
           <strong>{formatDateTime(nextContact)}</strong>
         </article>
       </section>
@@ -184,7 +200,7 @@ export function FocusPanel({
         ))}
       </div>
 
-      {activeTab === "summary" ? (
+      {activeTab === "overview" ? (
         <CaseSummary
           detail={detail}
           workItem={workItem}
@@ -201,68 +217,80 @@ export function FocusPanel({
           feedbackSubmitting={feedbackSubmitting}
           feedbackStatus={feedbackStatus}
           assistantSending={assistantSending}
+          replyDraftText={replyDraftText}
+          replySource={replySource}
+          replySending={replySending}
+          replyStatus={replyStatus}
+          canPrefillReplyFromScript={Boolean(
+            latestScriptArtifact?.selected_text || latestScriptArtifact?.draft.follow_up_message || latestScriptArtifact?.draft.ready_script,
+          )}
+          canPrefillReplyFromObjection={Boolean(latestObjectionArtifact?.selected_response)}
           onChangeTab={onChangeTab}
           onFeedbackCommentChange={onFeedbackCommentChange}
           onFeedbackDecisionChange={onFeedbackDecisionChange}
           onSubmitFeedback={onSubmitFeedback}
           onQuickAssistantAction={onQuickAssistantAction}
+          onReplyDraftChange={onReplyDraftChange}
+          onPrefillReplyFromScript={onPrefillReplyFromScript}
+          onPrefillReplyFromObjection={onPrefillReplyFromObjection}
+          onClearReplyDraft={onClearReplyDraft}
+          onSendReply={onSendReply}
         />
       ) : null}
 
-      {activeTab === "script" ? (
-        <CaseAction
-          detail={detail}
-          workItem={workItem}
-          conversation={conversation}
-          aiEnabled={aiEnabled}
-          aiUnavailableMessage={aiUnavailableMessage}
-          assistantEnabled={assistantEnabled}
-          feedbackEnabled={feedbackEnabled}
-          propensityEnabled={propensityEnabled}
-          mode="script"
-          scriptGoal={scriptGoal}
-          onScriptGoalChange={onScriptGoalChange}
-          scriptLoading={scriptLoading}
-          scriptSelecting={scriptSelecting}
-          scriptStatus={scriptStatus}
-          onGenerateScript={onGenerateScript}
-          onSelectScriptVariant={onSelectScriptVariant}
-          objectionInput={objectionInput}
-          onObjectionInputChange={onObjectionInputChange}
-          objectionLoading={objectionLoading}
-          objectionSelecting={objectionSelecting}
-          objectionStatus={objectionStatus}
-          onGenerateObjectionWorkflow={onGenerateObjectionWorkflow}
-          onSelectObjectionOption={onSelectObjectionOption}
-        />
-      ) : null}
-
-      {activeTab === "objections" ? (
-        <CaseAction
-          detail={detail}
-          workItem={workItem}
-          conversation={conversation}
-          aiEnabled={aiEnabled}
-          aiUnavailableMessage={aiUnavailableMessage}
-          assistantEnabled={assistantEnabled}
-          feedbackEnabled={feedbackEnabled}
-          propensityEnabled={propensityEnabled}
-          mode="objections"
-          scriptGoal={scriptGoal}
-          onScriptGoalChange={onScriptGoalChange}
-          scriptLoading={scriptLoading}
-          scriptSelecting={scriptSelecting}
-          scriptStatus={scriptStatus}
-          onGenerateScript={onGenerateScript}
-          onSelectScriptVariant={onSelectScriptVariant}
-          objectionInput={objectionInput}
-          onObjectionInputChange={onObjectionInputChange}
-          objectionLoading={objectionLoading}
-          objectionSelecting={objectionSelecting}
-          objectionStatus={objectionStatus}
-          onGenerateObjectionWorkflow={onGenerateObjectionWorkflow}
-          onSelectObjectionOption={onSelectObjectionOption}
-        />
+      {activeTab === "actions" ? (
+        <div className="actions-stack">
+          <CaseAction
+            detail={detail}
+            workItem={workItem}
+            conversation={conversation}
+            aiEnabled={aiEnabled}
+            aiUnavailableMessage={aiUnavailableMessage}
+            assistantEnabled={assistantEnabled}
+            feedbackEnabled={feedbackEnabled}
+            propensityEnabled={propensityEnabled}
+            mode="script"
+            scriptGoal={scriptGoal}
+            onScriptGoalChange={onScriptGoalChange}
+            scriptLoading={scriptLoading}
+            scriptSelecting={scriptSelecting}
+            scriptStatus={scriptStatus}
+            onGenerateScript={onGenerateScript}
+            onSelectScriptVariant={onSelectScriptVariant}
+            objectionInput={objectionInput}
+            onObjectionInputChange={onObjectionInputChange}
+            objectionLoading={objectionLoading}
+            objectionSelecting={objectionSelecting}
+            objectionStatus={objectionStatus}
+            onGenerateObjectionWorkflow={onGenerateObjectionWorkflow}
+            onSelectObjectionOption={onSelectObjectionOption}
+          />
+          <CaseAction
+            detail={detail}
+            workItem={workItem}
+            conversation={conversation}
+            aiEnabled={aiEnabled}
+            aiUnavailableMessage={aiUnavailableMessage}
+            assistantEnabled={assistantEnabled}
+            feedbackEnabled={feedbackEnabled}
+            propensityEnabled={propensityEnabled}
+            mode="objections"
+            scriptGoal={scriptGoal}
+            onScriptGoalChange={onScriptGoalChange}
+            scriptLoading={scriptLoading}
+            scriptSelecting={scriptSelecting}
+            scriptStatus={scriptStatus}
+            onGenerateScript={onGenerateScript}
+            onSelectScriptVariant={onSelectScriptVariant}
+            objectionInput={objectionInput}
+            onObjectionInputChange={onObjectionInputChange}
+            objectionLoading={objectionLoading}
+            objectionSelecting={objectionSelecting}
+            objectionStatus={objectionStatus}
+            onGenerateObjectionWorkflow={onGenerateObjectionWorkflow}
+            onSelectObjectionOption={onSelectObjectionOption}
+          />
+        </div>
       ) : null}
 
       {activeTab === "crm" ? (
@@ -288,30 +316,29 @@ export function FocusPanel({
         />
       ) : null}
 
-      {activeTab === "profile" ? (
-        <CaseProfile
-          detail={detail}
-          workItem={workItem}
-          conversation={conversation}
-          aiEnabled={aiEnabled}
-          aiUnavailableMessage={aiUnavailableMessage}
-          assistantEnabled={assistantEnabled}
-          feedbackEnabled={feedbackEnabled}
-          propensityEnabled={propensityEnabled}
-        />
-      ) : null}
-
-      {activeTab === "portfolio" ? (
-        <CasePortfolio
-          detail={detail}
-          workItem={workItem}
-          conversation={conversation}
-          aiEnabled={aiEnabled}
-          aiUnavailableMessage={aiUnavailableMessage}
-          assistantEnabled={assistantEnabled}
-          feedbackEnabled={feedbackEnabled}
-          propensityEnabled={propensityEnabled}
-        />
+      {activeTab === "client" ? (
+        <div className="actions-stack">
+          <CaseProfile
+            detail={detail}
+            workItem={workItem}
+            conversation={conversation}
+            aiEnabled={aiEnabled}
+            aiUnavailableMessage={aiUnavailableMessage}
+            assistantEnabled={assistantEnabled}
+            feedbackEnabled={feedbackEnabled}
+            propensityEnabled={propensityEnabled}
+          />
+          <CasePortfolio
+            detail={detail}
+            workItem={workItem}
+            conversation={conversation}
+            aiEnabled={aiEnabled}
+            aiUnavailableMessage={aiUnavailableMessage}
+            assistantEnabled={assistantEnabled}
+            feedbackEnabled={feedbackEnabled}
+            propensityEnabled={propensityEnabled}
+          />
+        </div>
       ) : null}
     </section>
   );

@@ -31,7 +31,7 @@ export function CaseAction({
           <div className="section-title">
             <div>
               <p className="panel__eyebrow">Сценарий</p>
-              <h3>Сценарий контакта по кейсу</h3>
+              <h3>Сценарий контакта</h3>
             </div>
             <div className="button-row">
               <button
@@ -51,7 +51,7 @@ export function CaseAction({
               type="text"
               value={scriptGoal}
               onChange={(event) => onScriptGoalChange(event.target.value)}
-              placeholder="Какой следующий шаг нужно закрыть в этом контакте"
+              placeholder="Что нужно закрыть этим контактом"
             />
           </label>
           {!aiEnabled ? <StatusMessage compact type="error" message={aiUnavailableMessage} /> : null}
@@ -118,8 +118,8 @@ export function CaseAction({
             </div>
           ) : (
             <div className="empty-state empty-state--small">
-              <strong>Сценарий ещё не собран</strong>
-              <p>Сформируйте сценарий из текущего кейса, затем отдельно выберите вариант для контакта.</p>
+              <strong>Сценария пока нет</strong>
+              <p>Соберите вариант для текущего кейса.</p>
             </div>
           )}
         </section>
@@ -142,7 +142,7 @@ export function CaseAction({
                   </article>
                 ))
               ) : (
-                <p className="insight">История появится после первого собранного сценария.</p>
+                <p className="insight">История появится после первого сценария.</p>
               )}
             </div>
           </section>
@@ -160,7 +160,7 @@ export function CaseAction({
         <div className="section-title">
           <div>
             <p className="panel__eyebrow">Возражения</p>
-            <h3>Разбор возражения по кейсу</h3>
+            <h3>Разбор возражения</h3>
           </div>
           <div className="button-row">
             <button
@@ -180,7 +180,7 @@ export function CaseAction({
             rows={3}
             value={objectionInput}
             onChange={(event) => onObjectionInputChange(event.target.value)}
-            placeholder="Например: дорого, слишком рискованно, не сейчас"
+            placeholder="Например: дорого или не сейчас"
           />
         </label>
         {!aiEnabled ? <StatusMessage compact type="error" message={aiUnavailableMessage} /> : null}
@@ -239,8 +239,8 @@ export function CaseAction({
           </div>
         ) : (
           <div className="empty-state empty-state--small">
-            <strong>Разбор возражения ещё не собран</strong>
-            <p>Сначала сформируйте варианты, затем отдельно выберите ответ, который менеджер реально возьмёт в работу.</p>
+            <strong>Разбора пока нет</strong>
+            <p>Соберите варианты ответа.</p>
           </div>
         )}
       </section>
@@ -261,7 +261,7 @@ export function CaseAction({
                 </article>
               ))
             ) : (
-              <p className="insight">История появится после первого разбора возражения.</p>
+              <p className="insight">История появится после первого разбора.</p>
             )}
           </div>
         </section>

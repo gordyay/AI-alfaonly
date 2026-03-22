@@ -1,4 +1,19 @@
-import { startTransition, useDeferredValue, useEffect, useRef, useState } from "react";
+import { startTransition, useDeferredValue, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+import { AssistantDrawer } from "./components/AssistantDrawer";
+import { AssistantPanel } from "./components/AssistantPanel";
+import { AppHeader } from "./components/AppHeader";
+import { CaseProgressStrip } from "./components/CaseProgressStrip";
+import { FocusPanel } from "./components/FocusPanel";
+import { GuidedTour, type GuidedTourStep } from "./components/GuidedTour";
+import { StatusMessage } from "./components/StatusMessage";
+import { SupervisorPanel } from "./components/SupervisorPanel";
+import { WorkQueueRail } from "./components/WorkQueueRail";
+import { useAssistant } from "./hooks/useAssistant";
+import { useCaseWorkflowActions } from "./hooks/useCaseWorkflowActions";
+import { useClientDetail } from "./hooks/useClientDetail";
+import { useCockpit } from "./hooks/useCockpit";
+import { syncFocusScreenStateToUrl, useFocusScreenReducer } from "./hooks/useFocusScreenReducer";
+import { useSupervisorDashboard } from "./hooks/useSupervisorDashboard";
 import { apiGet } from "./lib/api";
 import { getFrontendFeatureFlags } from "./lib/ui";
 import {
@@ -9,70 +24,58 @@ import {
   groupWorkQueue,
   type WorkQueueFilters,
 } from "./lib/utils";
-import type { AssistantActionResult, ClientDetailResponse, HealthResponse, SortMode, WorkItem } from "./types";
-import { AssistantPanel } from "./components/AssistantPanel";
-import { FocusPanel } from "./components/FocusPanel";
-import { GuidedTour, type GuidedTourStep } from "./components/GuidedTour";
-import { Hero } from "./components/Hero";
-import { JourneyBar } from "./components/JourneyBar";
-import { OnboardingPanel } from "./components/OnboardingPanel";
-import { StatusMessage } from "./components/StatusMessage";
-import { SupervisorPanel } from "./components/SupervisorPanel";
-import { WorkQueueRail } from "./components/WorkQueueRail";
-import { useAssistant } from "./hooks/useAssistant";
-import { useCaseWorkflowActions } from "./hooks/useCaseWorkflowActions";
-import { useClientDetail } from "./hooks/useClientDetail";
-import { useCockpit } from "./hooks/useCockpit";
-import { useFocusScreenReducer } from "./hooks/useFocusScreenReducer";
-import { useSupervisorDashboard } from "./hooks/useSupervisorDashboard";
+import type { AppMode, AssistantActionResult, ClientDetailResponse, HealthResponse, SortMode, WorkItem } from "./types";
 
-const ONBOARDING_STORAGE_KEY = "alfa_only_onboarding_hidden";
 const TOUR_SEEN_STORAGE_KEY = "alfa_only_guided_tour_seen";
 
-const TOUR_STEPS: GuidedTourStep[] = [
-  {
-    id: "hero",
-    selector: "[data-tour='hero']",
-    title: "Это верхняя панель дня",
-    description: "Здесь видно общую картину: сколько кейсов в работе, что срочно и по какому менеджеру открыт экран.",
-    note: "Если хотите быстро сменить порядок просмотра или менеджера, начните отсюда.",
-  },
-  {
-    id: "queue",
-    selector: "[data-tour='queue']",
-    title: "Слева находится очередь кейсов",
-    description: "Это основной вход в работу. Каждый элемент уже отсортирован по важности и содержит краткое объяснение пользы.",
-    note: "Нажмите на любой кейс, чтобы открыть его подробности в центре.",
-  },
-  {
-    id: "focus",
-    selector: "[data-tour='focus']",
-    title: "В центре вы работаете с кейсом",
-    description: "Здесь можно прочитать историю контакта, понять, почему кейс важен, принять решение и подготовить запись в CRM.",
-    note: "Если вы зашли впервые, начните со вкладки «Сводка», затем перейдите в «CRM».",
-  },
-  {
-    id: "assistant",
-    selector: "[data-tour='assistant']",
-    title: "Справа находится помощник",
-    description: "Помощник умеет собирать сводку, предлагать текст сообщения, помогать с возражениями и подсказывать следующий шаг.",
-    note: "Используйте быстрые кнопки, если не хотите печатать запрос вручную.",
-  },
-  {
-    id: "journey",
-    selector: "[data-tour='journey']",
-    title: "Сверху есть дорожная карта",
-    description: "Этот блок показывает, где вы находитесь: выбрали кейс, приняли решение, подготовили результат или уже сохранили итог.",
-    note: "Если потерялись, просто посмотрите на активный шаг и продолжайте оттуда.",
-  },
-  {
-    id: "supervisor",
-    selector: "[data-tour='supervisor']",
-    title: "Ниже видна общая сводка по использованию",
-    description: "Здесь отражается, насколько часто рекомендации реально используются и по каким типам кейсов менеджер принимает решения.",
-    note: "Этот блок полезен, чтобы понять, где система помогает, а где ей пока не доверяют.",
-  },
-];
+const APPBAR_TOUR_STEP: GuidedTourStep = {
+  id: "appbar",
+  selector: "[data-tour='appbar']",
+  title: "Верхняя навигация",
+  description: "Здесь переключаются входящие, кейс и аналитика.",
+  note: "Сначала выберите режим, потом выполняйте задачу.",
+};
+
+const INBOX_TOUR_STEP: GuidedTourStep = {
+  id: "queue",
+  selector: "[data-tour='queue']",
+  spotlightSelector: "[data-tour-spotlight='queue']",
+  title: "Очередь кейсов",
+  description: "Здесь только список кейсов, поиск и фильтры.",
+  note: "Выберите карточку, чтобы открыть рабочее место.",
+};
+
+const CASE_TOUR_STEP: GuidedTourStep = {
+  id: "focus",
+  selector: "[data-tour='focus']",
+  title: "Работа по кейсу",
+  description: "Здесь принимается решение и готовится запись в CRM.",
+  note: "Вкладки сгруппированы по задаче.",
+};
+
+const CASE_LAUNCH_TOUR_STEP: GuidedTourStep = {
+  id: "case-launch",
+  selector: "[data-tour='case-launch']",
+  title: "Быстрый переход в кейс",
+  description: "Выбранный кейс можно открыть отдельно от очереди.",
+  note: "Так triage не смешивается с исполнением.",
+};
+
+const ASSISTANT_TOUR_STEP: GuidedTourStep = {
+  id: "assistant",
+  selector: "[data-tour='assistant']",
+  title: "Помощник по запросу",
+  description: "AI открывается в drawer только когда нужен.",
+  note: "Основной экран остается чистым.",
+};
+
+const ANALYTICS_TOUR_STEP: GuidedTourStep = {
+  id: "supervisor",
+  selector: "[data-tour='supervisor']",
+  title: "Отдельная аналитика",
+  description: "Метрики вынесены из основного потока.",
+  note: "Открывайте этот режим после работы по кейсам.",
+};
 
 function getNextManagerId(currentManagerId: string) {
   return currentManagerId === "m1" ? "m2" : "m1";
@@ -101,7 +104,7 @@ function getSelectedWorkItem(
 export function App() {
   const [screenState, dispatch] = useFocusScreenReducer();
   const [health, setHealth] = useState<HealthResponse | null>(null);
-  const focusPanelRef = useRef<HTMLDivElement | null>(null);
+  const tourOriginRef = useRef<{ mode: AppMode; assistantOpen: boolean } | null>(null);
   const deferredQuery = useDeferredValue(screenState.filterQuery.trim().toLowerCase());
 
   const { cockpit, cockpitLoading, cockpitError, loadCockpit } = useCockpit(screenState.managerId);
@@ -111,42 +114,64 @@ export function App() {
     screenState.selectedWorkItemId,
   );
 
-  const featureFlags = health ? getFrontendFeatureFlags(health) : null;
+  const featureFlags = useMemo(() => (health ? getFrontendFeatureFlags(health) : null), [health]);
   const assistantEnabled = featureFlags?.assistantPanel ?? false;
   const supervisorEnabled = featureFlags?.supervisorDashboard ?? false;
   const feedbackEnabled = featureFlags?.feedbackLoop ?? false;
   const propensityEnabled = featureFlags?.propensityModule ?? false;
 
-  const workQueue = cockpit?.work_queue ?? [];
-  const selectedWorkItem = getSelectedWorkItem(workQueue, selectedDetail, screenState.selectedWorkItemId);
-  const selectedConversation = selectedDetail
-    ? getConversationForWorkItem(selectedDetail.conversations, selectedWorkItem)
-    : null;
+  const workQueue = useMemo(() => cockpit?.work_queue ?? [], [cockpit]);
+  const selectedWorkItem = useMemo(
+    () => getSelectedWorkItem(workQueue, selectedDetail, screenState.selectedWorkItemId),
+    [workQueue, selectedDetail, screenState.selectedWorkItemId],
+  );
+  const selectedConversation = useMemo(
+    () => (selectedDetail ? getConversationForWorkItem(selectedDetail.conversations, selectedWorkItem) : null),
+    [selectedDetail, selectedWorkItem],
+  );
   const latestScriptArtifact = selectedDetail?.script_history?.[0] ?? null;
   const latestObjectionArtifact = selectedDetail?.objection_history?.[0] ?? null;
-  const filteredWorkQueue = filterWorkQueue(workQueue, deferredQuery, screenState.queueFilters);
-  const filteredSections = groupWorkQueue(filteredWorkQueue);
-  const productOptions = [
-    { value: "all", label: "Все продукты" },
-    ...Array.from(
-      new Map(
-        workQueue
-          .filter((item) => item.product_code && item.product_name)
-          .map((item) => [item.product_code as string, { value: item.product_code as string, label: item.product_name as string }]),
-      ).values(),
-    ),
-  ];
-  const currentFeedback =
-    selectedDetail?.recommendation_feedback.find((item) => item.recommendation_id === selectedWorkItem?.recommendation_id) ??
-    null;
-  const savedFeedbackDecision =
-    currentFeedback?.decision ??
-    (selectedWorkItem?.recommendation_status !== "pending" ? selectedWorkItem?.recommendation_status : null);
+  const filteredWorkQueue = useMemo(
+    () => filterWorkQueue(workQueue, deferredQuery, screenState.queueFilters),
+    [workQueue, deferredQuery, screenState.queueFilters],
+  );
+  const filteredSections = useMemo(() => groupWorkQueue(filteredWorkQueue), [filteredWorkQueue]);
+  const productOptions = useMemo(
+    () => [
+      { value: "all", label: "Все продукты" },
+      ...Array.from(
+        new Map(
+          workQueue
+            .filter((item) => item.product_code && item.product_name)
+            .map((item) => [
+              item.product_code as string,
+              { value: item.product_code as string, label: item.product_name as string },
+            ]),
+        ).values(),
+      ),
+    ],
+    [workQueue],
+  );
+  const currentFeedback = useMemo(
+    () =>
+      selectedDetail?.recommendation_feedback.find((item) => item.recommendation_id === selectedWorkItem?.recommendation_id) ??
+      null,
+    [selectedDetail, selectedWorkItem?.recommendation_id],
+  );
+  const savedFeedbackDecision = useMemo(
+    () =>
+      currentFeedback?.decision ??
+      (selectedWorkItem?.recommendation_status !== "pending" ? selectedWorkItem?.recommendation_status : null),
+    [currentFeedback, selectedWorkItem?.recommendation_status],
+  );
   const effectiveSavedFeedbackDecision = feedbackEnabled ? (savedFeedbackDecision ?? null) : null;
-  const savedCRMNote =
-    selectedDetail?.crm_notes.find((note) => note.recommendation_id === selectedWorkItem?.recommendation_id) ??
-    selectedDetail?.crm_notes[0] ??
-    null;
+  const savedCRMNote = useMemo(
+    () =>
+      selectedDetail?.crm_notes.find((note) => note.recommendation_id === selectedWorkItem?.recommendation_id) ??
+      selectedDetail?.crm_notes[0] ??
+      null,
+    [selectedDetail, selectedWorkItem?.recommendation_id],
+  );
   const aiEnabled = health?.ai.available ?? false;
   const aiUnavailableMessage = health?.ai.reason ?? "AI-функции временно недоступны.";
 
@@ -179,110 +204,208 @@ export function App() {
     prepareAssistantDraftThread: assistant.prepareDraftThread,
   });
 
-  const journeySteps = [
-    {
-      id: "select",
-      title: "Выбрать кейс",
-      description: selectedWorkItem ? selectedWorkItem.title : "Откройте кейс из плана дня.",
-      done: Boolean(selectedWorkItem),
-      active: !selectedWorkItem,
-    },
-    ...(feedbackEnabled
-      ? [
-          {
-            id: "decide",
-            title: "Принять решение",
-            description: effectiveSavedFeedbackDecision
-              ? `Решение сохранено: ${getRecommendationStatusLabel(effectiveSavedFeedbackDecision)}`
-              : screenState.feedbackDecision
-                ? `Готово к сохранению: ${getRecommendationStatusLabel(screenState.feedbackDecision)}`
-                : "Выберите: принять, доработать или отклонить.",
-            done: Boolean(effectiveSavedFeedbackDecision),
-            active: Boolean(selectedWorkItem) && !effectiveSavedFeedbackDecision,
-          },
-        ]
-      : []),
-    {
-      id: "prepare",
-      title: "Подготовить артефакт",
-      description:
-        screenState.aiDraft || latestScriptArtifact || latestObjectionArtifact
-          ? "Сценарий, разбор возражения или CRM-черновик готовы к проверке."
-          : "Подготовьте сценарий, разбор возражения или CRM-черновик по кейсу.",
-      done: Boolean(screenState.aiDraft || latestScriptArtifact || latestObjectionArtifact),
-      active: Boolean(selectedWorkItem) && !screenState.aiDraft && !latestScriptArtifact && !latestObjectionArtifact,
-    },
-    {
-      id: "save",
-      title: "Закрыть цикл",
-      description: savedCRMNote
-        ? "Результат уже сохранён в CRM и попал в историю действий."
-        : "Сохраните итог в CRM, чтобы он появился в общей сводке.",
-      done: Boolean(savedCRMNote),
-      active: Boolean(selectedWorkItem) && !savedCRMNote,
-    },
-  ];
+  const journeySteps = useMemo(
+    () => [
+      {
+        id: "select",
+        title: "Кейс",
+        description: selectedWorkItem ? "Выбран" : "Не выбран",
+        done: Boolean(selectedWorkItem),
+        active: !selectedWorkItem,
+      },
+      ...(feedbackEnabled
+        ? [
+            {
+              id: "decide",
+              title: "Решение",
+              description: effectiveSavedFeedbackDecision
+                ? getRecommendationStatusLabel(effectiveSavedFeedbackDecision)
+                : screenState.feedbackDecision
+                  ? getRecommendationStatusLabel(screenState.feedbackDecision)
+                  : "Не выбрано",
+              done: Boolean(effectiveSavedFeedbackDecision),
+              active: Boolean(selectedWorkItem) && !effectiveSavedFeedbackDecision,
+            },
+          ]
+        : []),
+      {
+        id: "prepare",
+        title: "Артефакты",
+        description: screenState.aiDraft || latestScriptArtifact || latestObjectionArtifact ? "Готовы" : "В работе",
+        done: Boolean(screenState.aiDraft || latestScriptArtifact || latestObjectionArtifact),
+        active: Boolean(selectedWorkItem) && !screenState.aiDraft && !latestScriptArtifact && !latestObjectionArtifact,
+      },
+      {
+        id: "save",
+        title: "CRM",
+        description: savedCRMNote ? "Сохранено" : "Не сохранено",
+        done: Boolean(savedCRMNote),
+        active: Boolean(selectedWorkItem) && !savedCRMNote,
+      },
+    ],
+    [
+      feedbackEnabled,
+      effectiveSavedFeedbackDecision,
+      latestObjectionArtifact,
+      latestScriptArtifact,
+      savedCRMNote,
+      screenState.aiDraft,
+      screenState.feedbackDecision,
+      selectedWorkItem,
+    ],
+  );
 
-  const tourSteps = TOUR_STEPS.filter((step) => {
-    if (step.id === "assistant") {
-      return assistantEnabled;
+  const tourSteps = useMemo(() => {
+    const showInbox = () =>
+      dispatch({
+        type: "patch",
+        patch: {
+          mode: "inbox",
+          assistantOpen: false,
+        },
+      });
+    const showCase = () =>
+      dispatch({
+        type: "patch",
+        patch: {
+          mode: "case",
+          assistantOpen: false,
+        },
+      });
+    const showAssistant = () =>
+      dispatch({
+        type: "patch",
+        patch: {
+          mode: "case",
+          assistantOpen: true,
+        },
+      });
+    const showAnalytics = () =>
+      dispatch({
+        type: "patch",
+        patch: {
+          mode: "analytics",
+          assistantOpen: false,
+        },
+      });
+
+    const steps: GuidedTourStep[] = [
+      {
+        ...APPBAR_TOUR_STEP,
+        prepare: showInbox,
+      },
+      {
+        ...INBOX_TOUR_STEP,
+        prepare: showInbox,
+      },
+    ];
+
+    if (selectedWorkItem) {
+      steps.push(
+        {
+          ...CASE_LAUNCH_TOUR_STEP,
+          prepare: showInbox,
+        },
+        {
+          ...CASE_TOUR_STEP,
+          prepare: showCase,
+        },
+      );
+
+      if (assistantEnabled) {
+        steps.push({
+          ...ASSISTANT_TOUR_STEP,
+          prepare: showAssistant,
+        });
+      }
     }
-    if (step.id === "supervisor") {
-      return supervisorEnabled;
+
+    if (supervisorEnabled) {
+      steps.push({
+        ...ANALYTICS_TOUR_STEP,
+        prepare: showAnalytics,
+      });
     }
-    return true;
-  });
+
+    return steps;
+  }, [assistantEnabled, dispatch, selectedWorkItem, supervisorEnabled]);
 
   async function loadHealth() {
     const response = await apiGet<HealthResponse>("/health");
     setHealth(response);
   }
 
-  useEffect(() => {
-    const savedValue = window.localStorage.getItem(ONBOARDING_STORAGE_KEY);
-    if (savedValue !== "true") {
-      window.localStorage.setItem(ONBOARDING_STORAGE_KEY, "true");
+  const initializeManagerScreen = useEffectEvent(async (ignoreSignal: { current: boolean }) => {
+    resetClientDetails();
+    assistant.resetAssistantState();
+
+    try {
+      const cockpitResponse = await loadCockpit();
+      if (!ignoreSignal.current) {
+        await workflowActions.applyCockpitSelection(
+          cockpitResponse,
+          screenState.selectedWorkItemId,
+          screenState.selectedClientId,
+        );
+      }
+    } catch {
+      return;
     }
+  });
+
+  const loadSupervisorDashboardEvent = useEffectEvent(async () => {
+    await loadSupervisorDashboard();
+  });
+
+  const loadAssistantThreadsEvent = useEffectEvent(async () => {
+    await assistant.loadAssistantThreads(null);
+  });
+
+  useEffect(() => {
     loadHealth().catch(() => undefined);
   }, []);
 
   useEffect(() => {
-    let ignore = false;
+    syncFocusScreenStateToUrl({
+      managerId: screenState.managerId,
+      mode: screenState.mode,
+      selectedClientId: screenState.selectedClientId,
+      selectedWorkItemId: screenState.selectedWorkItemId,
+      activeTab: screenState.activeTab,
+      assistantOpen: screenState.assistantOpen,
+    });
+  }, [
+    screenState.activeTab,
+    screenState.assistantOpen,
+    screenState.managerId,
+    screenState.mode,
+    screenState.selectedClientId,
+    screenState.selectedWorkItemId,
+  ]);
 
-    resetClientDetails();
-    assistant.resetAssistantState();
+  useEffect(() => {
+    const ignoreSignal = { current: false };
 
-    async function initializeManagerScreen() {
-      try {
-        const cockpitResponse = await loadCockpit();
-        if (!ignore) {
-          await workflowActions.applyCockpitSelection(cockpitResponse);
-        }
-      } catch {
-        return;
-      }
-    }
-
-    initializeManagerScreen().catch(() => undefined);
+    initializeManagerScreen(ignoreSignal).catch(() => undefined);
 
     return () => {
-      ignore = true;
+      ignoreSignal.current = true;
     };
   }, [screenState.managerId]);
 
   useEffect(() => {
-    if (!supervisorEnabled) {
+    if (!supervisorEnabled || screenState.mode !== "analytics") {
       return;
     }
-    loadSupervisorDashboard().catch(() => undefined);
-  }, [screenState.managerId, supervisorEnabled]);
+    loadSupervisorDashboardEvent().catch(() => undefined);
+  }, [screenState.managerId, screenState.mode, supervisorEnabled]);
 
   useEffect(() => {
-    if (!assistantEnabled) {
+    if (!assistantEnabled || !screenState.assistantOpen) {
       return;
     }
-    assistant.loadAssistantThreads(null).catch(() => undefined);
-  }, [screenState.managerId, assistantEnabled]);
+    loadAssistantThreadsEvent().catch(() => undefined);
+  }, [screenState.assistantOpen, screenState.managerId, assistantEnabled]);
 
   useEffect(() => {
     if (!selectedDetail || screenState.aiDraft) {
@@ -295,7 +418,7 @@ export function App() {
         aiDraft: cloneDraft(selectedDetail.saved_ai_draft),
       },
     });
-  }, [selectedDetail, screenState.aiDraft]);
+  }, [dispatch, selectedDetail, screenState.aiDraft]);
 
   useEffect(() => {
     dispatch({
@@ -307,34 +430,7 @@ export function App() {
         objectionStatus: null,
       },
     });
-  }, [selectedWorkItem?.id]);
-
-  useEffect(() => {
-    if (!screenState.pendingFocusJump || cockpitLoading || detailLoading) {
-      return;
-    }
-
-    if (!window.matchMedia("(max-width: 1080px)").matches) {
-      dispatch({
-        type: "patch",
-        patch: {
-          pendingFocusJump: false,
-        },
-      });
-      return;
-    }
-
-    focusPanelRef.current?.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
-    });
-    dispatch({
-      type: "patch",
-      patch: {
-        pendingFocusJump: false,
-      },
-    });
-  }, [screenState.pendingFocusJump, cockpitLoading, detailLoading, selectedWorkItem?.id]);
+  }, [dispatch, selectedWorkItem?.id, selectedWorkItem?.next_best_action]);
 
   useEffect(() => {
     if (!feedbackEnabled) {
@@ -365,145 +461,233 @@ export function App() {
         (selectedWorkItem.recommendation_status !== "pending" ? selectedWorkItem.recommendation_status : null),
       comment: latestFeedback?.comment || "",
     });
-  }, [selectedDetail, selectedWorkItem, feedbackEnabled]);
+  }, [dispatch, selectedDetail, selectedWorkItem, feedbackEnabled]);
+
+  function openTour() {
+    if (!screenState.tourOpen) {
+      tourOriginRef.current = {
+        mode: screenState.mode,
+        assistantOpen: screenState.assistantOpen,
+      };
+    }
+
+    dispatch({
+      type: "patch",
+      patch: {
+        tourOpen: true,
+        mode: "inbox",
+        assistantOpen: false,
+      },
+    });
+  }
+
+  function closeTour() {
+    const tourOrigin = tourOriginRef.current;
+    tourOriginRef.current = null;
+
+    dispatch({
+      type: "patch",
+      patch: {
+        tourOpen: false,
+        mode: tourOrigin?.mode ?? screenState.mode,
+        assistantOpen: tourOrigin?.assistantOpen ?? false,
+      },
+    });
+    window.localStorage.setItem(TOUR_SEEN_STORAGE_KEY, "true");
+  }
+
+  function openInbox() {
+    dispatch({
+      type: "patch",
+      patch: {
+        mode: "inbox",
+        assistantOpen: false,
+      },
+    });
+  }
+
+  function openAnalytics() {
+    dispatch({
+      type: "patch",
+      patch: {
+        mode: "analytics",
+        assistantOpen: false,
+      },
+    });
+  }
+
+  function openCaseWorkspace() {
+    if (!selectedWorkItem) {
+      return;
+    }
+
+    dispatch({
+      type: "patch",
+      patch: {
+        mode: "case",
+      },
+    });
+  }
+
+  function openAssistant() {
+    if (!assistantEnabled) {
+      return;
+    }
+
+    dispatch({
+      type: "patch",
+      patch: {
+        assistantOpen: true,
+      },
+    });
+  }
+
+  function closeAssistant() {
+    dispatch({
+      type: "patch",
+      patch: {
+        assistantOpen: false,
+      },
+    });
+  }
+
+  function sendAssistantMessage(message?: string) {
+    if (!assistantEnabled) {
+      return;
+    }
+
+    dispatch({
+      type: "patch",
+      patch: {
+        assistantOpen: true,
+      },
+    });
+    assistant.sendAssistantMessage(message).catch(() => undefined);
+  }
 
   return (
     <div className="app-shell">
-      <div data-tour="hero">
-        <Hero
-          stats={cockpit?.stats}
-          managerId={screenState.managerId}
-          sortMode={screenState.sortMode}
-          loading={cockpitLoading && !cockpit}
-          onToggleSort={() =>
+      <AppHeader
+        stats={cockpit?.stats}
+        managerId={screenState.managerId}
+        loading={cockpitLoading && !cockpit}
+        mode={screenState.mode}
+        selectedWorkItemTitle={selectedWorkItem?.title ?? null}
+        onToggleManager={() =>
+          startTransition(() => {
             dispatch({
-              type: "patch",
-              patch: {
-                sortMode: getNextSortMode(screenState.sortMode),
-              },
-            })
-          }
-          onToggleManager={() =>
-            startTransition(() => {
-              dispatch({
-                type: "resetForManagerChange",
-                managerId: getNextManagerId(screenState.managerId),
-              });
-            })
-          }
-        />
-      </div>
+              type: "resetForManagerChange",
+              managerId: getNextManagerId(screenState.managerId),
+            });
+          })
+        }
+        onShowInbox={openInbox}
+        onShowAnalytics={openAnalytics}
+        onOpenTour={openTour}
+      />
 
       {cockpitError ? <StatusMessage type="error" message={cockpitError} /> : null}
 
-      <OnboardingPanel
-        collapsed={screenState.onboardingCollapsed}
-        onDismiss={() => {
-          dispatch({
-            type: "patch",
-            patch: {
-              onboardingCollapsed: true,
-            },
-          });
-          window.localStorage.setItem(ONBOARDING_STORAGE_KEY, "true");
-        }}
-        onExpand={() => {
-          dispatch({
-            type: "patch",
-            patch: {
-              onboardingCollapsed: false,
-            },
-          });
-          window.localStorage.removeItem(ONBOARDING_STORAGE_KEY);
-        }}
-        onStartTour={() => {
-          dispatch({
-            type: "patch",
-            patch: {
-              tourOpen: true,
-              onboardingCollapsed: true,
-            },
-          });
-          window.localStorage.setItem(ONBOARDING_STORAGE_KEY, "true");
-        }}
-      />
+      <GuidedTour open={screenState.tourOpen} steps={tourSteps} onClose={closeTour} onComplete={closeTour} />
 
-      <GuidedTour
-        open={screenState.tourOpen}
-        steps={tourSteps}
-        onClose={() => {
-          dispatch({
-            type: "patch",
-            patch: {
-              tourOpen: false,
-              onboardingCollapsed: true,
-            },
-          });
-          window.localStorage.setItem(TOUR_SEEN_STORAGE_KEY, "true");
-          window.localStorage.setItem(ONBOARDING_STORAGE_KEY, "true");
-        }}
-        onComplete={() => {
-          dispatch({
-            type: "patch",
-            patch: {
-              tourOpen: false,
-              onboardingCollapsed: true,
-            },
-          });
-          window.localStorage.setItem(TOUR_SEEN_STORAGE_KEY, "true");
-          window.localStorage.setItem(ONBOARDING_STORAGE_KEY, "true");
-        }}
-      />
+      {screenState.mode === "inbox" ? (
+        <main className="screen-shell inbox-screen">
+          {selectedWorkItem ? (
+            <section className="panel inbox-focus-card" data-tour="case-launch">
+              <div className="inbox-focus-card__copy">
+                <p className="panel__eyebrow">Выбранный кейс</p>
+                <h2>{selectedWorkItem.title}</h2>
+                <p>{selectedWorkItem.client_name}</p>
+              </div>
+              <div className="button-row">
+                <button className="primary-button" type="button" onClick={openCaseWorkspace}>
+                  Открыть кейс
+                </button>
+                {assistantEnabled ? (
+                  <button className="ghost-button" type="button" onClick={openAssistant}>
+                    Помощник
+                  </button>
+                ) : null}
+              </div>
+            </section>
+          ) : null}
 
-      <main className="workspace-grid">
-        <div data-tour="queue">
-          <WorkQueueRail
-            sections={filteredSections}
-            totalItems={workQueue.length}
-            visibleItems={filteredWorkQueue.length}
-            loading={cockpitLoading}
-            selectedWorkItemId={screenState.selectedWorkItemId}
-            selectedWorkItemTitle={selectedWorkItem?.title ?? null}
-            onJumpToFocus={() => {
-              focusPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-            }}
-            filterValue={screenState.filterQuery}
-            onFilterChange={(value) =>
-              dispatch({
-                type: "patch",
-                patch: {
-                  filterQuery: value,
-                },
-              })
-            }
-            onSelectWorkItem={(item) => {
-              dispatch({
-                type: "patch",
-                patch: {
-                  pendingFocusJump: true,
-                },
-              });
-              workflowActions.selectWorkItem(item).catch(() => undefined);
-            }}
-            sortMode={screenState.sortMode}
-            filters={screenState.queueFilters}
-            productOptions={productOptions}
-            onChangeQueueFilter={(name: keyof WorkQueueFilters, value: string) => {
-              dispatch({
-                type: "setQueueFilter",
-                name,
-                value,
-              });
-            }}
-          />
-        </div>
+          <div data-tour="queue">
+            <WorkQueueRail
+              sections={filteredSections}
+              totalItems={workQueue.length}
+              visibleItems={filteredWorkQueue.length}
+              loading={cockpitLoading}
+              selectedWorkItemId={screenState.selectedWorkItemId}
+              filterValue={screenState.filterQuery}
+              onFilterChange={(value) =>
+                dispatch({
+                  type: "patch",
+                  patch: {
+                    filterQuery: value,
+                  },
+                })
+              }
+              onSelectWorkItem={(item) => {
+                dispatch({
+                  type: "patch",
+                  patch: {
+                    mode: "case",
+                    assistantOpen: false,
+                  },
+                });
+                workflowActions.selectWorkItem(item).catch(() => undefined);
+              }}
+              sortMode={screenState.sortMode}
+              onToggleSort={() =>
+                dispatch({
+                  type: "patch",
+                  patch: {
+                    sortMode: getNextSortMode(screenState.sortMode),
+                  },
+                })
+              }
+              filters={screenState.queueFilters}
+              productOptions={productOptions}
+              onChangeQueueFilter={(name: keyof WorkQueueFilters, value: string) => {
+                dispatch({
+                  type: "setQueueFilter",
+                  name,
+                  value,
+                });
+              }}
+            />
+          </div>
+        </main>
+      ) : null}
 
-        <div className="workspace-main" data-tour="focus" ref={focusPanelRef}>
+      {screenState.mode === "case" ? (
+        <main className="screen-shell case-screen" data-tour="focus">
+          <section className="panel case-workspace-bar">
+            <div className="case-workspace-bar__copy">
+              <p className="panel__eyebrow">Case Workspace</p>
+              <h2>{selectedWorkItem?.client_name || "Работа по кейсу"}</h2>
+              <p>{selectedWorkItem ? selectedWorkItem.title : "Выберите кейс во входящих."}</p>
+            </div>
+            <div className="button-row">
+              <button className="ghost-button" type="button" onClick={openInbox}>
+                К очереди
+              </button>
+              {assistantEnabled ? (
+                <button className="primary-button" type="button" onClick={openAssistant}>
+                  Помощник
+                </button>
+              ) : null}
+            </div>
+          </section>
+
+          {selectedWorkItem ? <CaseProgressStrip steps={journeySteps} /> : null}
+
           {cockpitLoading || detailLoading ? (
             <section className="panel focus-panel focus-panel--empty">
               <p className="panel__eyebrow">Загрузка</p>
-              <h2>Собираем контекст менеджера</h2>
-              <p>Подтягиваем очередь, профиль клиента и последние артефакты.</p>
+              <h2>Собираем кейс</h2>
+              <p>Подтягиваем данные клиента и историю контакта.</p>
             </section>
           ) : (
             <FocusPanel
@@ -582,6 +766,34 @@ export function App() {
               onSelectObjectionOption={(optionTitle, selectedResponse) => {
                 workflowActions.handleSelectObjectionOption(optionTitle, selectedResponse).catch(() => undefined);
               }}
+              replyDraftText={screenState.replyDraftText}
+              replySource={screenState.replySource}
+              replySending={screenState.replySending}
+              replyStatus={screenState.replyStatus}
+              onReplyDraftChange={(value) =>
+                dispatch({
+                  type: "patch",
+                  patch: {
+                    replyDraftText: value,
+                    replyStatus: null,
+                  },
+                })
+              }
+              onPrefillReplyFromScript={workflowActions.handlePrefillReplyFromScript}
+              onPrefillReplyFromObjection={workflowActions.handlePrefillReplyFromObjection}
+              onClearReplyDraft={() =>
+                dispatch({
+                  type: "patch",
+                  patch: {
+                    replyDraftText: "",
+                    replySource: "manual",
+                    replyStatus: null,
+                  },
+                })
+              }
+              onSendReply={() => {
+                workflowActions.handleSendReply().catch(() => undefined);
+              }}
               feedbackDecision={screenState.feedbackDecision}
               savedFeedbackDecision={effectiveSavedFeedbackDecision}
               feedbackComment={screenState.feedbackComment}
@@ -608,55 +820,59 @@ export function App() {
                 workflowActions.handleRecordFeedback().catch(() => undefined);
               }}
               onQuickAssistantAction={(message) => {
-                assistant.sendAssistantMessage(message).catch(() => undefined);
+                sendAssistantMessage(message);
               }}
             />
           )}
-        </div>
+        </main>
+      ) : null}
 
-        {assistantEnabled ? (
-          <div data-tour="assistant">
-            <AssistantPanel
-              selectedClientName={selectedDetail?.client.full_name}
-              threads={assistant.assistantThreads}
-              selectedThreadId={assistant.assistantSelectedThreadId}
-              threadDetail={assistant.assistantThreadDetail}
-              aiEnabled={aiEnabled}
-              aiUnavailableMessage={aiUnavailableMessage}
-              loading={assistant.assistantLoading}
-              sending={assistant.assistantSending}
-              status={assistant.assistantStatus}
-              inputValue={assistant.assistantInput}
-              onInputChange={assistant.setAssistantInput}
-              onCreateThread={() => {
-                assistant.prepareDraftThread(selectedDetail?.client.full_name ?? null);
-              }}
-              onSelectThread={(threadId) => {
-                assistant.loadAssistantThread(threadId).catch(() => undefined);
-              }}
-              onSendMessage={(message) => {
-                assistant.sendAssistantMessage(message).catch(() => undefined);
-              }}
-            />
-          </div>
-        ) : null}
-      </main>
+      {screenState.mode === "analytics" ? (
+        <main className="screen-shell analytics-screen" data-tour="supervisor">
+          <section className="panel analytics-intro">
+            <div>
+              <p className="panel__eyebrow">Analytics</p>
+              <h2>Метрики использования</h2>
+              <p>Отдельный экран для контроля качества и adoption.</p>
+            </div>
+            <button className="ghost-button" type="button" onClick={openInbox}>
+              Ко входящим
+            </button>
+          </section>
 
-      <div data-tour="journey">
-        <JourneyBar
-          steps={journeySteps}
-          note={
-            feedbackEnabled
-              ? "Шаги можно проходить в удобном порядке. Цикл считается завершённым, когда решение зафиксировано и итог сохранён в CRM."
-              : "Шаги можно проходить в удобном порядке. Цикл считается завершённым, когда итог по кейсу подготовлен и сохранён в CRM."
-          }
-        />
-      </div>
+          {supervisorEnabled ? (
+            <SupervisorPanel dashboard={supervisorDashboard} />
+          ) : (
+            <StatusMessage type="loading" message="Supervisor-аналитика отключена feature flag'ом." />
+          )}
+        </main>
+      ) : null}
 
-      {supervisorEnabled ? (
-        <div data-tour="supervisor">
-          <SupervisorPanel dashboard={supervisorDashboard} />
-        </div>
+      {assistantEnabled ? (
+        <AssistantDrawer open={screenState.assistantOpen} onClose={closeAssistant}>
+          <AssistantPanel
+            selectedClientName={selectedDetail?.client.full_name}
+            threads={assistant.assistantThreads}
+            selectedThreadId={assistant.assistantSelectedThreadId}
+            threadDetail={assistant.assistantThreadDetail}
+            aiEnabled={aiEnabled}
+            aiUnavailableMessage={aiUnavailableMessage}
+            loading={assistant.assistantLoading}
+            sending={assistant.assistantSending}
+            status={assistant.assistantStatus}
+            inputValue={assistant.assistantInput}
+            onInputChange={assistant.setAssistantInput}
+            onCreateThread={() => {
+              assistant.prepareDraftThread(selectedDetail?.client.full_name ?? null);
+            }}
+            onSelectThread={(threadId) => {
+              assistant.loadAssistantThread(threadId).catch(() => undefined);
+            }}
+            onSendMessage={(message) => {
+              assistant.sendAssistantMessage(message).catch(() => undefined);
+            }}
+          />
+        </AssistantDrawer>
       ) : null}
     </div>
   );
