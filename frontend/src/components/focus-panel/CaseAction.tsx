@@ -30,10 +30,7 @@ export function CaseAction({
       <section className="focus-layout">
         <section className="content-card">
           <div className="section-title">
-            <div>
-              <p className="panel__eyebrow">Сценарий</p>
-              <h3>Сценарий контакта</h3>
-            </div>
+            <h3>Сценарий контакта</h3>
             <div className="button-row">
               <button className="ghost-button" type="button" onClick={() => onOpenAssistantTask("sales_script")}>
                 В помощнике
@@ -162,10 +159,7 @@ export function CaseAction({
     <section className="focus-layout">
       <section className="content-card">
         <div className="section-title">
-          <div>
-            <p className="panel__eyebrow">Возражения</p>
-            <h3>Разбор возражения</h3>
-          </div>
+          <h3>Разбор возражения</h3>
           <div className="button-row">
             <button className="ghost-button" type="button" onClick={() => onOpenAssistantTask("objection_workflow")}>
               В помощнике

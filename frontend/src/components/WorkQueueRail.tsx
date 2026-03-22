@@ -160,18 +160,11 @@ export function WorkQueueRail({
       <div className="panel__header panel__header--stack">
         <div className="queue-header">
           <div className="queue-header__copy">
-            <p className="panel__eyebrow">Рабочая очередь</p>
-            <div>
-              <h2>Очередь кейсов</h2>
-            </div>
+            <h2>Очередь кейсов</h2>
           </div>
-          <div className="queue-summary-card">
-            <strong>{visibleItems}</strong>
-            <div className="queue-summary-card__copy">
-              <span>{loading && totalItems === 0 ? "обновляем" : `из ${totalItems} в списке`}</span>
-              <small>{sortMode === "priority" ? "по важности" : "по сроку"}</small>
-            </div>
-          </div>
+          <p className="queue-header__meta">
+            {loading && totalItems === 0 ? "Обновляем..." : `${visibleItems} из ${totalItems}`}
+          </p>
         </div>
 
         <div className="queue-toolbar">
@@ -225,10 +218,7 @@ export function WorkQueueRail({
           sections.map((section) => (
             <section className="cockpit-section" key={section.id}>
               <header className="cockpit-section__header">
-                <div>
-                  <p className="panel__eyebrow">{section.title}</p>
-                  <strong>{section.subtitle}</strong>
-                </div>
+                <strong>{section.title}</strong>
                 <span className="badge">{section.items.length}</span>
               </header>
 

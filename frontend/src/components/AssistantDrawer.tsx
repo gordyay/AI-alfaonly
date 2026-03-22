@@ -22,10 +22,7 @@ export function AssistantDrawer({ open, onClose, children }: AssistantDrawerProp
         role="dialog"
       >
         <div className="assistant-drawer__chrome">
-          <div>
-            <p className="panel__eyebrow">AI</p>
-            <strong>Помощник</strong>
-          </div>
+          <strong>Помощник</strong>
           <button className="ghost-button" type="button" onClick={onClose}>
             Закрыть
           </button>

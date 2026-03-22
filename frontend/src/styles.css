@@ -463,6 +463,12 @@ textarea:focus {
   margin: 0;
 }
 
+.queue-header__meta {
+  margin: 0;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
 .queue-header__subtitle {
   color: var(--muted);
   line-height: 1.6;
@@ -854,6 +860,13 @@ textarea:focus {
   margin-top: 16px;
 }
 
+.summary-strip > *,
+.focus-layout > *,
+.overview-grid > *,
+.section-title > * {
+  min-width: 0;
+}
+
 .summary-card,
 .content-card,
 .assistant-rich-card,
@@ -1123,7 +1136,6 @@ textarea:focus {
 
 .assistant-panel {
   display: grid;
-  grid-template-rows: auto auto auto auto minmax(220px, 1fr) auto;
   gap: 12px;
   position: sticky;
   top: 12px;
@@ -1133,14 +1145,13 @@ textarea:focus {
   display: flex;
   justify-content: space-between;
   gap: 16px;
-  align-items: start;
+  align-items: baseline;
 }
 
-.assistant-panel__header--stack {
-  display: grid;
+.assistant-panel__header h2 {
+  margin: 0;
 }
 
-.assistant-panel__scope-card,
 .assistant-preview-card,
 .assistant-choice-card {
   border: 1px solid rgba(19, 20, 24, 0.08);
@@ -1148,16 +1159,9 @@ textarea:focus {
   border-radius: var(--radius-lg);
 }
 
-.assistant-panel__scope-card {
-  padding: 12px 14px;
-  display: grid;
-  gap: 4px;
-}
-
-.assistant-panel__scope-card span,
-.assistant-panel__scope-card small {
+.assistant-panel__context {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 0.95rem;
 }
 
 .assistant-task-tabs {
@@ -1197,15 +1201,15 @@ textarea:focus {
   gap: 12px;
 }
 
-.assistant-preview-card--launcher {
-  background: linear-gradient(145deg, rgba(19, 20, 24, 0.03), rgba(255, 255, 255, 0.96));
-}
-
 .assistant-preview-card__header {
   display: flex;
   justify-content: space-between;
   gap: 12px;
   align-items: start;
+}
+
+.assistant-preview-card__header h3 {
+  margin: 0;
 }
 
 .assistant-preview-card__summary {
@@ -1247,11 +1251,18 @@ textarea:focus {
   min-height: 320px;
   max-height: 100%;
   overflow: auto;
+  flex: 1;
 }
 
 .assistant-composer {
   display: grid;
   gap: 10px;
+  align-content: start;
+}
+
+.assistant-composer .primary-button {
+  justify-self: start;
+  align-self: start;
 }
 
 .status-message {
@@ -1495,11 +1506,12 @@ textarea:focus {
   height: 100%;
   position: static;
   top: auto;
+  display: flex;
+  flex-direction: column;
   border: 0;
   box-shadow: none;
   background: transparent;
   padding: 18px;
-  grid-template-rows: auto auto auto auto minmax(220px, 1fr) auto;
 }
 
 .assistant-drawer-shell .assistant-panel__messages {
@@ -1743,5 +1755,10 @@ textarea:focus {
     width: 100vw;
     height: 100vh;
     border-radius: 0;
+  }
+
+  .assistant-composer .primary-button {
+    width: 100%;
+    justify-self: stretch;
   }
 }

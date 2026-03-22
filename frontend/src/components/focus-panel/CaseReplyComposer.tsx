@@ -49,19 +49,12 @@ export function CaseReplyComposer({
   return (
     <section className="content-card reply-composer">
       <div className="section-title">
-        <div>
-          <p className="panel__eyebrow">Ответ клиенту</p>
-          <h3>Черновик и отправка сообщения</h3>
-        </div>
+        <h3>Ответ клиенту</h3>
         <div className="reply-composer__meta">
           <span className="badge badge--accent">{interaction ? getChannelLabel(interaction.channel) : "Без канала"}</span>
           <span className="badge">{getReplySourceLabel(replySource)}</span>
         </div>
       </div>
-
-      <p className="insight">
-        После отправки сообщение сразу попадёт в историю кейса и сохранится в CRM как исходящий ответ.
-      </p>
 
       {interaction && !interaction.is_text_based ? (
         <StatusMessage

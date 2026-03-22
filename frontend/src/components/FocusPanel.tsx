@@ -134,7 +134,6 @@ export function FocusPanel({
   if (!detail || !workItem) {
     return (
       <section className="panel focus-panel focus-panel--empty">
-        <p className="panel__eyebrow">Кейс</p>
         <h2>Выберите кейс</h2>
         <p>Детали появятся здесь.</p>
       </section>
@@ -151,7 +150,6 @@ export function FocusPanel({
     <section className="panel focus-panel">
       <header className="focus-panel__header">
         <div>
-          <p className="panel__eyebrow">Фокусный кейс</p>
           <h2>{workItem.title}</h2>
           <p className="focus-panel__subtitle">
             {client.full_name} · {getRecommendationStatusLabel(workItem.recommendation_status)} ·{" "}

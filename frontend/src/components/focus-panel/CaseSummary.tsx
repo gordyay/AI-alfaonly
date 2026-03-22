@@ -98,10 +98,7 @@ export function CaseSummary({
     <div className="overview-stack">
       <section className="content-card content-card--history">
         <div className="section-title">
-          <div>
-            <h3>Общая лента кейса</h3>
-            <p className="insight">Здесь вместе показаны все чаты, звонки и встречи клиента в хронологическом порядке.</p>
-          </div>
+          <h3>Лента кейса</h3>
         </div>
 
         <div className="message-thread message-thread--case">
@@ -145,18 +142,6 @@ export function CaseSummary({
 
       {replyInteraction ? (
         <section className="content-card reply-target-block">
-          <div className="section-title">
-            <div>
-              <p className="panel__eyebrow">Канал ответа</p>
-              <h3>Чат с клиентом</h3>
-              <p className="insight">
-                У клиента один текстовый канал. Звонки и встречи остаются в общей ленте кейса, но ответ отправляется только сюда.
-              </p>
-            </div>
-          </div>
-          <p className="insight">
-            Ответ будет отправлен в текстовый канал: <strong>{replyInteraction.title}</strong>.
-          </p>
           <CaseReplyComposer
             interaction={replyInteraction}
             replyDraftText={replyDraftText}
@@ -176,10 +161,7 @@ export function CaseSummary({
       ) : (
         <section className="content-card reply-unavailable-card">
           <h4>Ответ клиенту</h4>
-          <p className="insight">
-            В кейсе нет текстового канала. Звонки и встречи остаются событиями истории, но отправить сообщение отсюда
-            нельзя.
-          </p>
+          <p className="insight">Для этого кейса недоступен текстовый канал.</p>
         </section>
       )}
 

@@ -2,7 +2,6 @@ import { startTransition, useDeferredValue, useEffect, useEffectEvent, useMemo, 
 import { AssistantDrawer } from "./components/AssistantDrawer";
 import { AssistantPanel } from "./components/AssistantPanel";
 import { AppHeader } from "./components/AppHeader";
-import { CaseProgressStrip } from "./components/CaseProgressStrip";
 import { FocusPanel } from "./components/FocusPanel";
 import { GuidedTour, type GuidedTourStep } from "./components/GuidedTour";
 import { StatusMessage } from "./components/StatusMessage";
@@ -20,7 +19,6 @@ import {
   cloneDraft,
   filterWorkQueue,
   getInteractionForCase,
-  getRecommendationStatusLabel,
   groupWorkQueue,
   type WorkQueueFilters,
 } from "./lib/utils";
@@ -59,14 +57,6 @@ const CASE_TOUR_STEP: GuidedTourStep = {
   title: "Работа по кейсу",
   description: "Здесь принимается решение и готовится запись в CRM.",
   note: "Вкладки сгруппированы по задаче.",
-};
-
-const CASE_LAUNCH_TOUR_STEP: GuidedTourStep = {
-  id: "case-launch",
-  selector: "[data-tour='case-launch']",
-  title: "Быстрый переход в кейс",
-  description: "Выбранный кейс можно открыть отдельно от очереди.",
-  note: "Так triage не смешивается с исполнением.",
 };
 
 const ASSISTANT_TOUR_STEP: GuidedTourStep = {
@@ -113,6 +103,7 @@ export function App() {
   const [screenState, dispatch] = useFocusScreenReducer();
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const tourOriginRef = useRef<{ mode: AppMode; assistantOpen: boolean } | null>(null);
+  const autoOpenedTourRef = useRef(false);
   const deferredQuery = useDeferredValue(screenState.filterQuery.trim().toLowerCase());
 
   const { cockpit, cockpitLoading, cockpitError, loadCockpit } = useCockpit(screenState.managerId);
@@ -219,57 +210,6 @@ export function App() {
     prepareAssistantDraftThread: assistant.prepareDraftThread,
   });
 
-  const journeySteps = useMemo(
-    () => [
-      {
-        id: "select",
-        title: "Кейс",
-        description: selectedWorkItem ? "Выбран" : "Не выбран",
-        done: Boolean(selectedWorkItem),
-        active: !selectedWorkItem,
-      },
-      ...(feedbackEnabled
-        ? [
-            {
-              id: "decide",
-              title: "Решение",
-              description: effectiveSavedFeedbackDecision
-                ? getRecommendationStatusLabel(effectiveSavedFeedbackDecision)
-                : screenState.feedbackDecision
-                  ? getRecommendationStatusLabel(screenState.feedbackDecision)
-                  : "Не выбрано",
-              done: Boolean(effectiveSavedFeedbackDecision),
-              active: Boolean(selectedWorkItem) && !effectiveSavedFeedbackDecision,
-            },
-          ]
-        : []),
-      {
-        id: "prepare",
-        title: "Артефакты",
-        description: screenState.aiDraft || latestScriptArtifact || latestObjectionArtifact ? "Готовы" : "В работе",
-        done: Boolean(screenState.aiDraft || latestScriptArtifact || latestObjectionArtifact),
-        active: Boolean(selectedWorkItem) && !screenState.aiDraft && !latestScriptArtifact && !latestObjectionArtifact,
-      },
-      {
-        id: "save",
-        title: "CRM",
-        description: savedCRMNote ? "Сохранено" : "Не сохранено",
-        done: Boolean(savedCRMNote),
-        active: Boolean(selectedWorkItem) && !savedCRMNote,
-      },
-    ],
-    [
-      feedbackEnabled,
-      effectiveSavedFeedbackDecision,
-      latestObjectionArtifact,
-      latestScriptArtifact,
-      savedCRMNote,
-      screenState.aiDraft,
-      screenState.feedbackDecision,
-      selectedWorkItem,
-    ],
-  );
-
   const tourSteps = useMemo(() => {
     const showInbox = () =>
       dispatch({
@@ -316,16 +256,10 @@ export function App() {
     ];
 
     if (selectedWorkItem) {
-      steps.push(
-        {
-          ...CASE_LAUNCH_TOUR_STEP,
-          prepare: showInbox,
-        },
-        {
-          ...CASE_TOUR_STEP,
-          prepare: showCase,
-        },
-      );
+      steps.push({
+        ...CASE_TOUR_STEP,
+        prepare: showCase,
+      });
 
       if (assistantEnabled) {
         steps.push({
@@ -423,6 +357,32 @@ export function App() {
     }
     loadAssistantThreadsEvent().catch(() => undefined);
   }, [assistant.assistantThreadDetail, screenState.assistantOpen, screenState.managerId, assistantEnabled]);
+
+  const openTourEvent = useEffectEvent(() => {
+    openTour();
+  });
+
+  useEffect(() => {
+    if (autoOpenedTourRef.current) {
+      return;
+    }
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    if (window.localStorage.getItem(TOUR_SEEN_STORAGE_KEY) === "true") {
+      autoOpenedTourRef.current = true;
+      return;
+    }
+
+    if (!health || cockpitLoading || !cockpit || !tourSteps.length) {
+      return;
+    }
+
+    autoOpenedTourRef.current = true;
+    openTourEvent();
+  }, [cockpit, cockpitLoading, health, openTourEvent, tourSteps.length]);
 
   useEffect(() => {
     if (!selectedDetail || screenState.aiDraft) {
@@ -552,19 +512,6 @@ export function App() {
     });
   }
 
-  function openCaseWorkspace() {
-    if (!selectedWorkItem) {
-      return;
-    }
-
-    dispatch({
-      type: "patch",
-      patch: {
-        mode: "case",
-      },
-    });
-  }
-
   function openAssistant(taskKind?: AssistantTaskKind) {
     if (!assistantEnabled) {
       return;
@@ -596,7 +543,6 @@ export function App() {
         managerId={screenState.managerId}
         loading={cockpitLoading && !cockpit}
         mode={screenState.mode}
-        selectedWorkItemTitle={selectedWorkItem?.title ?? null}
         onToggleManager={() =>
           startTransition(() => {
             dispatch({
@@ -616,26 +562,6 @@ export function App() {
 
       {screenState.mode === "inbox" ? (
         <main className="screen-shell inbox-screen">
-          {selectedWorkItem ? (
-            <section className="panel inbox-focus-card" data-tour="case-launch">
-              <div className="inbox-focus-card__copy">
-                <p className="panel__eyebrow">Выбранный кейс</p>
-                <h2>{selectedWorkItem.title}</h2>
-                <p>{selectedWorkItem.client_name}</p>
-              </div>
-              <div className="button-row">
-                <button className="primary-button" type="button" onClick={openCaseWorkspace}>
-                  Открыть кейс
-                </button>
-                {assistantEnabled ? (
-                  <button className="ghost-button" type="button" onClick={openAssistant}>
-                    Помощник
-                  </button>
-                ) : null}
-              </div>
-            </section>
-          ) : null}
-
           <div data-tour="queue">
             <WorkQueueRail
               sections={filteredSections}
@@ -687,29 +613,8 @@ export function App() {
 
       {screenState.mode === "case" ? (
         <main className="screen-shell case-screen" data-tour="focus">
-          <section className="panel case-workspace-bar">
-            <div className="case-workspace-bar__copy">
-              <p className="panel__eyebrow">Case Workspace</p>
-              <h2>{selectedWorkItem?.client_name || "Работа по кейсу"}</h2>
-              <p>{selectedWorkItem ? selectedWorkItem.title : "Выберите кейс во входящих."}</p>
-            </div>
-            <div className="button-row">
-              <button className="ghost-button" type="button" onClick={openInbox}>
-                К очереди
-              </button>
-              {assistantEnabled ? (
-                <button className="primary-button" type="button" onClick={openAssistant}>
-                  Помощник
-                </button>
-              ) : null}
-            </div>
-          </section>
-
-          {selectedWorkItem ? <CaseProgressStrip steps={journeySteps} /> : null}
-
           {cockpitLoading || detailLoading ? (
             <section className="panel focus-panel focus-panel--empty">
-              <p className="panel__eyebrow">Загрузка</p>
               <h2>Собираем кейс</h2>
               <p>Подтягиваем данные клиента и историю контакта.</p>
             </section>
@@ -852,18 +757,7 @@ export function App() {
       ) : null}
 
       {screenState.mode === "analytics" ? (
-        <main className="screen-shell analytics-screen" data-tour="supervisor">
-          <section className="panel analytics-intro">
-            <div>
-              <p className="panel__eyebrow">Analytics</p>
-              <h2>Метрики использования</h2>
-              <p>Отдельный экран для контроля качества и adoption.</p>
-            </div>
-            <button className="ghost-button" type="button" onClick={openInbox}>
-              Ко входящим
-            </button>
-          </section>
-
+        <main className="screen-shell analytics-screen">
           {supervisorEnabled ? (
             <SupervisorPanel dashboard={supervisorDashboard} />
           ) : (
@@ -876,7 +770,6 @@ export function App() {
         <AssistantDrawer open={screenState.assistantOpen} onClose={closeAssistant}>
           <AssistantPanel
             selectedClientName={selectedDetail?.client.full_name}
-            selectedWorkItemTitle={selectedWorkItem?.title ?? null}
             mode={assistant.assistantMode}
             taskKind={assistant.assistantTaskKind}
             stage={assistant.assistantStage}

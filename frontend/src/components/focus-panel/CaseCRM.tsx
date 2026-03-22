@@ -52,10 +52,7 @@ export function CaseCRM({
     <section className="focus-layout focus-layout--crm">
       <section className="content-card">
         <div className="section-title">
-          <div>
-            <p className="panel__eyebrow">CRM-заметка</p>
-            <h3>Черновик и финальная версия</h3>
-          </div>
+          <h3>CRM</h3>
           <div className="button-row">
             <button className="ghost-button" type="button" onClick={() => onOpenAssistantTask("summary_crm")}>
               В помощнике

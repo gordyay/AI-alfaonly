@@ -14,7 +14,6 @@ import { StatusMessage } from "./StatusMessage";
 
 interface AssistantPanelProps {
   selectedClientName?: string | null;
-  selectedWorkItemTitle?: string | null;
   mode: AssistantMode;
   taskKind: AssistantTaskKind;
   stage: AssistantStage;
@@ -141,7 +140,6 @@ function AssistantMessageCard({ message }: { message: AssistantMessageRecord }) 
 
 export function AssistantPanel({
   selectedClientName,
-  selectedWorkItemTitle,
   mode,
   taskKind,
   stage,
@@ -169,16 +167,9 @@ export function AssistantPanel({
 
   return (
     <aside className="panel assistant-panel">
-      <header className="assistant-panel__header assistant-panel__header--stack">
-        <div>
-          <p className="panel__eyebrow">Помощник</p>
-          <h2>{taskPrompt.title}</h2>
-        </div>
-        <div className="assistant-panel__scope-card">
-          <span>{mode === "case" ? "Кейс" : "Режим"}</span>
-          <strong>{mode === "case" ? selectedClientName || "Без клиента" : "Общий AI"}</strong>
-          {mode === "case" && selectedWorkItemTitle ? <small>{selectedWorkItemTitle}</small> : null}
-        </div>
+      <header className="assistant-panel__header">
+        <h2>{taskPrompt.title}</h2>
+        {mode === "case" && selectedClientName ? <span className="assistant-panel__context">{selectedClientName}</span> : null}
       </header>
 
       <div className="assistant-task-tabs">
@@ -221,10 +212,7 @@ export function AssistantPanel({
       {preview ? (
         <section className="assistant-preview-card">
           <div className="assistant-preview-card__header">
-            <div>
-              <p className="panel__eyebrow">Preview</p>
-              <h3>{preview.title}</h3>
-            </div>
+            <h3>{preview.title}</h3>
             <span className="badge badge--accent">{stage === "applied" ? "Применено" : "Готово"}</span>
           </div>
           <p className="assistant-preview-card__summary">{preview.summary}</p>
@@ -255,17 +243,7 @@ export function AssistantPanel({
             </button>
           </div>
         </section>
-      ) : (
-        <section className="assistant-preview-card assistant-preview-card--launcher">
-          <p className="panel__eyebrow">Шаг 1</p>
-          <h3>{taskPrompt.title}</h3>
-          <p className="assistant-preview-card__summary">
-            {mode === "case"
-              ? "Сначала сформируйте результат, потом подтвердите применение в кейс."
-              : "Этот режим не влияет на данные кейса и работает как общий AI-чат."}
-          </p>
-        </section>
-      )}
+      ) : null}
 
       <div className="assistant-panel__messages">
         {threadDetail?.messages.length ? (
