@@ -2,6 +2,7 @@ import type { UiStatus } from "../../lib/ui";
 import type {
   ActivityLogEntry,
   AISummaryDraft,
+  AssistantTaskKind,
   CaseInteraction,
   ClientDetailResponse,
   RecommendationStatus,
@@ -43,11 +44,10 @@ export interface CaseSummaryProps extends FocusCaseBaseProps {
   canPrefillReplyFromScript: boolean;
   canPrefillReplyFromObjection: boolean;
   onChangeTab: (tab: ViewTab) => void;
-  onSelectInteraction: (interactionId: string) => void;
   onFeedbackCommentChange: (value: string) => void;
   onFeedbackDecisionChange: (decision: RecommendationStatus) => void;
   onSubmitFeedback: () => void;
-  onQuickAssistantAction: (message: string) => void;
+  onOpenAssistantTask: (taskKind: AssistantTaskKind) => void;
   onReplyDraftChange: (value: string) => void;
   onPrefillReplyFromScript: () => void;
   onPrefillReplyFromObjection: () => void;
@@ -71,6 +71,7 @@ export interface CaseActionProps extends FocusCaseBaseProps {
   objectionStatus?: UiStatus;
   onGenerateObjectionWorkflow: () => void;
   onSelectObjectionOption: (optionTitle: string, selectedResponse: string) => void;
+  onOpenAssistantTask: (taskKind: AssistantTaskKind) => void;
 }
 
 export interface CaseCRMProps extends FocusCaseBaseProps {
@@ -84,6 +85,7 @@ export interface CaseCRMProps extends FocusCaseBaseProps {
   onSaveSummary: () => void;
   onCopyCRM: () => void;
   onUpdateDraft: (draft: AISummaryDraft) => void;
+  onOpenAssistantTask: (taskKind: AssistantTaskKind) => void;
 }
 
 export type CaseProfileProps = FocusCaseBaseProps;

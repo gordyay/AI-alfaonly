@@ -6,36 +6,30 @@ import {
   getRecommendationStatusLabel,
   getRecommendationTypeLabel,
 } from "../../lib/utils";
-import { CaseReplyComposer } from "./CaseReplyComposer";
 import { StatusMessage } from "../StatusMessage";
+import { CaseReplyComposer } from "./CaseReplyComposer";
 import { getRecentAuditEntries, type CaseSummaryProps, type VisibleActivityEntry } from "./types";
 
 export function CaseSummary({
   detail,
   workItem,
   interaction,
-  aiEnabled,
-  aiUnavailableMessage,
-  assistantEnabled = true,
   feedbackEnabled = true,
   feedbackDecision,
   savedFeedbackDecision,
   feedbackComment,
   feedbackSubmitting,
   feedbackStatus,
-  assistantSending,
   replyDraftText,
   replySource,
   replySending,
   replyStatus,
   canPrefillReplyFromScript,
   canPrefillReplyFromObjection,
-  onChangeTab,
-  onSelectInteraction,
   onFeedbackCommentChange,
   onFeedbackDecisionChange,
   onSubmitFeedback,
-  onQuickAssistantAction,
+  onOpenAssistantTask,
   onReplyDraftChange,
   onPrefillReplyFromScript,
   onPrefillReplyFromObjection,
@@ -57,8 +51,10 @@ export function CaseSummary({
   const timelineItems = [...detail.timeline].sort(
     (left, right) => new Date(left.created_at).getTime() - new Date(right.created_at).getTime(),
   );
-  const textInteractions = detail.interactions.filter((item) => item.is_text_based);
-  const replyInteraction = interaction?.is_text_based ? interaction : textInteractions[0] ?? null;
+  const replyInteraction =
+    (interaction?.is_text_based ? interaction : null) ??
+    detail.interactions.find((item) => item.is_text_based) ??
+    null;
   const visibleActivityEntries: VisibleActivityEntry[] = recentAuditEntries.map((item) => ({
     id: item.id,
     title: `${getRecommendationTypeLabel(item.recommendation_type)} · ${getActivityActionLabel(item.action)}${
@@ -103,8 +99,8 @@ export function CaseSummary({
       <section className="content-card content-card--history">
         <div className="section-title">
           <div>
-            <h3>История взаимодействий</h3>
-            <p className="insight">Чаты, звонки и встречи показаны в одной ленте кейса, в хронологическом порядке.</p>
+            <h3>Общая лента кейса</h3>
+            <p className="insight">Здесь вместе показаны все чаты, звонки и встречи клиента в хронологическом порядке.</p>
           </div>
         </div>
 
@@ -145,52 +141,47 @@ export function CaseSummary({
             </div>
           )}
         </div>
-
-        {replyInteraction ? (
-          <section className="reply-target-block">
-            {textInteractions.length > 1 ? (
-              <div className="reply-target-picker">
-                {textInteractions.map((item) => (
-                  <button
-                    className={`interaction-pill interaction-pill--compact${replyInteraction.id === item.id ? " is-active" : ""}`}
-                    key={item.id}
-                    type="button"
-                    onClick={() => onSelectInteraction(item.id)}
-                  >
-                    <span className="badge badge--subtle">{getChannelLabel(item.channel)}</span>
-                    <strong>{item.title}</strong>
-                  </button>
-                ))}
-              </div>
-            ) : null}
-            <p className="insight">
-              Ответ будет отправлен в текстовый канал: <strong>{replyInteraction.title}</strong>.
-            </p>
-            <CaseReplyComposer
-              interaction={replyInteraction}
-              replyDraftText={replyDraftText}
-              replySource={replySource}
-              replySending={replySending}
-              replyStatus={replyStatus}
-              canPrefillFromScript={canPrefillReplyFromScript}
-              canPrefillFromObjection={canPrefillReplyFromObjection}
-              onReplyDraftChange={onReplyDraftChange}
-              onPrefillFromScript={onPrefillReplyFromScript}
-              onPrefillFromObjection={onPrefillReplyFromObjection}
-              onClearReplyDraft={onClearReplyDraft}
-              onSendReply={onSendReply}
-            />
-          </section>
-        ) : (
-          <section className="content-card reply-unavailable-card">
-            <h4>Ответ клиенту</h4>
-            <p className="insight">
-              В кейсе нет текстового канала. Звонки и встречи остаются событиями истории, но отправить сообщение отсюда
-              нельзя.
-            </p>
-          </section>
-        )}
       </section>
+
+      {replyInteraction ? (
+        <section className="content-card reply-target-block">
+          <div className="section-title">
+            <div>
+              <p className="panel__eyebrow">Канал ответа</p>
+              <h3>Чат с клиентом</h3>
+              <p className="insight">
+                У клиента один текстовый канал. Звонки и встречи остаются в общей ленте кейса, но ответ отправляется только сюда.
+              </p>
+            </div>
+          </div>
+          <p className="insight">
+            Ответ будет отправлен в текстовый канал: <strong>{replyInteraction.title}</strong>.
+          </p>
+          <CaseReplyComposer
+            interaction={replyInteraction}
+            replyDraftText={replyDraftText}
+            replySource={replySource}
+            replySending={replySending}
+            replyStatus={replyStatus}
+            canPrefillFromScript={canPrefillReplyFromScript}
+            canPrefillFromObjection={canPrefillReplyFromObjection}
+            onReplyDraftChange={onReplyDraftChange}
+            onPrefillFromScript={onPrefillReplyFromScript}
+            onPrefillFromObjection={onPrefillReplyFromObjection}
+            onClearReplyDraft={onClearReplyDraft}
+            onSendReply={onSendReply}
+            onOpenAssistantReply={() => onOpenAssistantTask("reply_draft")}
+          />
+        </section>
+      ) : (
+        <section className="content-card reply-unavailable-card">
+          <h4>Ответ клиенту</h4>
+          <p className="insight">
+            В кейсе нет текстового канала. Звонки и встречи остаются событиями истории, но отправить сообщение отсюда
+            нельзя.
+          </p>
+        </section>
+      )}
 
       <div className="overview-grid">
         <section className="content-card">
@@ -213,110 +204,84 @@ export function CaseSummary({
           </div>
         </section>
 
-        <section className="content-card">
-          <h3>Следующий шаг</h3>
-          <div className="stack-list">
-            <article className="stack-card">
-              <strong>Цель</strong>
-              <p>{workItem.business_goal || "Закрыть ближайший следующий шаг."}</p>
-            </article>
-            <article className="stack-card">
-              <strong>Действие</strong>
-              <p>{workItem.next_best_action}</p>
-            </article>
-            <article className="stack-card">
-              <strong>Продукт</strong>
-              <p>{workItem.product_name || "Не выделен"}</p>
-            </article>
-          </div>
-        </section>
-      </div>
-
-      <div className="overview-grid">
-        <section className="content-card">
-          <h3>Быстрые переходы</h3>
-          <div className="button-row">
-            <button className="ghost-button" type="button" onClick={() => onChangeTab("actions")}>
-              Действия
-            </button>
-            <button className="ghost-button" type="button" onClick={() => onChangeTab("client")}>
-              Клиент
-            </button>
-            <button className="ghost-button" type="button" onClick={() => onChangeTab("crm")}>
-              CRM
-            </button>
-            {assistantEnabled ? (
-              <button
-                className="ghost-button"
-                type="button"
-                onClick={() => onQuickAssistantAction("Подскажи следующий шаг по текущему кейсу")}
-                disabled={!aiEnabled || assistantSending}
-              >
-                {!aiEnabled ? "AI недоступен" : assistantSending ? "Готовим..." : "Следующий шаг"}
-              </button>
-            ) : null}
-          </div>
-          {assistantEnabled && !aiEnabled ? <StatusMessage compact type="error" message={aiUnavailableMessage} /> : null}
-        </section>
-
-        {feedbackEnabled ? (
+        <div className="content-stack">
           <section className="content-card">
-            <h3>Решение по рекомендации</h3>
-            <div className="button-row">
-              <button
-                className={`ghost-button${feedbackDecision === "accepted" ? " is-selected" : ""}`}
-                type="button"
-                onClick={() => onFeedbackDecisionChange("accepted")}
-                disabled={feedbackSubmitting}
-              >
-                Принять
-              </button>
-              <button
-                className={`ghost-button${feedbackDecision === "edited" ? " is-selected" : ""}`}
-                type="button"
-                onClick={() => onFeedbackDecisionChange("edited")}
-                disabled={feedbackSubmitting}
-              >
-                Доработать
-              </button>
-              <button
-                className={`ghost-button${feedbackDecision === "rejected" ? " is-selected" : ""}`}
-                type="button"
-                onClick={() => onFeedbackDecisionChange("rejected")}
-                disabled={feedbackSubmitting}
-              >
-                Отклонить
-              </button>
+            <h3>Следующий шаг</h3>
+            <div className="stack-list">
+              <article className="stack-card">
+                <strong>Цель</strong>
+                <p>{workItem.business_goal || "Закрыть ближайший следующий шаг."}</p>
+              </article>
+              <article className="stack-card">
+                <strong>Действие</strong>
+                <p>{workItem.next_best_action}</p>
+              </article>
+              <article className="stack-card">
+                <strong>Продукт</strong>
+                <p>{workItem.product_name || "Не выделен"}</p>
+              </article>
             </div>
-            <label className="field">
-              <span>Комментарий</span>
-              <textarea
-                rows={3}
-                value={feedbackComment}
-                onChange={(event) => onFeedbackCommentChange(event.target.value)}
-                placeholder="Коротко зафиксируйте причину"
-              />
-            </label>
-            <button
-              className="primary-button"
-              type="button"
-              onClick={onSubmitFeedback}
-              disabled={feedbackSubmitting || !feedbackDecision || !isFeedbackDirty}
-            >
-              {feedbackButtonLabel}
-            </button>
-            <StatusMessage type={feedbackStatus?.type} message={feedbackStatus?.text} />
-            {currentFeedback ? (
-              <div className="stack-card">
-                <strong>
-                  Последнее решение: {getRecommendationStatusLabel(savedFeedbackDecision || currentFeedback.decision)}
-                </strong>
-                <p>{currentFeedback.comment || "Комментарий не был добавлен."}</p>
-                <small>{formatDateTime(currentFeedback.created_at)}</small>
-              </div>
-            ) : null}
           </section>
-        ) : null}
+
+          {feedbackEnabled ? (
+            <section className="content-card">
+              <h3>Решение по рекомендации</h3>
+              <div className="button-row">
+                <button
+                  className={`ghost-button${feedbackDecision === "accepted" ? " is-selected" : ""}`}
+                  type="button"
+                  onClick={() => onFeedbackDecisionChange("accepted")}
+                  disabled={feedbackSubmitting}
+                >
+                  Принять
+                </button>
+                <button
+                  className={`ghost-button${feedbackDecision === "edited" ? " is-selected" : ""}`}
+                  type="button"
+                  onClick={() => onFeedbackDecisionChange("edited")}
+                  disabled={feedbackSubmitting}
+                >
+                  Доработать
+                </button>
+                <button
+                  className={`ghost-button${feedbackDecision === "rejected" ? " is-selected" : ""}`}
+                  type="button"
+                  onClick={() => onFeedbackDecisionChange("rejected")}
+                  disabled={feedbackSubmitting}
+                >
+                  Отклонить
+                </button>
+              </div>
+              <label className="field">
+                <span>Комментарий</span>
+                <textarea
+                  rows={3}
+                  value={feedbackComment}
+                  onChange={(event) => onFeedbackCommentChange(event.target.value)}
+                  placeholder="Коротко зафиксируйте причину"
+                />
+              </label>
+              <button
+                className="primary-button"
+                type="button"
+                onClick={onSubmitFeedback}
+                disabled={feedbackSubmitting || !feedbackDecision || !isFeedbackDirty}
+              >
+                {feedbackButtonLabel}
+              </button>
+              <StatusMessage type={feedbackStatus?.type} message={feedbackStatus?.text} />
+              {currentFeedback ? (
+                <div className="stack-card">
+                  <strong>
+                    Последнее решение: {getRecommendationStatusLabel(savedFeedbackDecision || currentFeedback.decision)}
+                  </strong>
+                  <p>{currentFeedback.comment || "Комментарий не был добавлен."}</p>
+                  <small>{formatDateTime(currentFeedback.created_at)}</small>
+                </div>
+              ) : null}
+            </section>
+          ) : null}
+        </div>
       </div>
 
       <section className="content-card">

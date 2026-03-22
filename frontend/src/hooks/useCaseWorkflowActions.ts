@@ -128,8 +128,42 @@ export function useCaseWorkflowActions({
     });
   }
 
-  async function syncAssistantAction(actionResult?: AssistantActionResult | null) {
+  async function syncAssistantAction(actionResult?: AssistantActionResult | null, targetTab?: string | null) {
     if (!actionResult?.client_id) {
+      return;
+    }
+
+    const nextTaskKind = actionResult.task_kind ?? actionResult.action_type;
+
+    if (nextTaskKind === "summary_crm" && actionResult.draft) {
+      dispatch({
+        type: "patch",
+        patch: {
+          aiDraft: cloneDraft(actionResult.draft),
+          activeTab: (targetTab as FocusScreenState["activeTab"]) ?? "crm",
+          selectedInteractionId:
+            actionResult.source_interaction_id ?? actionResult.conversation_id ?? state.selectedInteractionId,
+          aiStatus: { type: "success", text: actionResult.note ?? "Черновик подготовлен через помощника." },
+        },
+      });
+      return;
+    }
+
+    if (nextTaskKind === "reply_draft" && actionResult.reply_draft_text) {
+      dispatch({
+        type: "patch",
+        patch: {
+          activeTab: (targetTab as FocusScreenState["activeTab"]) ?? "overview",
+          replyDraftText: actionResult.reply_draft_text,
+          replySource: "assistant",
+          selectedInteractionId:
+            actionResult.source_interaction_id ?? actionResult.conversation_id ?? state.selectedInteractionId,
+          replyStatus: {
+            type: "success",
+            text: actionResult.note ?? "Черновик ответа подставлен в кейс.",
+          },
+        },
+      });
       return;
     }
 
@@ -139,38 +173,26 @@ export function useCaseWorkflowActions({
     const cockpitResponse = await loadCockpit();
     await applyCockpitSelection(cockpitResponse, nextWorkItemId, actionResult.client_id);
 
-    if (actionResult.draft) {
+    if (nextTaskKind === "sales_script" && actionResult.sales_script_draft) {
       dispatch({
         type: "patch",
         patch: {
-          aiDraft: cloneDraft(actionResult.draft),
-          activeTab: "crm",
-          selectedInteractionId:
-            actionResult.source_interaction_id ?? actionResult.conversation_id ?? state.selectedInteractionId,
-          aiStatus: { type: "success", text: "Черновик для CRM подготовлен через помощника." },
-        },
-      });
-    }
-    if (actionResult.sales_script_draft) {
-      dispatch({
-        type: "patch",
-        patch: {
-          activeTab: "actions",
+          activeTab: (targetTab as FocusScreenState["activeTab"]) ?? "actions",
           scriptStatus: {
             type: "success",
-            text: "Ассистент подготовил скрипт. Выберите и сохраните вариант в центре кейса.",
+            text: actionResult.note ?? "Скрипт сохранен в историю кейса.",
           },
         },
       });
     }
-    if (actionResult.objection_workflow_draft) {
+    if (nextTaskKind === "objection_workflow" && actionResult.objection_workflow_draft) {
       dispatch({
         type: "patch",
         patch: {
-          activeTab: "actions",
+          activeTab: (targetTab as FocusScreenState["activeTab"]) ?? "actions",
           objectionStatus: {
             type: "success",
-            text: "Ассистент подготовил разбор возражения. Зафиксируйте выбранный ответ в центре кейса.",
+            text: actionResult.note ?? "Ответ на возражение сохранен в кейс.",
           },
         },
       });
@@ -625,7 +647,7 @@ export function useCaseWorkflowActions({
   }
 
   async function handleSendReply() {
-    if (!selectedDetail || !selectedInteraction || !selectedWorkItem) {
+    if (!selectedDetail || !selectedWorkItem) {
       dispatch({
         type: "patch",
         patch: {
@@ -635,7 +657,12 @@ export function useCaseWorkflowActions({
       return;
     }
 
-    if (!selectedInteraction.is_text_based) {
+    const replyInteraction =
+      (selectedInteraction?.is_text_based ? selectedInteraction : null) ??
+      selectedDetail.interactions.find((interaction) => interaction.is_text_based) ??
+      null;
+
+    if (!replyInteraction) {
       dispatch({
         type: "patch",
         patch: {
@@ -655,13 +682,15 @@ export function useCaseWorkflowActions({
       return;
     }
 
-    dispatch({
-      type: "patch",
-      patch: {
-        replySending: true,
-        replyStatus: { type: "loading", text: "Отправляем ответ клиенту и сохраняем в CRM..." },
-      },
-    });
+      dispatch({
+        type: "patch",
+        patch: {
+          selectedInteractionId:
+            state.selectedInteractionId === replyInteraction.id ? state.selectedInteractionId : replyInteraction.id,
+          replySending: true,
+          replyStatus: { type: "loading", text: "Отправляем ответ клиенту и сохраняем в CRM..." },
+        },
+      });
 
     try {
       const response = await apiPost<
@@ -676,7 +705,7 @@ export function useCaseWorkflowActions({
         }
       >(`/cases/${encodeURIComponent(selectedDetail.client.id)}/reply`, {
         case_id: selectedDetail.client.id,
-        source_interaction_id: selectedInteraction.id,
+        source_interaction_id: replyInteraction.id,
         manager_id: state.managerId,
         recommendation_id: selectedWorkItem.recommendation_id,
         source: state.replySource,

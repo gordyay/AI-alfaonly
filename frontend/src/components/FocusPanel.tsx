@@ -1,6 +1,14 @@
 import { formatDateTime, getFocusPropensityLabel, getMiniSummaryCopy, getRecommendationStatusLabel, getWorkItemTypeLabel } from "../lib/utils";
 import type { UiStatus } from "../lib/ui";
-import type { AISummaryDraft, CaseInteraction, ClientDetailResponse, RecommendationStatus, ViewTab, WorkItem } from "../types";
+import type {
+  AISummaryDraft,
+  AssistantTaskKind,
+  CaseInteraction,
+  ClientDetailResponse,
+  RecommendationStatus,
+  ViewTab,
+  WorkItem,
+} from "../types";
 import { CaseAction } from "./focus-panel/CaseAction";
 import { CaseCRM } from "./focus-panel/CaseCRM";
 import { CasePortfolio } from "./focus-panel/CasePortfolio";
@@ -18,7 +26,6 @@ interface FocusPanelProps {
   propensityEnabled?: boolean;
   activeTab: ViewTab;
   onChangeTab: (tab: ViewTab) => void;
-  onSelectInteraction: (interactionId: string) => void;
   aiDraft?: AISummaryDraft | null;
   aiLoading: boolean;
   aiSaving: boolean;
@@ -60,7 +67,7 @@ interface FocusPanelProps {
   onFeedbackCommentChange: (value: string) => void;
   onFeedbackDecisionChange: (decision: RecommendationStatus) => void;
   onSubmitFeedback: () => void;
-  onQuickAssistantAction: (message: string) => void;
+  onOpenAssistantTask: (taskKind: AssistantTaskKind) => void;
 }
 
 const TABS: Array<{ id: ViewTab; label: string }> = [
@@ -81,7 +88,6 @@ export function FocusPanel({
   propensityEnabled = true,
   activeTab,
   onChangeTab,
-  onSelectInteraction,
   aiDraft,
   aiLoading,
   aiSaving,
@@ -123,7 +129,7 @@ export function FocusPanel({
   onFeedbackCommentChange,
   onFeedbackDecisionChange,
   onSubmitFeedback,
-  onQuickAssistantAction,
+  onOpenAssistantTask,
 }: FocusPanelProps) {
   if (!detail || !workItem) {
     return (
@@ -228,11 +234,10 @@ export function FocusPanel({
           )}
           canPrefillReplyFromObjection={Boolean(latestObjectionArtifact?.selected_response)}
           onChangeTab={onChangeTab}
-          onSelectInteraction={onSelectInteraction}
           onFeedbackCommentChange={onFeedbackCommentChange}
           onFeedbackDecisionChange={onFeedbackDecisionChange}
           onSubmitFeedback={onSubmitFeedback}
-          onQuickAssistantAction={onQuickAssistantAction}
+          onOpenAssistantTask={onOpenAssistantTask}
           onReplyDraftChange={onReplyDraftChange}
           onPrefillReplyFromScript={onPrefillReplyFromScript}
           onPrefillReplyFromObjection={onPrefillReplyFromObjection}
@@ -267,6 +272,7 @@ export function FocusPanel({
             objectionStatus={objectionStatus}
             onGenerateObjectionWorkflow={onGenerateObjectionWorkflow}
             onSelectObjectionOption={onSelectObjectionOption}
+            onOpenAssistantTask={onOpenAssistantTask}
           />
           <CaseAction
             detail={detail}
@@ -292,6 +298,7 @@ export function FocusPanel({
             objectionStatus={objectionStatus}
             onGenerateObjectionWorkflow={onGenerateObjectionWorkflow}
             onSelectObjectionOption={onSelectObjectionOption}
+            onOpenAssistantTask={onOpenAssistantTask}
           />
         </div>
       ) : null}
@@ -316,6 +323,7 @@ export function FocusPanel({
           onSaveSummary={onSaveSummary}
           onCopyCRM={onCopyCRM}
           onUpdateDraft={onUpdateDraft}
+          onOpenAssistantTask={onOpenAssistantTask}
         />
       ) : null}
 

@@ -15,6 +15,8 @@ from .models import (
     AssistantMessageRecord,
     AssistantMessageRole,
     AssistantSnapshotType,
+    AssistantScopeKind,
+    AssistantTaskKind,
     AssistantThread,
     AssistantCitation,
     CRMDraftRevision,
@@ -260,6 +262,11 @@ class SQLiteStorage:
                     id TEXT PRIMARY KEY,
                     manager_id TEXT NOT NULL,
                     title TEXT NOT NULL,
+                    scope_kind TEXT NOT NULL DEFAULT 'global',
+                    client_id TEXT,
+                    work_item_id TEXT,
+                    interaction_id TEXT,
+                    task_kind TEXT,
                     last_selected_client_id TEXT,
                     memory_summary TEXT,
                     created_at TEXT NOT NULL,
@@ -315,6 +322,11 @@ class SQLiteStorage:
             self._ensure_table_column(connection, "clients", "ai_summary_generated_at", "TEXT")
             self._ensure_table_column(connection, "tasks", "business_goal", "TEXT")
             self._ensure_table_column(connection, "tasks", "linked_conversation_id", "TEXT")
+            self._ensure_table_column(connection, "assistant_threads", "scope_kind", "TEXT NOT NULL DEFAULT 'global'")
+            self._ensure_table_column(connection, "assistant_threads", "client_id", "TEXT")
+            self._ensure_table_column(connection, "assistant_threads", "work_item_id", "TEXT")
+            self._ensure_table_column(connection, "assistant_threads", "interaction_id", "TEXT")
+            self._ensure_table_column(connection, "assistant_threads", "task_kind", "TEXT")
             self._ensure_table_column(connection, "assistant_messages", "action_payload_json", "TEXT")
             self._ensure_table_column(connection, "recommendation_feedback", "client_id", "TEXT")
             self._ensure_table_column(connection, "recommendation_feedback", "conversation_id", "TEXT")
@@ -1190,14 +1202,20 @@ class SQLiteStorage:
             connection.execute(
                 """
                 INSERT INTO assistant_threads (
-                    id, manager_id, title, last_selected_client_id, memory_summary, created_at, updated_at
+                    id, manager_id, title, scope_kind, client_id, work_item_id, interaction_id, task_kind,
+                    last_selected_client_id, memory_summary, created_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     thread.id,
                     thread.manager_id,
                     thread.title,
+                    thread.scope_kind.value,
+                    thread.client_id,
+                    thread.work_item_id,
+                    thread.interaction_id,
+                    thread.task_kind.value if thread.task_kind else None,
                     thread.last_selected_client_id,
                     thread.memory_summary,
                     thread.created_at.isoformat(),
@@ -1208,9 +1226,16 @@ class SQLiteStorage:
 
         return thread
 
-    def list_assistant_threads(self, manager_id: str) -> list[AssistantThread]:
+    def list_assistant_threads(
+        self,
+        manager_id: str,
+        *,
+        scope_kind: AssistantScopeKind | None = None,
+        client_id: str | None = None,
+        work_item_id: str | None = None,
+    ) -> list[AssistantThread]:
         with self._connect() as connection:
-            rows = connection.execute(
+            query = [
                 """
                 SELECT assistant_threads.*
                 FROM assistant_threads
@@ -1220,12 +1245,57 @@ class SQLiteStorage:
                     FROM assistant_messages
                     WHERE assistant_messages.thread_id = assistant_threads.id
                   )
-                ORDER BY updated_at DESC
-                """,
-                (manager_id,),
+                """
+            ]
+            params: list[str] = [manager_id]
+            if scope_kind is not None:
+                query.append("AND scope_kind = ?")
+                params.append(scope_kind.value)
+            if client_id is not None:
+                query.append("AND client_id = ?")
+                params.append(client_id)
+            if work_item_id is not None:
+                query.append("AND work_item_id = ?")
+                params.append(work_item_id)
+            query.append("ORDER BY updated_at DESC")
+            rows = connection.execute(
+                "\n".join(query),
+                tuple(params),
             ).fetchall()
 
         return [self._map_assistant_thread(row) for row in rows]
+
+    def find_assistant_thread(
+        self,
+        *,
+        manager_id: str,
+        scope_kind: AssistantScopeKind,
+        client_id: str | None,
+        work_item_id: str | None,
+        task_kind: AssistantTaskKind | None,
+    ) -> AssistantThread | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT *
+                FROM assistant_threads
+                WHERE manager_id = ?
+                  AND scope_kind = ?
+                  AND COALESCE(client_id, '') = COALESCE(?, '')
+                  AND COALESCE(work_item_id, '') = COALESCE(?, '')
+                  AND COALESCE(task_kind, '') = COALESCE(?, '')
+                ORDER BY updated_at DESC
+                LIMIT 1
+                """,
+                (
+                    manager_id,
+                    scope_kind.value,
+                    client_id,
+                    work_item_id,
+                    task_kind.value if task_kind else None,
+                ),
+            ).fetchone()
+        return self._map_assistant_thread(row) if row else None
 
     def get_assistant_thread(self, thread_id: str) -> AssistantThread | None:
         with self._connect() as connection:
@@ -1245,6 +1315,10 @@ class SQLiteStorage:
         thread_id: str,
         *,
         title: str | None = None,
+        client_id: str | None = None,
+        work_item_id: str | None = None,
+        interaction_id: str | None = None,
+        task_kind: AssistantTaskKind | None = None,
         last_selected_client_id: str | None = None,
         memory_summary: str | None = None,
         updated_at: datetime | None = None,
@@ -1257,11 +1331,16 @@ class SQLiteStorage:
             connection.execute(
                 """
                 UPDATE assistant_threads
-                SET title = ?, last_selected_client_id = ?, memory_summary = ?, updated_at = ?
+                SET title = ?, client_id = ?, work_item_id = ?, interaction_id = ?, task_kind = ?,
+                    last_selected_client_id = ?, memory_summary = ?, updated_at = ?
                 WHERE id = ?
                 """,
                 (
                     title if title is not None else current.title,
+                    client_id if client_id is not None else current.client_id,
+                    work_item_id if work_item_id is not None else current.work_item_id,
+                    interaction_id if interaction_id is not None else current.interaction_id,
+                    task_kind.value if task_kind is not None else (current.task_kind.value if current.task_kind else None),
                     last_selected_client_id if last_selected_client_id is not None else current.last_selected_client_id,
                     memory_summary if memory_summary is not None else current.memory_summary,
                     (updated_at or utc_now()).isoformat(),
@@ -1617,6 +1696,11 @@ class SQLiteStorage:
             id=row["id"],
             manager_id=row["manager_id"],
             title=row["title"],
+            scope_kind=AssistantScopeKind(row["scope_kind"]) if row["scope_kind"] else AssistantScopeKind.global_scope,
+            client_id=row["client_id"] if "client_id" in row.keys() else None,
+            work_item_id=row["work_item_id"] if "work_item_id" in row.keys() else None,
+            interaction_id=row["interaction_id"] if "interaction_id" in row.keys() else None,
+            task_kind=AssistantTaskKind(row["task_kind"]) if "task_kind" in row.keys() and row["task_kind"] else None,
             last_selected_client_id=row["last_selected_client_id"],
             memory_summary=row["memory_summary"],
             created_at=datetime.fromisoformat(row["created_at"]),

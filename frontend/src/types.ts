@@ -5,6 +5,15 @@ export type WorkItemType = "task" | "communication" | "opportunity";
 export type RecommendationStatus = "pending" | "accepted" | "rejected" | "edited";
 export type AssistantRole = "user" | "assistant" | "tool";
 export type ReplySource = "manual" | "script" | "objection" | "assistant";
+export type AssistantMode = "case" | "global";
+export type AssistantTaskKind =
+  | "summary_crm"
+  | "sales_script"
+  | "objection_workflow"
+  | "reply_draft"
+  | "client_qa"
+  | "general_qa";
+export type AssistantStage = "launcher" | "preview" | "applied";
 
 export interface WorkItemFactorBreakdown {
   urgency: number;
@@ -333,8 +342,10 @@ export interface AssistantCitation {
 
 export interface AssistantMessageActionPayload {
   action_type: string;
+  summary_draft?: AISummaryDraft | null;
   sales_script_draft?: SalesScriptDraft | null;
   objection_workflow_draft?: ObjectionWorkflowDraft | null;
+  reply_draft_text?: string | null;
 }
 
 export interface AssistantMessageRecord {
@@ -352,6 +363,11 @@ export interface AssistantThread {
   id: string;
   manager_id: string;
   title: string;
+  scope_kind?: AssistantMode;
+  client_id?: string | null;
+  work_item_id?: string | null;
+  interaction_id?: string | null;
+  task_kind?: AssistantTaskKind | null;
   last_selected_client_id?: string | null;
   memory_summary?: string | null;
   created_at: string;
@@ -365,6 +381,7 @@ export interface AssistantThreadDetail {
 
 export interface AssistantActionResult {
   action_type: string;
+  task_kind?: AssistantTaskKind | null;
   client_id?: string | null;
   conversation_id?: string | null;
   case_id?: string | null;
@@ -372,14 +389,43 @@ export interface AssistantActionResult {
   draft?: AISummaryDraft | null;
   sales_script_draft?: SalesScriptDraft | null;
   objection_workflow_draft?: ObjectionWorkflowDraft | null;
+  reply_draft_text?: string | null;
   note?: string | null;
 }
 
+export interface AssistantPreviewChoice {
+  id: string;
+  title: string;
+  text: string;
+  helper_text?: string | null;
+}
+
+export interface AssistantPreview {
+  task_kind: AssistantTaskKind;
+  title: string;
+  summary: string;
+  target_tab?: ViewTab | null;
+  can_apply: boolean;
+  requires_choice: boolean;
+  choices: AssistantPreviewChoice[];
+  payload: Record<string, unknown>;
+}
+
 export interface AssistantChatResponse {
-  thread: AssistantThread;
+  session: AssistantThread;
   assistant_message: AssistantMessageRecord;
   citations: AssistantCitation[];
   used_context: AssistantCitation[];
+  preview?: AssistantPreview | null;
+  action_result?: AssistantActionResult | null;
+}
+
+export interface AssistantApplyResponse {
+  session: AssistantThread;
+  applied: boolean;
+  task_kind: AssistantTaskKind;
+  target_tab?: ViewTab | null;
+  message: string;
   action_result?: AssistantActionResult | null;
 }
 

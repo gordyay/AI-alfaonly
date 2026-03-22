@@ -16,6 +16,7 @@ interface CaseReplyComposerProps {
   onPrefillFromObjection: () => void;
   onClearReplyDraft: () => void;
   onSendReply: () => void;
+  onOpenAssistantReply: () => void;
 }
 
 function getReplySourceLabel(source: ReplySource) {
@@ -41,6 +42,7 @@ export function CaseReplyComposer({
   onPrefillFromObjection,
   onClearReplyDraft,
   onSendReply,
+  onOpenAssistantReply,
 }: CaseReplyComposerProps) {
   const canSend = Boolean(replyDraftText.trim()) && interaction?.is_text_based && !replySending;
 
@@ -91,6 +93,9 @@ export function CaseReplyComposer({
           disabled={!canPrefillFromObjection}
         >
           Подставить из возражения
+        </button>
+        <button className="ghost-button" type="button" onClick={onOpenAssistantReply}>
+          Через помощника
         </button>
         <button className="ghost-button" type="button" onClick={onClearReplyDraft} disabled={!replyDraftText}>
           Очистить

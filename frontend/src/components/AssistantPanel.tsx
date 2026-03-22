@@ -1,5 +1,9 @@
 import type {
   AssistantMessageRecord,
+  AssistantMode,
+  AssistantPreview,
+  AssistantStage,
+  AssistantTaskKind,
   AssistantThread,
   AssistantThreadDetail,
   ObjectionWorkflowDraft,
@@ -10,6 +14,12 @@ import { StatusMessage } from "./StatusMessage";
 
 interface AssistantPanelProps {
   selectedClientName?: string | null;
+  selectedWorkItemTitle?: string | null;
+  mode: AssistantMode;
+  taskKind: AssistantTaskKind;
+  stage: AssistantStage;
+  preview?: AssistantPreview | null;
+  selectedChoice?: string | null;
   threads: AssistantThread[];
   selectedThreadId?: string | null;
   threadDetail?: AssistantThreadDetail | null;
@@ -17,20 +27,68 @@ interface AssistantPanelProps {
   aiUnavailableMessage?: string | null;
   loading: boolean;
   sending: boolean;
+  applying: boolean;
   status?: { type: "loading" | "success" | "error"; text: string } | null;
   inputValue: string;
   onInputChange: (value: string) => void;
-  onCreateThread: () => void;
+  onSelectTask: (taskKind: AssistantTaskKind) => void;
   onSelectThread: (threadId: string) => void;
+  onSelectChoice: (choiceId: string) => void;
   onSendMessage: (message?: string) => void;
+  onApplyPreview: () => void;
 }
 
-const QUICK_ACTIONS = [
-  "Сводка",
-  "CRM-заметка",
-  "Скрипт",
-  "Возражение",
+const CASE_TASKS: AssistantTaskKind[] = [
+  "client_qa",
+  "summary_crm",
+  "sales_script",
+  "objection_workflow",
+  "reply_draft",
 ];
+
+const GLOBAL_TASKS: AssistantTaskKind[] = ["general_qa"];
+
+function getTaskLabel(taskKind: AssistantTaskKind) {
+  const labels: Record<AssistantTaskKind, string> = {
+    summary_crm: "CRM",
+    sales_script: "Скрипт",
+    objection_workflow: "Возражение",
+    reply_draft: "Ответ",
+    client_qa: "По кейсу",
+    general_qa: "Общий AI",
+  };
+  return labels[taskKind];
+}
+
+function getTaskPrompt(taskKind: AssistantTaskKind) {
+  const prompts: Record<AssistantTaskKind, { title: string; placeholder: string }> = {
+    summary_crm: {
+      title: "Собрать сводку и CRM-черновик",
+      placeholder: "При необходимости уточните, на чем сделать акцент в CRM.",
+    },
+    sales_script: {
+      title: "Подготовить скрипт контакта",
+      placeholder: "Опишите цель или нюанс контакта, который нужно учесть.",
+    },
+    objection_workflow: {
+      title: "Разобрать возражение",
+      placeholder: "Введите формулировку возражения клиента.",
+    },
+    reply_draft: {
+      title: "Подготовить ответ клиенту",
+      placeholder: "Уточните тон или задачу ответа.",
+    },
+    client_qa: {
+      title: "Вопрос по кейсу",
+      placeholder: "Спросите про клиента, контекст или следующий шаг.",
+    },
+    general_qa: {
+      title: "Общий AI",
+      placeholder: "Задайте общий вопрос без привязки к кейсу.",
+    },
+  };
+  return prompts[taskKind];
+}
 
 function renderSalesScriptDraft(draft: SalesScriptDraft) {
   return (
@@ -40,58 +98,12 @@ function renderSalesScriptDraft(draft: SalesScriptDraft) {
         <span>{getChannelLabel(draft.channel)}</span>
       </header>
       <p className="assistant-rich-card__line">
-        {(draft.product_name || "Без выделенного продукта") +
-          " · " +
-          (draft.contact_goal || "Без явной цели") +
-          " · " +
-          getToneLabel(draft.tone)}
+        {(draft.product_name || "Без продукта") + " · " + (draft.contact_goal || "Без цели") + " · " + getToneLabel(draft.tone)}
       </p>
       <div className="assistant-rich-card__block">
-        <span>Готовый текст</span>
+        <span>Основной текст</span>
         <p>{draft.ready_script}</p>
       </div>
-      {draft.manager_talking_points.length ? (
-        <div className="assistant-rich-card__block">
-          <span>Тезисы</span>
-          <ul>
-            {draft.manager_talking_points.map((point) => (
-              <li key={point}>{point}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-      {draft.follow_up_message ? (
-        <div className="assistant-rich-card__block">
-          <span>Короткое напоминание</span>
-          <p>{draft.follow_up_message}</p>
-        </div>
-      ) : null}
-      {draft.next_step ? (
-        <div className="assistant-rich-card__block">
-          <span>Следующий шаг</span>
-          <p>{draft.next_step}</p>
-        </div>
-      ) : null}
-      {draft.grounding_facts.length ? (
-        <div className="assistant-rich-card__block">
-          <span>На чём основан ответ</span>
-          <ul>
-            {draft.grounding_facts.map((fact) => (
-              <li key={fact}>{fact}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-      {draft.data_gaps.length ? (
-        <div className="assistant-rich-card__block">
-          <span>Чего не хватает</span>
-          <ul>
-            {draft.data_gaps.map((gap) => (
-              <li key={gap}>{gap}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
     </section>
   );
 }
@@ -104,49 +116,9 @@ function renderObjectionDraft(draft: ObjectionWorkflowDraft) {
         <span>{Math.round(draft.analysis.confidence * 100)}%</span>
       </header>
       <div className="assistant-rich-card__block">
-        <span>Что делать</span>
-        <div className="stack-list">
-          {draft.handling_options.map((option) => (
-            <article className="stack-card" key={option.title}>
-              <strong>{option.title}</strong>
-              <p>{option.response}</p>
-              <small>{option.rationale}</small>
-            </article>
-          ))}
-        </div>
-      </div>
-      <div className="assistant-rich-card__block">
-        <span>Что не говорить</span>
-        <ul>
-          {draft.what_not_to_say.map((item) => (
-            <li key={item}>{item}</li>
-          ))}
-        </ul>
-      </div>
-      <div className="assistant-rich-card__block">
         <span>Следующий шаг</span>
         <p>{draft.next_step}</p>
       </div>
-      {draft.grounding_facts.length ? (
-        <div className="assistant-rich-card__block">
-          <span>На чём основан ответ</span>
-          <ul>
-            {draft.grounding_facts.map((fact) => (
-              <li key={fact}>{fact}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-      {draft.data_gaps.length ? (
-        <div className="assistant-rich-card__block">
-          <span>Чего не хватает</span>
-          <ul>
-            {draft.data_gaps.map((gap) => (
-              <li key={gap}>{gap}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
     </section>
   );
 }
@@ -155,7 +127,7 @@ function AssistantMessageCard({ message }: { message: AssistantMessageRecord }) 
   return (
     <article className={`assistant-message assistant-message--${message.role}`}>
       <div className="assistant-message__meta">
-        <span>{message.role === "user" ? "Вы" : message.role === "tool" ? "Действие" : "Ассистент"}</span>
+        <span>{message.role === "user" ? "Вы" : message.role === "tool" ? "Применение" : "Помощник"}</span>
         <span>{formatDateTime(message.created_at)}</span>
       </div>
       <p>{message.content}</p>
@@ -163,22 +135,18 @@ function AssistantMessageCard({ message }: { message: AssistantMessageRecord }) 
       {message.action_payload?.objection_workflow_draft
         ? renderObjectionDraft(message.action_payload.objection_workflow_draft)
         : null}
-      {message.citations.length ? (
-        <div className="citation-list">
-          {message.citations.map((citation) => (
-            <article className="citation-card" key={citation.snapshot_id}>
-              <strong>{citation.title}</strong>
-              <p>{citation.excerpt || "Источник из базы знаний"}</p>
-            </article>
-          ))}
-        </div>
-      ) : null}
     </article>
   );
 }
 
 export function AssistantPanel({
   selectedClientName,
+  selectedWorkItemTitle,
+  mode,
+  taskKind,
+  stage,
+  preview,
+  selectedChoice,
   threads,
   selectedThreadId,
   threadDetail,
@@ -186,28 +154,46 @@ export function AssistantPanel({
   aiUnavailableMessage,
   loading,
   sending,
+  applying,
   status,
   inputValue,
   onInputChange,
-  onCreateThread,
+  onSelectTask,
   onSelectThread,
+  onSelectChoice,
   onSendMessage,
+  onApplyPreview,
 }: AssistantPanelProps) {
+  const tasks = mode === "case" ? CASE_TASKS : GLOBAL_TASKS;
+  const taskPrompt = getTaskPrompt(taskKind);
+
   return (
     <aside className="panel assistant-panel">
-      <header className="assistant-panel__header">
+      <header className="assistant-panel__header assistant-panel__header--stack">
         <div>
           <p className="panel__eyebrow">Помощник</p>
-          <h2>AI по кейсу</h2>
+          <h2>{taskPrompt.title}</h2>
         </div>
-        <button className="ghost-button" type="button" onClick={onCreateThread}>
-          Новый чат
-        </button>
+        <div className="assistant-panel__scope-card">
+          <span>{mode === "case" ? "Кейс" : "Режим"}</span>
+          <strong>{mode === "case" ? selectedClientName || "Без клиента" : "Общий AI"}</strong>
+          {mode === "case" && selectedWorkItemTitle ? <small>{selectedWorkItemTitle}</small> : null}
+        </div>
       </header>
 
-      <p className="assistant-panel__scope">
-        Кейс: <strong>{selectedClientName || "общий контекст"}</strong>
-      </p>
+      <div className="assistant-task-tabs">
+        {tasks.map((item) => (
+          <button
+            className={`ghost-button${item === taskKind ? " is-selected" : ""}`}
+            key={item}
+            type="button"
+            onClick={() => onSelectTask(item)}
+          >
+            {getTaskLabel(item)}
+          </button>
+        ))}
+      </div>
+
       {!aiEnabled ? <StatusMessage type="error" message={aiUnavailableMessage} /> : null}
       <StatusMessage type={status?.type} message={status?.text} />
 
@@ -226,33 +212,68 @@ export function AssistantPanel({
           ))
         ) : (
           <div className="empty-state empty-state--small">
-            <strong>{loading ? "Загружаем чаты" : "Чатов пока нет"}</strong>
-            <p>Создайте новый чат или задайте вопрос.</p>
+            <strong>{loading ? "Загружаем сессии" : "Истории пока нет"}</strong>
+            <p>Новая сессия начнется после первого запроса.</p>
           </div>
         )}
       </div>
 
-      <div className="assistant-quick-actions">
-        {QUICK_ACTIONS.map((action) => (
-          <button
-            className="ghost-button"
-            key={action}
-            type="button"
-            onClick={() => onSendMessage(action)}
-            disabled={!aiEnabled || sending}
-          >
-            {action}
-          </button>
-        ))}
-      </div>
+      {preview ? (
+        <section className="assistant-preview-card">
+          <div className="assistant-preview-card__header">
+            <div>
+              <p className="panel__eyebrow">Preview</p>
+              <h3>{preview.title}</h3>
+            </div>
+            <span className="badge badge--accent">{stage === "applied" ? "Применено" : "Готово"}</span>
+          </div>
+          <p className="assistant-preview-card__summary">{preview.summary}</p>
+          {preview.choices.length ? (
+            <div className="assistant-preview-card__choices">
+              {preview.choices.map((choice) => (
+                <button
+                  className={`assistant-choice-card${selectedChoice === choice.id ? " is-active" : ""}`}
+                  key={choice.id}
+                  type="button"
+                  onClick={() => onSelectChoice(choice.id)}
+                >
+                  <strong>{choice.title}</strong>
+                  <p>{choice.text}</p>
+                  {choice.helper_text ? <small>{choice.helper_text}</small> : null}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          <div className="button-row">
+            <button
+              className="primary-button"
+              type="button"
+              onClick={onApplyPreview}
+              disabled={!preview.can_apply || applying || (preview.requires_choice && !selectedChoice)}
+            >
+              {applying ? "Применяем..." : "Применить в кейс"}
+            </button>
+          </div>
+        </section>
+      ) : (
+        <section className="assistant-preview-card assistant-preview-card--launcher">
+          <p className="panel__eyebrow">Шаг 1</p>
+          <h3>{taskPrompt.title}</h3>
+          <p className="assistant-preview-card__summary">
+            {mode === "case"
+              ? "Сначала сформируйте результат, потом подтвердите применение в кейс."
+              : "Этот режим не влияет на данные кейса и работает как общий AI-чат."}
+          </p>
+        </section>
+      )}
 
       <div className="assistant-panel__messages">
         {threadDetail?.messages.length ? (
           threadDetail.messages.map((message) => <AssistantMessageCard key={message.id} message={message} />)
         ) : (
           <div className="empty-state empty-state--small">
-            <strong>Ассистент готов</strong>
-            <p>История появится после первого запроса.</p>
+            <strong>Сессия готова</strong>
+            <p>Отправьте первый запрос для этой задачи.</p>
           </div>
         )}
       </div>
@@ -267,12 +288,12 @@ export function AssistantPanel({
         <textarea
           value={inputValue}
           onChange={(event) => onInputChange(event.target.value)}
-          placeholder="Спросите про клиента, сообщение или следующий шаг"
+          placeholder={taskPrompt.placeholder}
           rows={4}
           disabled={!aiEnabled}
         />
         <button className="primary-button" disabled={!aiEnabled || sending || !inputValue.trim()} type="submit">
-          {sending ? "Отправляем..." : "Отправить"}
+          {sending ? "Готовим..." : "Сформировать"}
         </button>
       </form>
     </aside>

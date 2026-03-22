@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -96,6 +96,20 @@ class ReplySource(str, Enum):
     script = "script"
     objection = "objection"
     assistant = "assistant"
+
+
+class AssistantScopeKind(str, Enum):
+    case = "case"
+    global_scope = "global"
+
+
+class AssistantTaskKind(str, Enum):
+    summary_crm = "summary_crm"
+    sales_script = "sales_script"
+    objection_workflow = "objection_workflow"
+    reply_draft = "reply_draft"
+    client_qa = "client_qa"
+    general_qa = "general_qa"
 
 
 class Product(BaseModel):
@@ -562,6 +576,11 @@ class AssistantThread(BaseModel):
     id: str
     manager_id: str
     title: str
+    scope_kind: AssistantScopeKind = AssistantScopeKind.global_scope
+    client_id: Optional[str] = None
+    work_item_id: Optional[str] = None
+    interaction_id: Optional[str] = None
+    task_kind: Optional[AssistantTaskKind] = None
     last_selected_client_id: Optional[str] = None
     memory_summary: Optional[str] = None
     created_at: datetime
@@ -570,8 +589,10 @@ class AssistantThread(BaseModel):
 
 class AssistantMessageActionPayload(BaseModel):
     action_type: str
+    summary_draft: Optional[AISummaryDraft] = None
     sales_script_draft: Optional[SalesScriptDraft] = None
     objection_workflow_draft: Optional[ObjectionWorkflowDraft] = None
+    reply_draft_text: Optional[str] = None
 
 
 class AssistantMessageRecord(BaseModel):
@@ -607,6 +628,7 @@ class AssistantLLMResponse(BaseModel):
 
 class AssistantActionResult(BaseModel):
     action_type: str
+    task_kind: Optional[AssistantTaskKind] = None
     client_id: Optional[str] = None
     conversation_id: Optional[str] = None
     case_id: Optional[str] = None
@@ -614,11 +636,17 @@ class AssistantActionResult(BaseModel):
     draft: Optional[AISummaryDraft] = None
     sales_script_draft: Optional[SalesScriptDraft] = None
     objection_workflow_draft: Optional[ObjectionWorkflowDraft] = None
+    reply_draft_text: Optional[str] = None
     note: Optional[str] = None
 
 
 class AssistantThreadCreateRequest(BaseModel):
     manager_id: str = "m1"
+    scope_kind: AssistantScopeKind = AssistantScopeKind.global_scope
+    client_id: Optional[str] = None
+    work_item_id: Optional[str] = None
+    interaction_id: Optional[str] = None
+    task_kind: Optional[AssistantTaskKind] = None
     selected_client_id: Optional[str] = None
     title: Optional[str] = None
 
@@ -631,16 +659,57 @@ class AssistantThreadDetail(BaseModel):
 class AssistantChatRequest(BaseModel):
     manager_id: str = "m1"
     thread_id: str
+    task_kind: AssistantTaskKind = AssistantTaskKind.general_qa
     message: str
     selected_client_id: Optional[str] = None
     selected_work_item_id: Optional[str] = None
+    selected_interaction_id: Optional[str] = None
+    task_input: Optional[str] = None
+
+
+class AssistantPreviewChoice(BaseModel):
+    id: str
+    title: str
+    text: str
+    helper_text: Optional[str] = None
+
+
+class AssistantPreview(BaseModel):
+    task_kind: AssistantTaskKind
+    title: str
+    summary: str
+    target_tab: Optional[str] = None
+    can_apply: bool = False
+    requires_choice: bool = False
+    choices: List[AssistantPreviewChoice] = Field(default_factory=list)
+    payload: dict[str, Any] = Field(default_factory=dict)
 
 
 class AssistantChatResponse(BaseModel):
-    thread: AssistantThread
+    session: AssistantThread
     assistant_message: AssistantMessageRecord
     citations: List[AssistantCitation] = Field(default_factory=list)
     used_context: List[AssistantCitation] = Field(default_factory=list)
+    preview: Optional[AssistantPreview] = None
+    action_result: Optional[AssistantActionResult] = None
+
+
+class AssistantApplyRequest(BaseModel):
+    manager_id: str = "m1"
+    thread_id: str
+    task_kind: AssistantTaskKind
+    selected_client_id: Optional[str] = None
+    selected_work_item_id: Optional[str] = None
+    selected_interaction_id: Optional[str] = None
+    selected_choice: Optional[str] = None
+
+
+class AssistantApplyResponse(BaseModel):
+    session: AssistantThread
+    applied: bool
+    task_kind: AssistantTaskKind
+    target_tab: Optional[str] = None
+    message: str
     action_result: Optional[AssistantActionResult] = None
 
 

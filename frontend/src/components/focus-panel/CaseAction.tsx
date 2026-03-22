@@ -21,6 +21,7 @@ export function CaseAction({
   objectionStatus,
   onGenerateObjectionWorkflow,
   onSelectObjectionOption,
+  onOpenAssistantTask,
 }: CaseActionProps) {
   if (mode === "script") {
     const latestScript = detail.script_history[0] ?? null;
@@ -34,6 +35,9 @@ export function CaseAction({
               <h3>Сценарий контакта</h3>
             </div>
             <div className="button-row">
+              <button className="ghost-button" type="button" onClick={() => onOpenAssistantTask("sales_script")}>
+                В помощнике
+              </button>
               <button
                 className="primary-button"
                 type="button"
@@ -163,6 +167,9 @@ export function CaseAction({
             <h3>Разбор возражения</h3>
           </div>
           <div className="button-row">
+            <button className="ghost-button" type="button" onClick={() => onOpenAssistantTask("objection_workflow")}>
+              В помощнике
+            </button>
             <button
               className="primary-button"
               type="button"

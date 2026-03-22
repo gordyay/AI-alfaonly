@@ -42,6 +42,7 @@ export function CaseCRM({
   onSaveSummary,
   onCopyCRM,
   onUpdateDraft,
+  onOpenAssistantTask,
 }: CaseCRMProps) {
   const followUpValue = toFollowUpInputValue(aiDraft?.follow_up_date);
   const canSaveCRM = Boolean(aiDraft && (!feedbackEnabled || savedFeedbackDecision));
@@ -56,6 +57,9 @@ export function CaseCRM({
             <h3>Черновик и финальная версия</h3>
           </div>
           <div className="button-row">
+            <button className="ghost-button" type="button" onClick={() => onOpenAssistantTask("summary_crm")}>
+              В помощнике
+            </button>
             <button className="ghost-button" type="button" onClick={onGenerateSummary} disabled={!aiEnabled || aiLoading}>
               {aiLoading ? "Генерируем..." : "Собрать черновик"}
             </button>

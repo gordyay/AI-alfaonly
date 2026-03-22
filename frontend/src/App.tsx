@@ -24,7 +24,15 @@ import {
   groupWorkQueue,
   type WorkQueueFilters,
 } from "./lib/utils";
-import type { AppMode, AssistantActionResult, ClientDetailResponse, HealthResponse, SortMode, WorkItem } from "./types";
+import type {
+  AppMode,
+  AssistantActionResult,
+  AssistantTaskKind,
+  ClientDetailResponse,
+  HealthResponse,
+  SortMode,
+  WorkItem,
+} from "./types";
 
 const TOUR_SEEN_STORAGE_KEY = "alfa_only_guided_tour_seen";
 
@@ -181,8 +189,8 @@ export function App() {
   const aiEnabled = health?.ai.available ?? false;
   const aiUnavailableMessage = health?.ai.reason ?? "AI-функции временно недоступны.";
 
-  async function handleAssistantActionResult(actionResult?: AssistantActionResult | null) {
-    await workflowActions.syncAssistantAction(actionResult);
+  async function handleAssistantActionResult(actionResult?: AssistantActionResult | null, targetTab?: string | null) {
+    await workflowActions.syncAssistantAction(actionResult, targetTab);
   }
 
   const assistant = useAssistant({
@@ -190,6 +198,7 @@ export function App() {
     selectedClientId: screenState.selectedClientId,
     selectedClientName: selectedDetail?.client.full_name ?? null,
     selectedWorkItemId: screenState.selectedWorkItemId,
+    selectedInteractionId: screenState.selectedInteractionId,
     onActionResult: handleAssistantActionResult,
   });
 
@@ -409,11 +418,11 @@ export function App() {
   }, [screenState.managerId, screenState.mode, supervisorEnabled]);
 
   useEffect(() => {
-    if (!assistantEnabled || !screenState.assistantOpen) {
+    if (!assistantEnabled || !screenState.assistantOpen || assistant.assistantThreadDetail) {
       return;
     }
     loadAssistantThreadsEvent().catch(() => undefined);
-  }, [screenState.assistantOpen, screenState.managerId, assistantEnabled]);
+  }, [assistant.assistantThreadDetail, screenState.assistantOpen, screenState.managerId, assistantEnabled]);
 
   useEffect(() => {
     if (!selectedDetail || screenState.aiDraft) {
@@ -556,17 +565,19 @@ export function App() {
     });
   }
 
-  function openAssistant() {
+  function openAssistant(taskKind?: AssistantTaskKind) {
     if (!assistantEnabled) {
       return;
     }
 
+    const nextTaskKind = taskKind ?? (selectedWorkItem ? "client_qa" : "general_qa");
     dispatch({
       type: "patch",
       patch: {
         assistantOpen: true,
       },
     });
+    assistant.openAssistantTask(nextTaskKind).catch(() => undefined);
   }
 
   function closeAssistant() {
@@ -576,20 +587,6 @@ export function App() {
         assistantOpen: false,
       },
     });
-  }
-
-  function sendAssistantMessage(message?: string) {
-    if (!assistantEnabled) {
-      return;
-    }
-
-    dispatch({
-      type: "patch",
-      patch: {
-        assistantOpen: true,
-      },
-    });
-    assistant.sendAssistantMessage(message).catch(() => undefined);
   }
 
   return (
@@ -735,15 +732,6 @@ export function App() {
                   },
                 })
               }
-              onSelectInteraction={(interactionId) =>
-                dispatch({
-                  type: "patch",
-                  patch: {
-                    selectedInteractionId: interactionId,
-                    replyStatus: null,
-                  },
-                })
-              }
               aiDraft={screenState.aiDraft}
               aiLoading={screenState.aiLoading}
               aiSaving={screenState.aiSaving}
@@ -855,8 +843,8 @@ export function App() {
               onSubmitFeedback={() => {
                 workflowActions.handleRecordFeedback().catch(() => undefined);
               }}
-              onQuickAssistantAction={(message) => {
-                sendAssistantMessage(message);
+              onOpenAssistantTask={(taskKind) => {
+                openAssistant(taskKind);
               }}
             />
           )}
@@ -888,6 +876,12 @@ export function App() {
         <AssistantDrawer open={screenState.assistantOpen} onClose={closeAssistant}>
           <AssistantPanel
             selectedClientName={selectedDetail?.client.full_name}
+            selectedWorkItemTitle={selectedWorkItem?.title ?? null}
+            mode={assistant.assistantMode}
+            taskKind={assistant.assistantTaskKind}
+            stage={assistant.assistantStage}
+            preview={assistant.assistantPreview}
+            selectedChoice={assistant.assistantSelectedChoice}
             threads={assistant.assistantThreads}
             selectedThreadId={assistant.assistantSelectedThreadId}
             threadDetail={assistant.assistantThreadDetail}
@@ -895,17 +889,22 @@ export function App() {
             aiUnavailableMessage={aiUnavailableMessage}
             loading={assistant.assistantLoading}
             sending={assistant.assistantSending}
+            applying={assistant.assistantApplying}
             status={assistant.assistantStatus}
             inputValue={assistant.assistantInput}
             onInputChange={assistant.setAssistantInput}
-            onCreateThread={() => {
-              assistant.prepareDraftThread(selectedDetail?.client.full_name ?? null);
+            onSelectTask={(taskKind) => {
+              assistant.openAssistantTask(taskKind).catch(() => undefined);
             }}
             onSelectThread={(threadId) => {
               assistant.loadAssistantThread(threadId).catch(() => undefined);
             }}
+            onSelectChoice={assistant.setAssistantSelectedChoice}
             onSendMessage={(message) => {
               assistant.sendAssistantMessage(message).catch(() => undefined);
+            }}
+            onApplyPreview={() => {
+              assistant.applyAssistantPreview().catch(() => undefined);
             }}
           />
         </AssistantDrawer>
