@@ -30,7 +30,7 @@ async def test_health(client: AsyncClient):
 async def test_frontend_index(client: AsyncClient):
     response = await client.get('/')
     assert response.status_code == 200
-    assert 'Alfa Only Assistant MVP' in response.text
+    assert 'Alfa Only Manager Cockpit' in response.text
 
 
 @pytest.mark.anyio
@@ -39,6 +39,73 @@ async def test_clients_list(client: AsyncClient):
     assert response.status_code == 200
     body = response.json()
     assert len(body['items']) >= 1
+
+
+@pytest.mark.anyio
+async def test_tasks_list_returns_seeded_manager_tasks(client: AsyncClient):
+    response = await client.get('/tasks?manager_id=m1')
+    assert response.status_code == 200
+    items = response.json()['items']
+    assert len(items) >= 3
+    assert {'business_goal', 'linked_conversation_id', 'task_type', 'status'}.issubset(items[0].keys())
+
+
+@pytest.mark.anyio
+async def test_cockpit_returns_unified_work_queue(client: AsyncClient):
+    response = await client.get('/cockpit?manager_id=m1')
+    assert response.status_code == 200
+    body = response.json()
+    assert body['manager_id'] == 'm1'
+    assert body['focus_item'] is not None
+    assert body['sections']
+    assert {'actionable_items', 'urgent_items', 'due_today_items', 'opportunity_items', 'clients_in_focus'}.issubset(
+        body['stats'].keys()
+    )
+    item_types = {item['item_type'] for item in body['work_queue']}
+    assert {'task', 'communication', 'opportunity'}.issubset(item_types)
+    first_item = body['work_queue'][0]
+    assert {'expected_benefit', 'recommendation_status', 'factor_breakdown'}.issubset(first_item.keys())
+    assert {'urgency', 'client_value', 'engagement', 'commercial_potential', 'churn_risk', 'ai_context'}.issubset(
+        first_item['factor_breakdown'].keys()
+    )
+
+
+@pytest.mark.anyio
+async def test_client_propensity_endpoint_returns_ranked_products(client: AsyncClient):
+    response = await client.get('/client/c1/propensity')
+    assert response.status_code == 200
+    body = response.json()
+    assert body['client_id'] == 'c1'
+    assert len(body['items']) >= 3
+    assert {'product_name', 'score', 'fit_label', 'reasons', 'data_gaps', 'factors'}.issubset(body['items'][0].keys())
+
+
+@pytest.mark.anyio
+async def test_product_plan_endpoint_returns_clients_for_product(client: AsyncClient):
+    response = await client.get('/propensity/clients?manager_id=m1&product_id=p3')
+    assert response.status_code == 200
+    body = response.json()
+    assert body['manager_id'] == 'm1'
+    assert body['product_id'] == 'p3'
+    assert body['items']
+
+
+@pytest.mark.anyio
+async def test_objection_workflow_endpoint_returns_playbook(client: AsyncClient):
+    response = await client.post(
+        '/ai/objection-workflow',
+        json={
+            'client_id': 'c2',
+            'conversation_id': 'conv2',
+            'manager_id': 'm1',
+            'objection_text': 'Не хочу избыточный риск',
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body['draft']['analysis']['objection_type'] in {'risk', 'other'}
+    assert len(body['draft']['handling_options']) >= 2
+    assert body['draft']['what_not_to_say']
 
 
 @pytest.mark.anyio
@@ -86,6 +153,12 @@ async def test_client_card_found(client: AsyncClient):
     assert response.status_code == 200
     body = response.json()
     assert body['client']['id'] == 'c1'
+    assert body['work_items']
+    assert body['generated_artifacts'] is not None
+    assert body['product_propensity']['items']
+    assert body['objection_workflow']['draft']['handling_options']
+    assert 'recommendation_feedback' in body
+    assert 'activity_log' in body
     assert body['dialog_recommendation'] is not None
     assert body['dialog_recommendation']['client_id'] == 'c1'
     assert body['conversations']
@@ -112,6 +185,22 @@ async def test_client_card_found(client: AsyncClient):
     ).issubset(conversation['insights'].keys())
     assert conversation['insights']['next_contact_due_at'] is not None
     assert conversation['insights']['objection_tags']
+
+
+@pytest.mark.anyio
+async def test_client_detail_can_be_scoped_to_specific_work_item(client: AsyncClient):
+    investment_case = await client.get('/client/c1?work_item_id=task:task-2')
+    assert investment_case.status_code == 200
+    investment_body = investment_case.json()
+    assert investment_body['selected_work_item_id'] == 'task:task-2'
+    assert investment_body['selected_conversation_id'] == 'conv1'
+
+    service_case = await client.get('/client/c1?work_item_id=task:task-9')
+    assert service_case.status_code == 200
+    service_body = service_case.json()
+    assert service_body['selected_work_item_id'] == 'task:task-9'
+    assert service_body['selected_conversation_id'] == 'conv1b'
+    assert service_body['selected_conversation_id'] != investment_body['selected_conversation_id']
 
 
 @pytest.mark.anyio
@@ -158,8 +247,11 @@ async def test_create_crm_note(client: AsyncClient):
 @pytest.mark.anyio
 async def test_feedback(client: AsyncClient):
     payload = {
-        'recommendation_id': 'rec-1',
+        'recommendation_id': 'rec:communication:conv1',
         'manager_id': 'm1',
+        'recommendation_type': 'manager_work_item',
+        'client_id': 'c1',
+        'conversation_id': 'conv1',
         'decision': 'accepted',
         'comment': 'Ок',
     }
@@ -167,3 +259,90 @@ async def test_feedback(client: AsyncClient):
     assert response.status_code == 200
     body = response.json()
     assert body['feedback']['decision'] == 'accepted'
+    assert body['created'] is True
+
+    detail_response = await client.get('/client/c1?work_item_id=task:task-2')
+    detail = detail_response.json()
+    assert any(item['recommendation_id'] == 'rec:communication:conv1' for item in detail['recommendation_feedback'])
+    assert any(item['action'] == 'feedback_saved' for item in detail['activity_log'])
+
+
+@pytest.mark.anyio
+async def test_feedback_deduplicates_identical_events(client: AsyncClient):
+    payload = {
+        'recommendation_id': 'rec:communication:conv1',
+        'manager_id': 'm1',
+        'recommendation_type': 'manager_work_item',
+        'client_id': 'c1',
+        'conversation_id': 'conv1',
+        'decision': 'accepted',
+        'comment': 'Ок',
+    }
+    first = await client.post('/feedback', json=payload)
+    second = await client.post('/feedback', json=payload)
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert first.json()['created'] is True
+    assert second.json()['created'] is False
+
+    detail_response = await client.get('/client/c1?work_item_id=task:task-2')
+    detail = detail_response.json()
+    matching_actions = [
+        item for item in detail['activity_log']
+        if item['recommendation_id'] == 'rec:communication:conv1' and item['action'] == 'feedback_saved'
+    ]
+    assert len(matching_actions) == 1
+
+
+@pytest.mark.anyio
+async def test_crm_note_can_close_feedback_loop(client: AsyncClient):
+    payload = {
+        'client_id': 'c1',
+        'manager_id': 'm1',
+        'recommendation_id': 'rec:communication:conv1',
+        'recommendation_decision': 'edited',
+        'decision_comment': 'Нужен более мягкий follow-up, чем в базовой рекомендации.',
+        'note_text': 'Подготовить более мягкий follow-up и вернуться с кратким сравнением.',
+        'outcome': 'follow_up',
+        'source_conversation_id': 'conv1',
+    }
+    response = await client.post('/crm-note', json=payload)
+    assert response.status_code == 200
+    created = response.json()['crm_note']
+    assert created['recommendation_id'] == 'rec:communication:conv1'
+    assert created['recommendation_decision'] == 'edited'
+
+    detail_response = await client.get('/client/c1?work_item_id=task:task-2')
+    detail = detail_response.json()
+    assert any(item['recommendation_id'] == 'rec:communication:conv1' for item in detail['recommendation_feedback'])
+    assert detail['crm_notes'][0]['recommendation_id'] == 'rec:communication:conv1'
+
+
+@pytest.mark.anyio
+async def test_supervisor_dashboard_returns_metrics(client: AsyncClient):
+    feedback_response = await client.post(
+        '/feedback',
+        json={
+            'recommendation_id': 'rec:communication:conv1',
+            'manager_id': 'm1',
+            'recommendation_type': 'manager_work_item',
+            'client_id': 'c1',
+            'conversation_id': 'conv1',
+            'decision': 'accepted',
+            'comment': 'Беру в работу.',
+        },
+    )
+    assert feedback_response.status_code == 200
+
+    response = await client.get('/supervisor/dashboard?manager_id=m1')
+    assert response.status_code == 200
+    body = response.json()
+    assert body['manager_id'] == 'm1'
+    assert len(body['cards']) >= 6
+    assert {'adoption-rate', 'acceptance-rate', 'edited-rate', 'rejected-rate', 'coverage-rate', 'latency-hours'} == {
+        item['id'] for item in body['cards']
+    }
+    assert 'decision_breakdown' in body
+    assert 'recent_decisions' in body
+    assert body['completion_funnel']

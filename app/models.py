@@ -13,6 +13,26 @@ class TaskStatus(str, Enum):
     done = "done"
 
 
+class WorkItemType(str, Enum):
+    task = "task"
+    communication = "communication"
+    opportunity = "opportunity"
+
+
+class RecommendationStatus(str, Enum):
+    pending = "pending"
+    accepted = "accepted"
+    rejected = "rejected"
+    edited = "edited"
+
+
+class GeneratedArtifactType(str, Enum):
+    summary = "summary"
+    crm_note = "crm_note"
+    sales_script = "sales_script"
+    objection_workflow = "objection_workflow"
+
+
 class ChannelType(str, Enum):
     chat = "chat"
     call = "call"
@@ -46,6 +66,23 @@ class AssistantSnapshotType(str, Enum):
     conversation_overview = "conversation_overview"
     recommendation_overview = "recommendation_overview"
     crm_overview = "crm_overview"
+    propensity_overview = "propensity_overview"
+
+
+class ProductFitLabel(str, Enum):
+    strong = "strong"
+    medium = "medium"
+    weak = "weak"
+
+
+class ObjectionType(str, Enum):
+    price = "price"
+    risk = "risk"
+    timing = "timing"
+    trust = "trust"
+    complexity = "complexity"
+    no_need = "no_need"
+    other = "other"
 
 
 class Product(BaseModel):
@@ -104,7 +141,9 @@ class Task(BaseModel):
     channel: ChannelType
     priority_label: str = "unknown"
     task_type: str
+    business_goal: Optional[str] = None
     source_system: str
+    linked_conversation_id: Optional[str] = None
     product_code: Optional[str] = None
 
 
@@ -168,6 +207,127 @@ class DialogFeedItem(DialogRecommendation):
     pass
 
 
+class WorkItemFactorBreakdown(BaseModel):
+    urgency: float
+    client_value: float
+    engagement: float
+    commercial_potential: float
+    churn_risk: float
+    ai_context: float
+
+
+class WorkItem(BaseModel):
+    id: str
+    item_type: WorkItemType
+    client_id: str
+    client_name: str
+    title: str
+    summary: str
+    priority_score: int
+    priority_label: str
+    why: List[str] = Field(default_factory=list)
+    next_best_action: str
+    expected_benefit: str
+    factor_breakdown: WorkItemFactorBreakdown
+    recommendation_id: str
+    recommendation_status: RecommendationStatus = RecommendationStatus.pending
+    recommendation_type: str = "manager_work_item"
+    ai_context_note: Optional[str] = None
+    due_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+    channel: Optional[ChannelType] = None
+    task_id: Optional[str] = None
+    task_status: Optional[TaskStatus] = None
+    task_type: Optional[str] = None
+    business_goal: Optional[str] = None
+    conversation_id: Optional[str] = None
+    source_system: Optional[str] = None
+    product_code: Optional[str] = None
+    product_name: Optional[str] = None
+    client_churn_risk: Optional[str] = None
+
+
+class CockpitSection(BaseModel):
+    id: str
+    title: str
+    subtitle: str
+    item_type: WorkItemType
+    items: List[WorkItem] = Field(default_factory=list)
+
+
+class CockpitStats(BaseModel):
+    actionable_items: int
+    urgent_items: int
+    due_today_items: int
+    opportunity_items: int
+    clients_in_focus: int
+
+
+class ManagerCockpit(BaseModel):
+    manager_id: str
+    generated_at: datetime
+    stats: CockpitStats
+    focus_item: Optional[WorkItem] = None
+    sections: List[CockpitSection] = Field(default_factory=list)
+    work_queue: List[WorkItem] = Field(default_factory=list)
+
+
+class GeneratedArtifact(BaseModel):
+    id: str
+    artifact_type: GeneratedArtifactType
+    client_id: str
+    title: str
+    summary: str
+    created_at: datetime
+    source_conversation_id: Optional[str] = None
+    source_task_id: Optional[str] = None
+
+
+class ProductPropensityFactors(BaseModel):
+    product_fit: float
+    affordability: float
+    behavioral_signal: float
+    relationship_depth: float
+    portfolio_gap: float
+
+
+class ProductPropensityItem(BaseModel):
+    product_id: str
+    product_name: str
+    category: str
+    score: int
+    fit_label: ProductFitLabel
+    reasons: List[str] = Field(default_factory=list)
+    data_gaps: List[str] = Field(default_factory=list)
+    next_best_action: str
+    factors: ProductPropensityFactors
+    already_holds: bool = False
+
+
+class ProductPropensityResponse(BaseModel):
+    client_id: str
+    generated_at: datetime
+    items: List[ProductPropensityItem] = Field(default_factory=list)
+
+
+class ProductPlanCandidate(BaseModel):
+    client_id: str
+    client_name: str
+    product_id: str
+    product_name: str
+    score: int
+    fit_label: ProductFitLabel
+    reasons: List[str] = Field(default_factory=list)
+    next_best_action: str
+
+
+class ProductPlanResponse(BaseModel):
+    manager_id: str
+    product_id: str
+    generated_at: datetime
+    items: List[ProductPlanCandidate] = Field(default_factory=list)
+
+
 class AISummaryDraft(BaseModel):
     contact_summary: str
     key_points: List[str] = Field(default_factory=list)
@@ -176,19 +336,62 @@ class AISummaryDraft(BaseModel):
     follow_up_required: bool
     follow_up_date: Optional[datetime] = None
     follow_up_reason: Optional[str] = None
+    grounding_facts: List[str] = Field(default_factory=list)
     data_gaps: List[str] = Field(default_factory=list)
+
+
+class SalesScriptVariant(BaseModel):
+    label: str
+    manager_talking_points: List[str] = Field(default_factory=list)
+    ready_script: str
+    style: Optional[str] = None
+    tactic: Optional[str] = None
 
 
 class SalesScriptDraft(BaseModel):
     manager_talking_points: List[str] = Field(default_factory=list)
     ready_script: str
     channel: ChannelType
+    contact_goal: Optional[str] = None
+    product_name: Optional[str] = None
+    tone: Optional[str] = None
+    follow_up_message: Optional[str] = None
+    next_step: Optional[str] = None
+    grounding_facts: List[str] = Field(default_factory=list)
+    data_gaps: List[str] = Field(default_factory=list)
+    alternatives: List[SalesScriptVariant] = Field(default_factory=list)
+
+
+class ObjectionAnalysis(BaseModel):
+    objection_type: ObjectionType
+    objection_label: str
+    confidence: float = 0.0
+    evidence: List[str] = Field(default_factory=list)
+    customer_intent: Optional[str] = None
+
+
+class ObjectionHandlingOption(BaseModel):
+    title: str
+    response: str
+    rationale: str
+    style: Optional[str] = None
+    tactic: Optional[str] = None
+
+
+class ObjectionWorkflowDraft(BaseModel):
+    analysis: ObjectionAnalysis
+    handling_options: List[ObjectionHandlingOption] = Field(default_factory=list)
+    what_not_to_say: List[str] = Field(default_factory=list)
+    next_step: str
+    grounding_facts: List[str] = Field(default_factory=list)
+    data_gaps: List[str] = Field(default_factory=list)
 
 
 class SummarizeDialogRequest(BaseModel):
     client_id: str
     conversation_id: str
     manager_id: str = "m1"
+    recommendation_id: Optional[str] = None
 
 
 class GenerateScriptRequest(BaseModel):
@@ -196,6 +399,16 @@ class GenerateScriptRequest(BaseModel):
     conversation_id: str
     manager_id: str = "m1"
     instruction: Optional[str] = None
+    contact_goal: Optional[str] = None
+    recommendation_id: Optional[str] = None
+
+
+class ObjectionWorkflowRequest(BaseModel):
+    client_id: str
+    conversation_id: str
+    manager_id: str = "m1"
+    objection_text: Optional[str] = None
+    recommendation_id: Optional[str] = None
 
 
 class SummarizeDialogResponse(BaseModel):
@@ -212,6 +425,70 @@ class GenerateScriptResponse(BaseModel):
     draft: SalesScriptDraft
     model_name: str
     generated_at: datetime
+    artifact_id: Optional[str] = None
+
+
+class ObjectionWorkflowResponse(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
+    draft: ObjectionWorkflowDraft
+    model_name: str
+    generated_at: datetime
+    artifact_id: Optional[str] = None
+
+
+class ScriptSelectionRequest(BaseModel):
+    artifact_id: str
+    manager_id: str = "m1"
+    variant_label: str
+    selected_text: Optional[str] = None
+
+
+class ObjectionSelectionRequest(BaseModel):
+    artifact_id: str
+    manager_id: str = "m1"
+    option_title: str
+    selected_response: Optional[str] = None
+
+
+class ScriptGenerationRecord(BaseModel):
+    id: str
+    client_id: str
+    manager_id: str
+    recommendation_id: Optional[str] = None
+    conversation_id: Optional[str] = None
+    contact_goal: Optional[str] = None
+    selected_variant_label: Optional[str] = None
+    selected_text: Optional[str] = None
+    draft: SalesScriptDraft
+    created_at: datetime
+    selected_at: Optional[datetime] = None
+
+
+class ObjectionWorkflowRecord(BaseModel):
+    id: str
+    client_id: str
+    manager_id: str
+    recommendation_id: Optional[str] = None
+    conversation_id: Optional[str] = None
+    selected_option_title: Optional[str] = None
+    selected_response: Optional[str] = None
+    draft: ObjectionWorkflowDraft
+    created_at: datetime
+    selected_at: Optional[datetime] = None
+
+
+class CRMDraftRevision(BaseModel):
+    id: str
+    client_id: str
+    manager_id: str
+    recommendation_id: Optional[str] = None
+    conversation_id: Optional[str] = None
+    stage: str
+    changed_fields: List[str] = Field(default_factory=list)
+    draft: AISummaryDraft
+    final_note_text: Optional[str] = None
+    created_at: datetime
 
 
 class AssistantCitation(BaseModel):
@@ -235,6 +512,7 @@ class AssistantThread(BaseModel):
 class AssistantMessageActionPayload(BaseModel):
     action_type: str
     sales_script_draft: Optional[SalesScriptDraft] = None
+    objection_workflow_draft: Optional[ObjectionWorkflowDraft] = None
 
 
 class AssistantMessageRecord(BaseModel):
@@ -274,6 +552,7 @@ class AssistantActionResult(BaseModel):
     conversation_id: Optional[str] = None
     draft: Optional[AISummaryDraft] = None
     sales_script_draft: Optional[SalesScriptDraft] = None
+    objection_workflow_draft: Optional[ObjectionWorkflowDraft] = None
     note: Optional[str] = None
 
 
@@ -293,6 +572,7 @@ class AssistantChatRequest(BaseModel):
     thread_id: str
     message: str
     selected_client_id: Optional[str] = None
+    selected_work_item_id: Optional[str] = None
 
 
 class AssistantChatResponse(BaseModel):
@@ -308,6 +588,9 @@ class CRMNote(BaseModel):
     client_id: str
     manager_id: str
     task_id: Optional[str] = None
+    recommendation_id: Optional[str] = None
+    recommendation_decision: Optional[FeedbackDecision] = None
+    decision_comment: Optional[str] = None
     note_text: str
     outcome: str
     channel: Optional[ChannelType] = None
@@ -334,8 +617,11 @@ class RecommendationFeedback(BaseModel):
     recommendation_id: str
     manager_id: str
     recommendation_type: str = "manual_review"
+    client_id: Optional[str] = None
+    conversation_id: Optional[str] = None
     decision: FeedbackDecision
     comment: Optional[str] = None
+    selected_variant: Optional[str] = None
     created_at: datetime
 
 
@@ -343,10 +629,13 @@ class ActivityLogEntry(BaseModel):
     id: str
     recommendation_type: str
     client_id: str
+    recommendation_id: Optional[str] = None
     conversation_id: Optional[str] = None
     manager_id: str
     action: str
+    decision: Optional[str] = None
     payload_excerpt: Optional[str] = None
+    context_snapshot: Optional[str] = None
     created_at: datetime
 
 
@@ -354,6 +643,9 @@ class CreateCRMNoteRequest(BaseModel):
     client_id: str
     manager_id: str = "m1"
     task_id: Optional[str] = None
+    recommendation_id: Optional[str] = None
+    recommendation_decision: Optional[FeedbackDecision] = None
+    decision_comment: Optional[str] = None
     note_text: str
     outcome: str
     channel: Optional[ChannelType] = None
@@ -369,5 +661,59 @@ class FeedbackRequest(BaseModel):
     recommendation_id: str
     manager_id: str
     recommendation_type: str = "manual_review"
+    client_id: Optional[str] = None
+    conversation_id: Optional[str] = None
     decision: FeedbackDecision
     comment: Optional[str] = None
+    selected_variant: Optional[str] = None
+
+
+class SupervisorMetricCard(BaseModel):
+    id: str
+    label: str
+    value: str
+    helper_text: Optional[str] = None
+
+
+class SupervisorDecisionBreakdown(BaseModel):
+    recommendation_type: str
+    total: int
+    accepted: int
+    edited: int
+    rejected: int
+    usage_rate: float
+
+
+class SupervisorProductDistribution(BaseModel):
+    product_code: str
+    product_name: Optional[str] = None
+    count: int
+
+
+class SupervisorFunnelStage(BaseModel):
+    id: str
+    label: str
+    count: int
+    helper_text: Optional[str] = None
+
+
+class SupervisorRecentDecision(BaseModel):
+    recommendation_id: str
+    recommendation_type: str
+    manager_id: str
+    client_id: Optional[str] = None
+    conversation_id: Optional[str] = None
+    decision: FeedbackDecision
+    comment: Optional[str] = None
+    selected_variant: Optional[str] = None
+    created_at: datetime
+
+
+class SupervisorDashboardResponse(BaseModel):
+    manager_id: str
+    generated_at: datetime
+    cards: List[SupervisorMetricCard] = Field(default_factory=list)
+    decision_breakdown: List[SupervisorDecisionBreakdown] = Field(default_factory=list)
+    product_distribution: List[SupervisorProductDistribution] = Field(default_factory=list)
+    recent_decisions: List[SupervisorRecentDecision] = Field(default_factory=list)
+    completion_funnel: List[SupervisorFunnelStage] = Field(default_factory=list)

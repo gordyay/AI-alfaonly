@@ -15,7 +15,10 @@ from app.models import (
     AssistantLLMResponse,
     ChannelType,
     GenerateScriptResponse,
+    ObjectionAnalysis,
+    ObjectionType,
     SalesScriptDraft,
+    SalesScriptVariant,
     SummarizeDialogResponse,
 )
 from app.seed_data import seed_mvp_data
@@ -54,9 +57,31 @@ def build_script_response() -> GenerateScriptResponse:
                 "Если удобно, пришлю компактное сравнение и дальше выберем оптимальный сценарий без лишней нагрузки по времени."
             ),
             channel=ChannelType.chat,
+            contact_goal="Поддержать интерес клиента и согласовать follow-up",
+            product_name="Премиальный вклад",
+            tone="soft",
+            follow_up_message="Если удобно, пришлю отдельно совсем короткое сравнение двух сценариев.",
+            next_step="После отправки сравнения предложить удобное окно для короткого контакта.",
+            alternatives=[
+                SalesScriptVariant(
+                    label="Более короткий",
+                    manager_talking_points=["Сразу перейти к сути."],
+                    ready_script="Иван, подготовил краткое сравнение двух спокойных сценариев размещения.",
+                )
+            ],
         ),
         model_name="fake-script-stage6",
         generated_at=datetime(2026, 3, 18, 10, 0, tzinfo=UTC),
+    )
+
+
+def build_objection_analysis() -> ObjectionAnalysis:
+    return ObjectionAnalysis(
+        objection_type=ObjectionType.risk,
+        objection_label="Риск и сохранность капитала",
+        confidence=0.8,
+        evidence=["высокий риск"],
+        customer_intent="Клиент хочет сначала зафиксировать границы по риску.",
     )
 
 
@@ -67,6 +92,7 @@ class FakeAssistantProvider(AIProvider):
         self.summary_contexts: list[dict] = []
         self.script_contexts: list[dict] = []
         self.assistant_contexts: list[dict] = []
+        self.objection_contexts: list[dict] = []
 
     def generate_script(self, context: dict) -> GenerateScriptResponse:
         self.script_contexts.append(context)
@@ -94,8 +120,9 @@ class FakeAssistantProvider(AIProvider):
             action_type=None,
         )
 
-    def classify_objection(self, context: dict) -> dict:
-        raise NotImplementedError
+    def classify_objection(self, context: dict) -> ObjectionAnalysis:
+        self.objection_contexts.append(context)
+        return build_objection_analysis()
 
 
 @dataclass
@@ -203,6 +230,29 @@ async def test_assistant_chat_summary_action_updates_client_summary(assistant_en
 
 
 @pytest.mark.anyio
+async def test_assistant_summary_action_uses_selected_work_item_scope(assistant_env: AssistantTestEnv):
+    thread_response = await assistant_env.client.post(
+        "/assistant/threads",
+        json={"manager_id": "m1", "selected_client_id": "c1"},
+    )
+    thread_id = thread_response.json()["thread"]["id"]
+
+    chat_response = await assistant_env.client.post(
+        "/assistant/chat",
+        json={
+          "manager_id": "m1",
+          "thread_id": thread_id,
+          "message": "Сделай сводку диалога и CRM-заметку",
+          "selected_client_id": "c1",
+          "selected_work_item_id": "task:task-9",
+        },
+    )
+
+    assert chat_response.status_code == 200
+    assert assistant_env.provider.summary_contexts[-1]["conversation"]["id"] == "conv1b"
+
+
+@pytest.mark.anyio
 async def test_assistant_chat_requests_client_context_for_summary_actions(assistant_env: AssistantTestEnv):
     thread_response = await assistant_env.client.post("/assistant/threads", json={"manager_id": "m1"})
     thread_id = thread_response.json()["thread"]["id"]
@@ -244,8 +294,12 @@ async def test_assistant_chat_script_action_returns_persisted_script_payload(ass
     body = chat_response.json()
     assert body["action_result"]["action_type"] == "sales_script"
     assert body["action_result"]["sales_script_draft"]["channel"] == "chat"
+    assert body["action_result"]["sales_script_draft"]["follow_up_message"]
+    assert body["action_result"]["sales_script_draft"]["alternatives"]
     assert assistant_env.provider.script_contexts
     assert assistant_env.provider.script_contexts[0]["instruction"] == "Подготовь скрипт продажи без давления"
+    assert assistant_env.provider.script_contexts[0]["propensity_rankings"]
+    assert assistant_env.provider.script_contexts[0]["objection_workflow"]
 
     detail_response = await assistant_env.client.get(f"/assistant/threads/{thread_id}")
     assert detail_response.status_code == 200
@@ -253,6 +307,36 @@ async def test_assistant_chat_script_action_returns_persisted_script_payload(ass
     assistant_message = messages[-1]
     assert assistant_message["action_payload"]["action_type"] == "sales_script"
     assert assistant_message["action_payload"]["sales_script_draft"]["ready_script"].startswith("Иван")
+
+
+@pytest.mark.anyio
+async def test_assistant_chat_objection_action_returns_workflow_payload(assistant_env: AssistantTestEnv):
+    thread_response = await assistant_env.client.post(
+        "/assistant/threads",
+        json={"manager_id": "m1", "selected_client_id": "c2"},
+    )
+    thread_id = thread_response.json()["thread"]["id"]
+
+    chat_response = await assistant_env.client.post(
+        "/assistant/chat",
+        json={
+            "manager_id": "m1",
+            "thread_id": thread_id,
+            "message": "Как отработать возражение по риску?",
+            "selected_client_id": "c2",
+        },
+    )
+
+    assert chat_response.status_code == 200
+    body = chat_response.json()
+    assert body["action_result"]["action_type"] == "objection_workflow"
+    assert body["action_result"]["objection_workflow_draft"]["analysis"]["objection_type"] == "risk"
+    assert assistant_env.provider.objection_contexts
+
+    detail_response = await assistant_env.client.get(f"/assistant/threads/{thread_id}")
+    assistant_message = detail_response.json()["messages"][-1]
+    assert assistant_message["action_payload"]["action_type"] == "objection_workflow"
+    assert assistant_message["action_payload"]["objection_workflow_draft"]["handling_options"]
 
 
 @pytest.mark.anyio

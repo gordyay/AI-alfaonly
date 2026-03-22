@@ -18,11 +18,14 @@ from app.models import (
     ChannelType,
     GenerateScriptResponse,
     Message,
+    ObjectionAnalysis,
+    ObjectionType,
     SalesScriptDraft,
+    SalesScriptVariant,
     SummarizeDialogResponse,
 )
 from app.seed_data import seed_mvp_data
-from app.services import AIScriptService, AISummaryService, DialogPriorityService
+from app.services import AIScriptService, AISummaryService, DialogPriorityService, ObjectionWorkflowService, ProductPropensityService
 
 
 def build_summary_response() -> SummarizeDialogResponse:
@@ -58,9 +61,36 @@ def build_script_response() -> GenerateScriptResponse:
                 "Если удобно, пришлю компактное сравнение и вместе выберем оптимальный следующий шаг."
             ),
             channel=ChannelType.chat,
+            contact_goal="Отправить компактное сравнение и закрепить следующий шаг",
+            product_name="Премиальный вклад",
+            tone="soft",
+            follow_up_message="Если удобно, могу отдельно прислать совсем короткую рамку по двум сценариям.",
+            next_step="Согласовать удобное окно для follow-up после отправки сравнения.",
+            alternatives=[
+                SalesScriptVariant(
+                    label="Более деловой",
+                    manager_talking_points=["Сразу перейти к выгоде и ликвидности."],
+                    ready_script="Иван, подготовил короткое сравнение по двум спокойным сценариям размещения.",
+                ),
+                SalesScriptVariant(
+                    label="Максимально мягкий",
+                    manager_talking_points=["Не давить и предложить только один следующий шаг."],
+                    ready_script="Иван, если удобно, могу прислать совсем короткую выжимку без лишних деталей.",
+                ),
+            ],
         ),
         model_name="fake-script-stage6",
         generated_at=datetime(2026, 3, 17, 9, 30, tzinfo=UTC),
+    )
+
+
+def build_objection_analysis() -> ObjectionAnalysis:
+    return ObjectionAnalysis(
+        objection_type=ObjectionType.risk,
+        objection_label="Риск и сохранность капитала",
+        confidence=0.82,
+        evidence=["слишком высокий риск", "сохранность капитала"],
+        customer_intent="Не принимать решение без ощущения контроля над риском.",
     )
 
 
@@ -76,6 +106,7 @@ class FakeAIProvider(AIProvider):
         self.contexts: list[dict] = []
         self.script_contexts: list[dict] = []
         self.assistant_contexts: list[dict] = []
+        self.objection_contexts: list[dict] = []
 
     def generate_script(self, context: dict) -> GenerateScriptResponse:
         self.script_contexts.append(context)
@@ -101,8 +132,11 @@ class FakeAIProvider(AIProvider):
             action_type=None,
         )
 
-    def classify_objection(self, context: dict) -> dict:
-        raise NotImplementedError
+    def classify_objection(self, context: dict) -> ObjectionAnalysis:
+        self.objection_contexts.append(context)
+        if self.error:
+            raise self.error
+        return build_objection_analysis()
 
 
 @dataclass
@@ -129,7 +163,7 @@ def test_ai_summary_service_builds_context(tmp_path):
     seed_mvp_data(storage)
     client = storage.get_client("c1")
     assert client is not None
-    conversation = storage.list_client_conversations("c1")[0]
+    conversation = next(item for item in storage.list_client_conversations("c1") if item.id == "conv1")
     recommendation = DialogPriorityService().build_recommendation(client=client, conversation=conversation)
 
     context = AISummaryService().build_context(client=client, conversation=conversation, recommendation=recommendation)
@@ -175,16 +209,24 @@ def test_ai_script_service_builds_context(tmp_path):
     seed_mvp_data(storage)
     client = storage.get_client("c1")
     assert client is not None
-    conversation = storage.list_client_conversations("c1")[0]
+    conversation = next(item for item in storage.list_client_conversations("c1") if item.id == "conv1")
     recommendation = DialogPriorityService().build_recommendation(client=client, conversation=conversation)
     crm_notes = storage.list_client_crm_notes("c1")
 
+    propensity = ProductPropensityService().build_client_propensity(storage=storage, client=client)
+    objection_workflow = ObjectionWorkflowService().build_workflow(
+        provider=FakeAIProvider(),
+        client=client,
+        conversation=conversation,
+    )
     context = AIScriptService().build_context(
         client=client,
         conversation=conversation,
         recommendation=recommendation,
         crm_notes=crm_notes,
         instruction="Подготовь короткий мягкий follow-up без давления.",
+        product_propensities=propensity.items,
+        objection_workflow=objection_workflow.draft,
     )
 
     assert context["client"]["id"] == "c1"
@@ -192,6 +234,47 @@ def test_ai_script_service_builds_context(tmp_path):
     assert context["conversation"]["id"] == conversation.id
     assert context["instruction"] == "Подготовь короткий мягкий follow-up без давления."
     assert len(context["crm_notes"]) <= 3
+    assert context["propensity_rankings"]
+    assert context["objection_workflow"]["analysis"]["objection_type"] == "risk"
+    assert context["script_job"]["preferred_tone"] in {"soft", "consultative", "concise_personal"}
+
+
+def test_product_propensity_service_ranks_products(tmp_path):
+    db_path = tmp_path / "stage7-propensity-context.sqlite3"
+    storage = SQLiteStorage(db_path=db_path)
+    seed_mvp_data(storage)
+    client = storage.get_client("c1")
+    assert client is not None
+
+    response = ProductPropensityService().build_client_propensity(storage=storage, client=client)
+
+    assert response.client_id == "c1"
+    assert len(response.items) >= 3
+    assert response.items[0].score >= response.items[1].score
+    assert {"product_fit", "affordability", "behavioral_signal", "relationship_depth", "portfolio_gap"}.issubset(
+        response.items[0].factors.model_dump().keys()
+    )
+
+
+def test_objection_workflow_service_builds_playbook(tmp_path):
+    db_path = tmp_path / "stage7-objection-context.sqlite3"
+    storage = SQLiteStorage(db_path=db_path)
+    seed_mvp_data(storage)
+    client = storage.get_client("c2")
+    assert client is not None
+    conversation = storage.list_client_conversations("c2")[0]
+    provider = FakeAIProvider()
+
+    response = ObjectionWorkflowService().build_workflow(
+        provider=provider,
+        client=client,
+        conversation=conversation,
+        objection_text="Не хочу заходить в высокий риск.",
+    )
+
+    assert response.draft.analysis.objection_type == ObjectionType.risk
+    assert len(response.draft.handling_options) >= 2
+    assert response.draft.what_not_to_say
 
 
 def test_groq_provider_parses_structured_script_content():
@@ -390,19 +473,20 @@ async def test_ai_summarize_dialog_returns_structured_draft(ai_env: AITestEnv):
     assert response.status_code == 200
     body = response.json()
     assert body["draft"]["outcome"] == "follow_up"
+    assert body["draft"]["grounding_facts"]
     assert body["model_name"] == "fake-llama-stage3"
     assert ai_env.provider.contexts
     assert ai_env.provider.contexts[0]["client"]["id"] == "c1"
     assert ai_env.provider.contexts[0]["conversation"]["id"] == conversation_id
 
-    refreshed_detail = await ai_env.client.get("/client/c1")
+    refreshed_detail = await ai_env.client.get("/client/c1?work_item_id=task:task-2")
     assert refreshed_detail.status_code == 200
     assert refreshed_detail.json()["client"]["ai_summary_text"] == body["draft"]["contact_summary"]
 
     activity_log_response = await ai_env.client.get("/client/c1/activity-log")
     assert activity_log_response.status_code == 200
     items = activity_log_response.json()["items"]
-    assert {("mini_summary", "generated"), ("crm_note_draft", "generated")}.issubset(
+    assert {("mini_summary", "summary_generated"), ("crm_note_draft", "crm_draft_generated")}.issubset(
         {(item["recommendation_type"], item["action"]) for item in items}
     )
 
@@ -479,25 +563,28 @@ async def test_generate_draft_then_save_crm_note_persists_ai_metadata(ai_env: AI
     assert created_note["source_conversation_id"] == conversation_id
     assert created_note["ai_generated"] is True
 
-    refreshed_detail = await ai_env.client.get("/client/c1")
+    refreshed_detail = await ai_env.client.get("/client/c1?work_item_id=task:task-9")
     assert refreshed_detail.status_code == 200
     latest_note = refreshed_detail.json()["crm_notes"][0]
+    latest_revision = refreshed_detail.json()["crm_draft_history"][0]
     assert latest_note["summary_text"] == draft["contact_summary"]
     assert latest_note["source_conversation_id"] == conversation_id
     assert latest_note["ai_generated"] is True
     assert latest_note["ai_draft_payload"]["contact_summary"] == draft["contact_summary"]
     assert refreshed_detail.json()["saved_ai_draft"]["crm_note_draft"] == draft["crm_note_draft"]
+    assert latest_revision["stage"] == "manager_finalized"
+    assert latest_revision["changed_fields"] == []
 
     activity_log_response = await ai_env.client.get("/client/c1/activity-log")
     assert activity_log_response.status_code == 200
     activity_pairs = {(item["recommendation_type"], item["action"]) for item in activity_log_response.json()["items"]}
-    assert ("crm_note", "saved") in activity_pairs
+    assert ("crm_note", "crm_note_saved") in activity_pairs
 
 
 @pytest.mark.anyio
 async def test_ai_generate_script_returns_structured_draft(ai_env: AITestEnv):
-    detail_response = await ai_env.client.get("/client/c1")
-    conversation_id = detail_response.json()["conversations"][0]["id"]
+    detail_response = await ai_env.client.get("/client/c1?work_item_id=task:task-2")
+    conversation_id = detail_response.json()["selected_conversation_id"]
 
     response = await ai_env.client.post(
         "/ai/generate-script",
@@ -512,14 +599,46 @@ async def test_ai_generate_script_returns_structured_draft(ai_env: AITestEnv):
     body = response.json()
     assert body["draft"]["channel"] == "chat"
     assert body["draft"]["ready_script"].startswith("Иван")
+    assert body["draft"]["grounding_facts"]
+    assert body["artifact_id"]
     assert ai_env.provider.script_contexts
     assert ai_env.provider.script_contexts[0]["instruction"] == "Подготовь короткий скрипт продажи без давления."
 
+    refreshed_detail = await ai_env.client.get("/client/c1?work_item_id=task:task-2")
+    assert refreshed_detail.status_code == 200
+    assert refreshed_detail.json()["script_history"][0]["id"] == body["artifact_id"]
+
     activity_log_response = await ai_env.client.get("/client/c1/activity-log")
     assert activity_log_response.status_code == 200
-    assert ("sales_script", "generated") in {
+    assert ("sales_script", "script_generated") in {
         (item["recommendation_type"], item["action"]) for item in activity_log_response.json()["items"]
     }
+
+
+@pytest.mark.anyio
+async def test_objection_workflow_response_contains_grounding_facts(ai_env: AITestEnv):
+    detail_response = await ai_env.client.get("/client/c2")
+    conversation_id = detail_response.json()["conversations"][0]["id"]
+
+    response = await ai_env.client.post(
+        "/ai/objection-workflow",
+        json={
+            "client_id": "c2",
+            "conversation_id": conversation_id,
+            "manager_id": "m1",
+            "objection_text": "Меня беспокоит риск.",
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["draft"]["grounding_facts"]
+    assert "data_gaps" in body["draft"]
+    assert body["artifact_id"]
+
+    refreshed_detail = await ai_env.client.get("/client/c2")
+    assert refreshed_detail.status_code == 200
+    assert refreshed_detail.json()["objection_history"][0]["id"] == body["artifact_id"]
 
 
 @pytest.mark.anyio
@@ -531,3 +650,47 @@ async def test_ai_generate_script_returns_404_for_unknown_conversation(ai_env: A
 
     assert response.status_code == 404
     assert response.json()["detail"] == "Conversation not found"
+
+
+@pytest.mark.anyio
+async def test_script_selection_and_objection_selection_are_persisted(ai_env: AITestEnv):
+    detail_response = await ai_env.client.get("/client/c1?work_item_id=task:task-2")
+    conversation_id = detail_response.json()["selected_conversation_id"]
+
+    script_response = await ai_env.client.post(
+        "/ai/generate-script",
+        json={"client_id": "c1", "conversation_id": conversation_id},
+    )
+    assert script_response.status_code == 200
+    script_artifact_id = script_response.json()["artifact_id"]
+    await ai_env.client.post(
+        "/ai/script-selection",
+        json={
+            "artifact_id": script_artifact_id,
+            "manager_id": "m1",
+            "variant_label": "main",
+            "selected_text": script_response.json()["draft"]["ready_script"],
+        },
+    )
+
+    objection_response = await ai_env.client.post(
+        "/ai/objection-workflow",
+        json={"client_id": "c1", "conversation_id": conversation_id, "objection_text": "Не хочу рисковать"},
+    )
+    assert objection_response.status_code == 200
+    objection_artifact_id = objection_response.json()["artifact_id"]
+    first_option = objection_response.json()["draft"]["handling_options"][0]
+    await ai_env.client.post(
+        "/ai/objection-selection",
+        json={
+            "artifact_id": objection_artifact_id,
+            "manager_id": "m1",
+            "option_title": first_option["title"],
+            "selected_response": first_option["response"],
+        },
+    )
+
+    refreshed_detail = await ai_env.client.get("/client/c1?work_item_id=task:task-2")
+    assert refreshed_detail.status_code == 200
+    assert refreshed_detail.json()["script_history"][0]["selected_variant_label"] == "main"
+    assert refreshed_detail.json()["objection_history"][0]["selected_option_title"] == first_option["title"]

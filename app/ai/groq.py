@@ -12,6 +12,8 @@ from ..models import (
     AISummaryDraft,
     AssistantLLMResponse,
     GenerateScriptResponse,
+    ObjectionAnalysis,
+    ObjectionWorkflowDraft,
     SalesScriptDraft,
     SummarizeDialogResponse,
 )
@@ -115,8 +117,35 @@ class GroqProvider(AIProvider):
             generated_at=utc_now(),
         )
 
-    def classify_objection(self, context: dict[str, Any]) -> dict[str, Any]:
-        raise NotImplementedError("Groq objection classification will be wired in Stage 3.")
+    def classify_objection(self, context: dict[str, Any]) -> ObjectionAnalysis:
+        if not self.settings.api_key:
+            raise AIProviderError(
+                "GROQ_API_KEY is not configured. Set it before starting the server, for example: export GROQ_API_KEY=..."
+            )
+
+        messages = self.build_objection_messages(context)
+        response_format = self.build_objection_response_format()
+
+        try:
+            client = self._create_client()
+            content, _model_name = self._request_summary_content(
+                client=client,
+                messages=messages,
+                response_format=response_format,
+            )
+            try:
+                return self.parse_objection_content(content)
+            except AIProviderError:
+                repaired_content, _repair_model_name = self._repair_objection_content(
+                    client=client,
+                    invalid_content=content,
+                    response_format=response_format,
+                )
+                return self.parse_objection_content(repaired_content)
+        except AIProviderError:
+            raise
+        except Exception as exc:
+            raise AIProviderError(self._build_friendly_provider_error(exc)) from exc
 
     def assistant_chat(self, context: dict[str, Any]) -> AssistantLLMResponse:
         if not self.settings.api_key:
@@ -224,6 +253,19 @@ class GroqProvider(AIProvider):
 
         return {"type": "json_object"}
 
+    def build_objection_response_format(self) -> dict[str, Any] | None:
+        if self._supports_json_schema(self.settings.model):
+            return {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "objection_analysis",
+                    "strict": self._supports_strict_json_schema(self.settings.model),
+                    "schema": ObjectionAnalysis.model_json_schema(),
+                },
+            }
+
+        return {"type": "json_object"}
+
     @staticmethod
     def build_repair_messages(invalid_content: str) -> list[dict[str, str]]:
         system_prompt = (
@@ -289,6 +331,7 @@ class GroqProvider(AIProvider):
             "Если есть сигнал keep_message_short, делай короткий готовый текст. "
             "Если канал chat, верни готовое сообщение клиенту. "
             "Если канал call или meeting, верни короткий spoken-script или opener. "
+            "Верни основной вариант, короткий follow-up, следующий шаг и минимум два альтернативных варианта. "
             "Верни только JSON без markdown и без дополнительных комментариев."
         )
         user_prompt = (
@@ -297,7 +340,38 @@ class GroqProvider(AIProvider):
             "{\n"
             '  "manager_talking_points": ["string"],\n'
             '  "ready_script": "string",\n'
-            '  "channel": "chat | call | meeting"\n'
+            '  "channel": "chat | call | meeting",\n'
+            '  "contact_goal": "string or null",\n'
+            '  "product_name": "string or null",\n'
+            '  "tone": "string or null",\n'
+            '  "follow_up_message": "string or null",\n'
+            '  "next_step": "string or null",\n'
+            '  "alternatives": [{"label": "string", "manager_talking_points": ["string"], "ready_script": "string"}]\n'
+            "}\n\n"
+            f"{json.dumps(context, ensure_ascii=False, indent=2)}"
+        )
+        return [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+
+    @staticmethod
+    def build_objection_messages(context: dict[str, Any]) -> list[dict[str, str]]:
+        system_prompt = (
+            "Ты помогаешь персональному менеджеру Alfa Only классифицировать возражение клиента. "
+            "Определи один доминирующий тип возражения только по переданному контексту. "
+            "Не выдумывай факты и не смешивай несколько типов без необходимости. "
+            "Верни только JSON."
+        )
+        user_prompt = (
+            "Классифицируй возражение клиента.\n\n"
+            "Формат JSON:\n"
+            "{\n"
+            '  "objection_type": "price | risk | timing | trust | complexity | no_need | other",\n'
+            '  "objection_label": "string",\n'
+            '  "confidence": 0.0,\n'
+            '  "evidence": ["string"],\n'
+            '  "customer_intent": "string or null"\n'
             "}\n\n"
             f"{json.dumps(context, ensure_ascii=False, indent=2)}"
         )
@@ -340,7 +414,36 @@ class GroqProvider(AIProvider):
             "{\n"
             '  "manager_talking_points": ["string"],\n'
             '  "ready_script": "string",\n'
-            '  "channel": "chat | call | meeting"\n'
+            '  "channel": "chat | call | meeting",\n'
+            '  "contact_goal": "string or null",\n'
+            '  "product_name": "string or null",\n'
+            '  "tone": "string or null",\n'
+            '  "follow_up_message": "string or null",\n'
+            '  "next_step": "string or null",\n'
+            '  "alternatives": [{"label": "string", "manager_talking_points": ["string"], "ready_script": "string"}]\n'
+            "}\n\n"
+            "Исходный ответ модели:\n"
+            f"{invalid_content[:6000]}"
+        )
+        return [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+
+    @staticmethod
+    def build_objection_repair_messages(invalid_content: str) -> list[dict[str, str]]:
+        system_prompt = (
+            "Ты исправляешь JSON-ответ AI для objection classification в Alfa Only. "
+            "Верни только валидный JSON без markdown и комментариев."
+        )
+        user_prompt = (
+            "Исправь этот JSON так, чтобы он соответствовал схеме:\n"
+            "{\n"
+            '  "objection_type": "price | risk | timing | trust | complexity | no_need | other",\n'
+            '  "objection_label": "string",\n'
+            '  "confidence": 0.0,\n'
+            '  "evidence": ["string"],\n'
+            '  "customer_intent": "string or null"\n'
             "}\n\n"
             "Исходный ответ модели:\n"
             f"{invalid_content[:6000]}"
@@ -385,6 +488,18 @@ class GroqProvider(AIProvider):
             return SalesScriptDraft.model_validate(payload)
         except ValidationError as exc:
             raise AIProviderError("Groq returned invalid structured sales script payload.") from exc
+
+    @staticmethod
+    def parse_objection_content(content: str) -> ObjectionAnalysis:
+        try:
+            payload = json.loads(content)
+        except json.JSONDecodeError as exc:
+            raise AIProviderError("Groq returned invalid JSON for objection classification.") from exc
+
+        try:
+            return ObjectionAnalysis.model_validate(payload)
+        except ValidationError as exc:
+            raise AIProviderError("Groq returned invalid structured objection payload.") from exc
 
     @staticmethod
     def _extract_message_content(response: Any) -> str:
@@ -480,6 +595,23 @@ class GroqProvider(AIProvider):
         except Exception as exc:
             raise AIProviderError(
                 "Модель вернула некорректный sales script, и автоматическое исправление не помогло. Попробуйте еще раз."
+            ) from exc
+
+    def _repair_objection_content(
+        self,
+        client: Any,
+        invalid_content: str,
+        response_format: dict[str, Any] | None,
+    ) -> tuple[str, str]:
+        try:
+            return self._request_summary_content(
+                client=client,
+                messages=self.build_objection_repair_messages(invalid_content),
+                response_format=response_format,
+            )
+        except Exception as exc:
+            raise AIProviderError(
+                "Модель вернула некорректную классификацию возражения, и автоматическое исправление не помогло."
             ) from exc
 
     def _create_client(self) -> Any:

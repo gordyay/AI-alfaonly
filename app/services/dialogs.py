@@ -51,10 +51,11 @@ class DialogPriorityService:
     ) -> list[DialogFeedItem]:
         reference_now = now or utc_now()
         items: list[DialogFeedItem] = []
+        clients = storage.list_clients(manager_id=manager_id)
+        latest_conversations = storage.list_latest_conversations([client.id for client in clients])
 
-        for client in storage.list_clients(manager_id=manager_id):
-            conversations = storage.list_client_conversations(client.id)
-            latest_conversation = conversations[0] if conversations else None
+        for client in clients:
+            latest_conversation = latest_conversations.get(client.id)
             if latest_conversation is None:
                 continue
 

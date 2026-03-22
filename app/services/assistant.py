@@ -17,7 +17,10 @@ from ..models import (
 from .ai_script import AIScriptService
 from .ai_summary import AISummaryService
 from .assistant_kb import AssistantKnowledgeService
+from .cockpit import ManagerCockpitService
 from .dialogs import DialogPriorityService
+from .objections import ObjectionWorkflowService
+from .propensity import ProductPropensityService
 
 
 THREAD_MEMORY_TRIGGER = 12
@@ -63,10 +66,14 @@ class AssistantService:
         dialog_service: DialogPriorityService,
         ai_summary_service: AISummaryService,
         ai_script_service: AIScriptService,
+        propensity_service: ProductPropensityService,
+        objection_service: ObjectionWorkflowService,
         manager_id: str,
         thread_id: str,
         message: str,
         selected_client_id: str | None = None,
+        selected_work_item_id: str | None = None,
+        cockpit_service: ManagerCockpitService | None = None,
         log_activity,
     ) -> AssistantChatResponse:
         thread = storage.get_assistant_thread(thread_id)
@@ -103,6 +110,8 @@ class AssistantService:
                     manager_id=manager_id,
                     thread_id=thread.id,
                     selected_client_id=selected_client_id,
+                    selected_work_item_id=selected_work_item_id,
+                    cockpit_service=cockpit_service,
                     log_activity=log_activity,
                 )
             elif self._is_script_request(message):
@@ -111,10 +120,27 @@ class AssistantService:
                     provider=provider,
                     ai_script_service=ai_script_service,
                     dialog_service=dialog_service,
+                    propensity_service=propensity_service,
+                    objection_service=objection_service,
                     manager_id=manager_id,
                     thread_id=thread.id,
                     selected_client_id=selected_client_id,
+                    selected_work_item_id=selected_work_item_id,
+                    cockpit_service=cockpit_service,
                     instruction=message,
+                    log_activity=log_activity,
+                )
+            elif self._is_objection_request(message):
+                assistant_message, action_result = self._run_objection_action(
+                    storage=storage,
+                    provider=provider,
+                    objection_service=objection_service,
+                    manager_id=manager_id,
+                    thread_id=thread.id,
+                    selected_client_id=selected_client_id,
+                    selected_work_item_id=selected_work_item_id,
+                    cockpit_service=cockpit_service,
+                    objection_text=message,
                     log_activity=log_activity,
                 )
             else:
@@ -129,13 +155,22 @@ class AssistantService:
                 )
         except AIProviderError as exc:
             conversation_id = None
+            recommendation_id = None
             if selected_client_id:
-                conversations = storage.list_client_conversations(selected_client_id)
-                conversation_id = conversations[0].id if conversations else None
+                _, work_item, conversation = self._resolve_case_scope(
+                    storage=storage,
+                    cockpit_service=cockpit_service,
+                    manager_id=manager_id,
+                    client_id=selected_client_id,
+                    selected_work_item_id=selected_work_item_id,
+                )
+                recommendation_id = work_item.recommendation_id if work_item else None
+                conversation_id = conversation.id if conversation else None
                 if self._is_summary_or_crm_action(message):
                     log_activity(
                         recommendation_type="mini_summary",
                         client_id=selected_client_id,
+                        recommendation_id=recommendation_id,
                         conversation_id=conversation_id,
                         manager_id=manager_id,
                         action="generation_failed",
@@ -144,6 +179,7 @@ class AssistantService:
                     log_activity(
                         recommendation_type="crm_note_draft",
                         client_id=selected_client_id,
+                        recommendation_id=recommendation_id,
                         conversation_id=conversation_id,
                         manager_id=manager_id,
                         action="generation_failed",
@@ -153,6 +189,17 @@ class AssistantService:
                     log_activity(
                         recommendation_type="sales_script",
                         client_id=selected_client_id,
+                        recommendation_id=recommendation_id,
+                        conversation_id=conversation_id,
+                        manager_id=manager_id,
+                        action="generation_failed",
+                        payload_excerpt=str(exc),
+                    )
+                elif self._is_objection_request(message):
+                    log_activity(
+                        recommendation_type="objection_workflow",
+                        client_id=selected_client_id,
+                        recommendation_id=recommendation_id,
                         conversation_id=conversation_id,
                         manager_id=manager_id,
                         action="generation_failed",
@@ -207,6 +254,8 @@ class AssistantService:
         manager_id: str,
         thread_id: str,
         selected_client_id: str | None,
+        selected_work_item_id: str | None,
+        cockpit_service: ManagerCockpitService | None,
         log_activity,
     ) -> tuple[AssistantMessageRecord, AssistantActionResult | None]:
         if not selected_client_id:
@@ -221,7 +270,13 @@ class AssistantService:
             )
             return message, None
 
-        client = storage.get_client(selected_client_id)
+        client, work_item, conversation = self._resolve_case_scope(
+            storage=storage,
+            cockpit_service=cockpit_service,
+            manager_id=manager_id,
+            client_id=selected_client_id,
+            selected_work_item_id=selected_work_item_id,
+        )
         if client is None:
             message = AssistantMessageRecord(
                 id=str(uuid4()),
@@ -234,14 +289,12 @@ class AssistantService:
             )
             return message, None
 
-        conversations = storage.list_client_conversations(client.id)
-        conversation = conversations[0] if conversations else None
         if conversation is None:
             message = AssistantMessageRecord(
                 id=str(uuid4()),
                 thread_id=thread_id,
                 role=AssistantMessageRole.assistant,
-                content="У клиента нет активного диалога, поэтому собрать сводку сейчас нельзя.",
+                content="У выбранного кейса нет привязанной коммуникации, поэтому собрать сводку сейчас нельзя.",
                 citations=[],
                 used_context=[],
                 created_at=utc_now(),
@@ -264,6 +317,7 @@ class AssistantService:
         log_activity(
             recommendation_type="mini_summary",
             client_id=client.id,
+            recommendation_id=work_item.recommendation_id if work_item else None,
             conversation_id=conversation.id,
             manager_id=manager_id,
             action="generated",
@@ -272,6 +326,7 @@ class AssistantService:
         log_activity(
             recommendation_type="crm_note_draft",
             client_id=client.id,
+            recommendation_id=work_item.recommendation_id if work_item else None,
             conversation_id=conversation.id,
             manager_id=manager_id,
             action="generated",
@@ -307,9 +362,13 @@ class AssistantService:
         provider: AIProvider,
         ai_script_service: AIScriptService,
         dialog_service: DialogPriorityService,
+        propensity_service: ProductPropensityService,
+        objection_service: ObjectionWorkflowService,
         manager_id: str,
         thread_id: str,
         selected_client_id: str | None,
+        selected_work_item_id: str | None,
+        cockpit_service: ManagerCockpitService | None,
         instruction: str,
         log_activity,
     ) -> tuple[AssistantMessageRecord, AssistantActionResult | None]:
@@ -325,7 +384,13 @@ class AssistantService:
             )
             return message, None
 
-        client = storage.get_client(selected_client_id)
+        client, work_item, conversation = self._resolve_case_scope(
+            storage=storage,
+            cockpit_service=cockpit_service,
+            manager_id=manager_id,
+            client_id=selected_client_id,
+            selected_work_item_id=selected_work_item_id,
+        )
         if client is None:
             message = AssistantMessageRecord(
                 id=str(uuid4()),
@@ -338,14 +403,12 @@ class AssistantService:
             )
             return message, None
 
-        conversations = storage.list_client_conversations(client.id)
-        conversation = conversations[0] if conversations else None
         if conversation is None:
             message = AssistantMessageRecord(
                 id=str(uuid4()),
                 thread_id=thread_id,
                 role=AssistantMessageRole.assistant,
-                content="У клиента нет активного диалога, поэтому собрать скрипт сейчас нельзя.",
+                content="У выбранного кейса нет привязанной коммуникации, поэтому собрать скрипт сейчас нельзя.",
                 citations=[],
                 used_context=[],
                 created_at=utc_now(),
@@ -354,6 +417,12 @@ class AssistantService:
 
         recommendation = dialog_service.build_recommendation(client=client, conversation=conversation)
         crm_notes = storage.list_client_crm_notes(client.id)
+        product_propensity = propensity_service.build_client_propensity(storage=storage, client=client)
+        objection_workflow = objection_service.build_workflow(
+            provider=provider,
+            client=client,
+            conversation=conversation,
+        )
         result = ai_script_service.generate_script(
             provider=provider,
             client=client,
@@ -361,10 +430,13 @@ class AssistantService:
             recommendation=recommendation,
             crm_notes=crm_notes,
             instruction=instruction,
+            product_propensities=product_propensity.items,
+            objection_workflow=objection_workflow.draft,
         )
         log_activity(
             recommendation_type="sales_script",
             client_id=client.id,
+            recommendation_id=work_item.recommendation_id if work_item else None,
             conversation_id=conversation.id,
             manager_id=manager_id,
             action="generated",
@@ -393,6 +465,133 @@ class AssistantService:
             note="Скрипт сохранен в истории ассистента.",
         )
         return assistant_message, action_result
+
+    def _run_objection_action(
+        self,
+        *,
+        storage: SQLiteStorage,
+        provider: AIProvider,
+        objection_service: ObjectionWorkflowService,
+        manager_id: str,
+        thread_id: str,
+        selected_client_id: str | None,
+        selected_work_item_id: str | None,
+        cockpit_service: ManagerCockpitService | None,
+        objection_text: str,
+        log_activity,
+    ) -> tuple[AssistantMessageRecord, AssistantActionResult | None]:
+        if not selected_client_id:
+            message = AssistantMessageRecord(
+                id=str(uuid4()),
+                thread_id=thread_id,
+                role=AssistantMessageRole.assistant,
+                content="Чтобы отработать возражение, сначала откройте клиента в основном окне.",
+                citations=[],
+                used_context=[],
+                created_at=utc_now(),
+            )
+            return message, None
+
+        client, work_item, conversation = self._resolve_case_scope(
+            storage=storage,
+            cockpit_service=cockpit_service,
+            manager_id=manager_id,
+            client_id=selected_client_id,
+            selected_work_item_id=selected_work_item_id,
+        )
+        if client is None:
+            message = AssistantMessageRecord(
+                id=str(uuid4()),
+                thread_id=thread_id,
+                role=AssistantMessageRole.assistant,
+                content="Не удалось найти выбранного клиента. Откройте его заново и повторите запрос.",
+                citations=[],
+                used_context=[],
+                created_at=utc_now(),
+            )
+            return message, None
+
+        if conversation is None:
+            message = AssistantMessageRecord(
+                id=str(uuid4()),
+                thread_id=thread_id,
+                role=AssistantMessageRole.assistant,
+                content="У выбранного кейса нет привязанной коммуникации, поэтому разбор возражения сейчас собрать нельзя.",
+                citations=[],
+                used_context=[],
+                created_at=utc_now(),
+            )
+            return message, None
+
+        result = objection_service.build_workflow(
+            provider=provider,
+            client=client,
+            conversation=conversation,
+            objection_text=objection_text,
+        )
+        log_activity(
+            recommendation_type="objection_workflow",
+            client_id=client.id,
+            recommendation_id=work_item.recommendation_id if work_item else None,
+            conversation_id=conversation.id,
+            manager_id=manager_id,
+            action="generated",
+            payload_excerpt=result.draft.analysis.objection_label,
+        )
+
+        used_context = self._build_client_used_context(storage, manager_id, client.id)
+        assistant_message = AssistantMessageRecord(
+            id=str(uuid4()),
+            thread_id=thread_id,
+            role=AssistantMessageRole.assistant,
+            content=f"Собрал разбор возражения по клиенту {client.full_name}.",
+            citations=used_context[:2],
+            used_context=used_context,
+            action_payload=AssistantMessageActionPayload(
+                action_type="objection_workflow",
+                objection_workflow_draft=result.draft,
+            ),
+            created_at=utc_now(),
+        )
+        action_result = AssistantActionResult(
+            action_type="objection_workflow",
+            client_id=client.id,
+            conversation_id=conversation.id,
+            objection_workflow_draft=result.draft,
+            note="Варианты отработки сохранены в истории ассистента.",
+        )
+        return assistant_message, action_result
+
+    @staticmethod
+    def _resolve_case_scope(
+        *,
+        storage: SQLiteStorage,
+        cockpit_service: ManagerCockpitService | None,
+        manager_id: str,
+        client_id: str,
+        selected_work_item_id: str | None,
+    ):
+        client = storage.get_client(client_id)
+        if client is None:
+            return None, None, None
+
+        work_item = None
+        if cockpit_service is not None:
+            cockpit = cockpit_service.build_manager_cockpit(storage=storage, manager_id=manager_id)
+            client_items = [item for item in cockpit.work_queue if item.client_id == client_id]
+            work_item = (
+                next((item for item in client_items if item.id == selected_work_item_id), None)
+                if selected_work_item_id
+                else None
+            ) or (client_items[0] if client_items else None)
+
+        conversations = storage.list_client_conversations(client_id)
+        conversation = (
+            next((item for item in conversations if item.id == work_item.conversation_id), None)
+            if work_item and work_item.conversation_id
+            else None
+        )
+        return client, work_item, conversation
 
     def _run_knowledge_chat(
         self,
@@ -445,6 +644,7 @@ class AssistantService:
                     "Сделай сводку диалога",
                     "Собери CRM-заметку",
                     "Подготовь скрипт продажи",
+                    "Как отработать возражение?",
                     "Сделай мягкий follow-up",
                     "Как ответить клиенту?",
                     "Что важно по клиенту?",
@@ -495,6 +695,22 @@ class AssistantService:
                 "сообщение клиенту",
                 "оффер",
                 "мягкий follow",
+            ]
+        )
+
+    @staticmethod
+    def _is_objection_request(message: str) -> bool:
+        lowered = message.lower()
+        return any(
+            token in lowered
+            for token in [
+                "возражен",
+                "как отработать",
+                "сомнен",
+                "дорого",
+                "не сейчас",
+                "слишком риск",
+                "что не говорить",
             ]
         )
 
