@@ -4,6 +4,14 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+# Load project-local environment variables for demo runs.
+if [[ -f "$ROOT_DIR/.env" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "$ROOT_DIR/.env"
+  set +a
+fi
+
 export APP_DB_PATH="${APP_DB_PATH:-app/data/demo.sqlite3}"
 export PORT="${PORT:-8000}"
 

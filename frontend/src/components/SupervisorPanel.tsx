@@ -49,12 +49,9 @@ export function SupervisorPanel({ dashboard }: SupervisorPanelProps) {
   }
 
   return (
-    <section className="panel supervisor-panel">
+    <section className="panel supervisor-panel" data-tour="supervisor">
       <header className="panel__header">
-        <div>
-          <p className="panel__eyebrow">Контроль и эффект</p>
-          <h2>Сводка по использованию и качеству решений</h2>
-        </div>
+        <h2>Метрики использования</h2>
         <div className="button-row">
           <button className="ghost-button" type="button" onClick={() => setExpanded((current) => !current)}>
             {expanded ? "Свернуть аналитику" : "Показать аналитику"}

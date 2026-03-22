@@ -1,8 +1,19 @@
 export type SortMode = "priority" | "due_at";
-export type ViewTab = "summary" | "script" | "objections" | "crm" | "profile" | "portfolio";
+export type AppMode = "inbox" | "case" | "analytics";
+export type ViewTab = "overview" | "actions" | "crm" | "client";
 export type WorkItemType = "task" | "communication" | "opportunity";
 export type RecommendationStatus = "pending" | "accepted" | "rejected" | "edited";
 export type AssistantRole = "user" | "assistant" | "tool";
+export type ReplySource = "manual" | "script" | "objection" | "assistant";
+export type AssistantMode = "case" | "global";
+export type AssistantTaskKind =
+  | "summary_crm"
+  | "sales_script"
+  | "objection_workflow"
+  | "reply_draft"
+  | "client_qa"
+  | "general_qa";
+export type AssistantStage = "launcher" | "preview" | "applied";
 
 export interface WorkItemFactorBreakdown {
   urgency: number;
@@ -42,6 +53,8 @@ export interface WorkItem {
   product_code?: string | null;
   product_name?: string | null;
   client_churn_risk?: string | null;
+  case_id?: string | null;
+  source_interaction_id?: string | null;
 }
 
 export interface CockpitSection {
@@ -128,6 +141,36 @@ export interface Conversation {
   started_at: string;
   messages: Message[];
   insights?: ConversationInsights | null;
+}
+
+export interface CaseInteraction {
+  id: string;
+  case_id: string;
+  client_id: string;
+  channel: string;
+  title: string;
+  started_at: string;
+  summary: string;
+  outcome?: string | null;
+  next_step?: string | null;
+  is_text_based: boolean;
+  message_count: number;
+  last_activity_at?: string | null;
+  messages: Message[];
+  insights?: ConversationInsights | null;
+}
+
+export interface CaseTimelineEvent {
+  id: string;
+  case_id: string;
+  interaction_id: string;
+  channel: string;
+  event_type: string;
+  created_at: string;
+  title: string;
+  text: string;
+  sender?: string | null;
+  is_outbound: boolean;
 }
 
 export interface ProductPropensityFactors {
@@ -249,6 +292,8 @@ export interface ScriptGenerationRecord {
   manager_id: string;
   recommendation_id?: string | null;
   conversation_id?: string | null;
+  case_id?: string | null;
+  source_interaction_id?: string | null;
   contact_goal?: string | null;
   selected_variant_label?: string | null;
   selected_text?: string | null;
@@ -263,6 +308,8 @@ export interface ObjectionWorkflowRecord {
   manager_id: string;
   recommendation_id?: string | null;
   conversation_id?: string | null;
+  case_id?: string | null;
+  source_interaction_id?: string | null;
   selected_option_title?: string | null;
   selected_response?: string | null;
   draft: ObjectionWorkflowDraft;
@@ -276,6 +323,8 @@ export interface CRMDraftRevision {
   manager_id: string;
   recommendation_id?: string | null;
   conversation_id?: string | null;
+  case_id?: string | null;
+  source_interaction_id?: string | null;
   stage: string;
   changed_fields: string[];
   draft: AISummaryDraft;
@@ -293,8 +342,10 @@ export interface AssistantCitation {
 
 export interface AssistantMessageActionPayload {
   action_type: string;
+  summary_draft?: AISummaryDraft | null;
   sales_script_draft?: SalesScriptDraft | null;
   objection_workflow_draft?: ObjectionWorkflowDraft | null;
+  reply_draft_text?: string | null;
 }
 
 export interface AssistantMessageRecord {
@@ -312,6 +363,11 @@ export interface AssistantThread {
   id: string;
   manager_id: string;
   title: string;
+  scope_kind?: AssistantMode;
+  client_id?: string | null;
+  work_item_id?: string | null;
+  interaction_id?: string | null;
+  task_kind?: AssistantTaskKind | null;
   last_selected_client_id?: string | null;
   memory_summary?: string | null;
   created_at: string;
@@ -325,19 +381,51 @@ export interface AssistantThreadDetail {
 
 export interface AssistantActionResult {
   action_type: string;
+  task_kind?: AssistantTaskKind | null;
   client_id?: string | null;
   conversation_id?: string | null;
+  case_id?: string | null;
+  source_interaction_id?: string | null;
   draft?: AISummaryDraft | null;
   sales_script_draft?: SalesScriptDraft | null;
   objection_workflow_draft?: ObjectionWorkflowDraft | null;
+  reply_draft_text?: string | null;
   note?: string | null;
 }
 
+export interface AssistantPreviewChoice {
+  id: string;
+  title: string;
+  text: string;
+  helper_text?: string | null;
+}
+
+export interface AssistantPreview {
+  task_kind: AssistantTaskKind;
+  title: string;
+  summary: string;
+  target_tab?: ViewTab | null;
+  can_apply: boolean;
+  requires_choice: boolean;
+  choices: AssistantPreviewChoice[];
+  payload: Record<string, unknown>;
+}
+
 export interface AssistantChatResponse {
-  thread: AssistantThread;
+  session: AssistantThread;
   assistant_message: AssistantMessageRecord;
   citations: AssistantCitation[];
   used_context: AssistantCitation[];
+  preview?: AssistantPreview | null;
+  action_result?: AssistantActionResult | null;
+}
+
+export interface AssistantApplyResponse {
+  session: AssistantThread;
+  applied: boolean;
+  task_kind: AssistantTaskKind;
+  target_tab?: ViewTab | null;
+  message: string;
   action_result?: AssistantActionResult | null;
 }
 
@@ -356,9 +444,19 @@ export interface CRMNote {
   follow_up_reason?: string | null;
   summary_text?: string | null;
   source_conversation_id?: string | null;
+  case_id?: string | null;
+  source_interaction_id?: string | null;
   ai_generated: boolean;
   ai_draft_payload?: AISummaryDraft | null;
+  note_type?: "crm_summary" | "outbound_reply";
+  outbound_message_text?: string | null;
   created_at: string;
+}
+
+export interface ClientReplyResponse {
+  message: Message;
+  crm_note: CRMNote;
+  activity_log_entry: ActivityLogEntry;
 }
 
 export interface GeneratedArtifact {
@@ -370,6 +468,8 @@ export interface GeneratedArtifact {
   created_at: string;
   source_conversation_id?: string | null;
   source_task_id?: string | null;
+  case_id?: string | null;
+  source_interaction_id?: string | null;
 }
 
 export interface RecommendationFeedbackRecord {
@@ -379,6 +479,8 @@ export interface RecommendationFeedbackRecord {
   recommendation_type: string;
   client_id?: string | null;
   conversation_id?: string | null;
+  case_id?: string | null;
+  source_interaction_id?: string | null;
   decision: RecommendationStatus;
   comment?: string | null;
   selected_variant?: string | null;
@@ -391,6 +493,8 @@ export interface ActivityLogEntry {
   client_id: string;
   recommendation_id?: string | null;
   conversation_id?: string | null;
+  case_id?: string | null;
+  source_interaction_id?: string | null;
   manager_id: string;
   action: string;
   decision?: string | null;
@@ -410,11 +514,12 @@ export interface FollowUp {
 
 export interface ClientDetailResponse {
   client: Client;
+  case_id: string;
   tasks: Array<Record<string, unknown>>;
-  conversations: Conversation[];
+  interactions: CaseInteraction[];
+  timeline: CaseTimelineEvent[];
   selected_work_item_id?: string | null;
-  selected_conversation_id?: string | null;
-  dialog_recommendation?: WorkItem | null;
+  selected_interaction_id?: string | null;
   work_items: WorkItem[];
   product_propensity?: ProductPropensityResponse | null;
   objection_workflow?: ObjectionWorkflowResponse | null;
@@ -438,7 +543,13 @@ export interface HealthResponse {
   stage: string;
   storage: string;
   version: string;
-  feature_flags: Record<string, boolean>;
+  feature_flags: {
+    supervisor_dashboard?: boolean;
+    assistant_panel?: boolean;
+    feedback_loop?: boolean;
+    propensity_module?: boolean;
+    [key: string]: boolean | undefined;
+  };
   ai: {
     available: boolean;
     provider: string;

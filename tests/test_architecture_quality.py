@@ -69,3 +69,37 @@ async def test_health_returns_feature_flags(tmp_path):
     body = response.json()
     assert "feature_flags" in body
     assert body["feature_flags"]["supervisor_dashboard"] is True
+
+
+@pytest.mark.anyio
+async def test_api_starts_without_frontend_bundle_and_reports_warning(tmp_path):
+    db_path = tmp_path / "missing-static.sqlite3"
+    storage = SQLiteStorage(db_path=db_path)
+    seed_mvp_data(storage)
+    settings = AppSettings(
+        title="Test app",
+        version="0.0.0",
+        db_path=str(db_path),
+        static_dir=tmp_path / "missing-static-dir",
+        stage_label="test",
+        features=FeatureFlags(),
+    )
+    app = create_app(db_path=str(db_path), settings=settings)
+    transport = ASGITransport(app=app)
+
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        health_response = await client.get("/health")
+        clients_response = await client.get("/clients?manager_id=m1")
+        index_response = await client.get("/")
+
+    assert health_response.status_code == 200
+    frontend = health_response.json()["frontend"]
+    assert frontend["available"] is False
+    assert frontend["static_mounted"] is False
+    assert "make frontend-build" in frontend["warning"]
+
+    assert clients_response.status_code == 200
+    assert clients_response.json()["items"]
+
+    assert index_response.status_code == 503
+    assert "Frontend unavailable" in index_response.text

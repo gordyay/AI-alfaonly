@@ -21,11 +21,14 @@
 
 ```text
 app/
-  main.py              FastAPI-приложение и HTTP API
+  main.py              сборка FastAPI-приложения
+  runtime.py           wiring сервисов и runtime-контекст приложения
+  cases.py             case-scoped helpers для client/ai/crm flow
   db.py                SQLite storage и seed-friendly access layer
   models.py            Pydantic-модели домена и API
   seed_data.py         demo dataset
   services/            cockpit, assistant, summary, scripts, objections, supervisor
+  routers/             system, cockpit, client, assistant, ai, crm, supervisor
   static/              production build frontend
 frontend/
   src/                 React UI
@@ -64,6 +67,7 @@ make frontend-build
 ```
 
 Vite складывает production bundle в `app/static/`, а FastAPI раздаёт его по `/static/...`.
+Если bundle ещё не собран, backend всё равно поднимет API: `/static` не будет смонтирован, а `/health` вернёт warning про отсутствие frontend.
 
 ### 3. Проверка готовности перед демо
 

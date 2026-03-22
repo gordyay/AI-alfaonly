@@ -1,7 +1,7 @@
 import type {
   AISummaryDraft,
+  CaseInteraction,
   CockpitSection,
-  Conversation,
   ProductPropensityResponse,
   WorkItem,
   WorkItemType,
@@ -114,19 +114,19 @@ export function fromFollowUpInputValue(dateValue: string, timeValue: string): st
   return new Date(`${dateValue}T${normalizedTime}:00`).toISOString();
 }
 
-export function getConversationForWorkItem(
-  conversations: Conversation[],
-  workItem?: WorkItem | null,
-): Conversation | null {
-  if (!conversations.length) {
+export function getInteractionForCase(
+  interactions: CaseInteraction[],
+  interactionId?: string | null,
+): CaseInteraction | null {
+  if (!interactions.length) {
     return null;
   }
 
-  if (workItem?.conversation_id) {
-    return conversations.find((conversation) => conversation.id === workItem.conversation_id) ?? null;
+  if (interactionId) {
+    return interactions.find((interaction) => interaction.id === interactionId) ?? null;
   }
 
-  return null;
+  return interactions.find((interaction) => interaction.is_text_based) ?? interactions[0] ?? null;
 }
 
 export function getMiniSummaryCopy(args: {
@@ -229,6 +229,7 @@ export function getRecommendationTypeLabel(value?: string | null): string {
     dialog_summary: "Сводка диалога",
     mini_summary: "Краткая сводка",
     crm_note: "CRM-заметка",
+    client_reply: "Ответ клиенту",
     crm_note_draft: "Черновик CRM",
     objection_workflow: "Разбор возражения",
     sales_script: "Скрипт продажи",
@@ -266,6 +267,7 @@ export function getActivityActionLabel(value?: string | null): string {
     summary_generated: "Сводка подготовлена",
     crm_draft_generated: "AI-черновик CRM подготовлен",
     crm_note_saved: "CRM сохранена",
+    client_reply_sent: "Ответ отправлен",
     feedback_saved: "Решение сохранено",
     assistant_answered: "Ассистент ответил",
     script_generated: "Скрипт подготовлен",
