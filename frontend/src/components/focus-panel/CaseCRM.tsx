@@ -28,7 +28,7 @@ function getCRMNoteTitle(noteType?: string | null) {
 
 export function CaseCRM({
   detail,
-  conversation,
+  interaction,
   aiEnabled,
   aiUnavailableMessage,
   feedbackEnabled = true,
@@ -251,7 +251,7 @@ export function CaseCRM({
           ) : (
             <p className="insight">Финальная CRM-заметка не сохранена.</p>
           )}
-          {conversation?.channel ? <p className="insight">Канал контакта: {conversation.channel}</p> : null}
+          {interaction?.channel ? <p className="insight">Канал контакта: {interaction.channel}</p> : null}
         </section>
       </aside>
     </section>

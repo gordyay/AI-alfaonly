@@ -15,12 +15,14 @@ router = APIRouter()
 @router.post("/crm-note")
 async def create_crm_note(request: Request, payload: CreateCRMNoteRequest):
     runtime = get_runtime(request)
-    if not runtime.storage.get_client(payload.client_id):
+    resolved_client_id = payload.case_id or payload.client_id
+    if not resolved_client_id or not runtime.storage.get_client(resolved_client_id):
         raise HTTPException(status_code=404, detail="Client not found")
+    source_interaction_id = payload.source_interaction_id or payload.source_conversation_id
 
     note = CRMNote(
         id=str(uuid4()),
-        client_id=payload.client_id,
+        client_id=resolved_client_id,
         manager_id=payload.manager_id,
         task_id=payload.task_id,
         recommendation_id=payload.recommendation_id,
@@ -32,7 +34,9 @@ async def create_crm_note(request: Request, payload: CreateCRMNoteRequest):
         follow_up_date=payload.follow_up_date,
         follow_up_reason=payload.follow_up_reason,
         summary_text=payload.summary_text,
-        source_conversation_id=payload.source_conversation_id,
+        source_conversation_id=source_interaction_id,
+        case_id=resolved_client_id,
+        source_interaction_id=source_interaction_id,
         ai_generated=payload.ai_generated,
         ai_draft_payload=payload.ai_draft_payload,
         note_type=payload.note_type,
@@ -44,10 +48,12 @@ async def create_crm_note(request: Request, payload: CreateCRMNoteRequest):
         runtime.storage.add_crm_draft_revision(
             CRMDraftRevision(
                 id=str(uuid4()),
-                client_id=payload.client_id,
+                client_id=resolved_client_id,
                 manager_id=payload.manager_id,
                 recommendation_id=payload.recommendation_id,
-                conversation_id=payload.source_conversation_id,
+                conversation_id=source_interaction_id,
+                case_id=resolved_client_id,
+                source_interaction_id=source_interaction_id,
                 stage="manager_finalized",
                 changed_fields=compute_draft_changed_fields(
                     ai_draft=payload.ai_draft_payload,
@@ -68,8 +74,10 @@ async def create_crm_note(request: Request, payload: CreateCRMNoteRequest):
                 recommendation_id=payload.recommendation_id,
                 manager_id=payload.manager_id,
                 recommendation_type="manager_work_item",
-                client_id=payload.client_id,
-                conversation_id=payload.source_conversation_id,
+                client_id=resolved_client_id,
+                conversation_id=source_interaction_id,
+                case_id=resolved_client_id,
+                source_interaction_id=source_interaction_id,
                 decision=payload.recommendation_decision,
                 comment=payload.decision_comment or "Решение зафиксировано вместе с CRM-заметкой.",
                 selected_variant=payload.note_text[:240],
@@ -79,9 +87,11 @@ async def create_crm_note(request: Request, payload: CreateCRMNoteRequest):
             log_activity(
                 runtime,
                 recommendation_type="manager_work_item_feedback",
-                client_id=payload.client_id,
+                client_id=resolved_client_id,
                 recommendation_id=payload.recommendation_id,
-                conversation_id=payload.source_conversation_id,
+                conversation_id=source_interaction_id,
+                case_id=resolved_client_id,
+                source_interaction_id=source_interaction_id,
                 manager_id=payload.manager_id,
                 action="feedback_saved",
                 decision=feedback.decision.value,
@@ -96,9 +106,11 @@ async def create_crm_note(request: Request, payload: CreateCRMNoteRequest):
     log_activity(
         runtime,
         recommendation_type="crm_note",
-        client_id=payload.client_id,
+        client_id=resolved_client_id,
         recommendation_id=payload.recommendation_id,
-        conversation_id=payload.source_conversation_id,
+        conversation_id=source_interaction_id,
+        case_id=resolved_client_id,
+        source_interaction_id=source_interaction_id,
         manager_id=payload.manager_id,
         action="crm_note_saved",
         decision=(payload.recommendation_decision.value if payload.recommendation_decision else None),

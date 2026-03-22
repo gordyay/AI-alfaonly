@@ -20,6 +20,7 @@ export interface FocusScreenState {
   queueFilters: WorkQueueFilters;
   selectedClientId: string | null;
   selectedWorkItemId: string | null;
+  selectedInteractionId: string | null;
   tourOpen: boolean;
   assistantOpen: boolean;
   activeTab: ViewTab;
@@ -76,6 +77,7 @@ function readInitialStateFromUrl(): Partial<FocusScreenState> {
   const managerId = params.get("manager")?.trim() || null;
   const selectedClientId = params.get("client")?.trim() || null;
   const selectedWorkItemId = params.get("item")?.trim() || null;
+  const selectedInteractionId = params.get("interaction")?.trim() || null;
 
   return {
     managerId: managerId ?? DEFAULT_MANAGER_ID,
@@ -83,6 +85,7 @@ function readInitialStateFromUrl(): Partial<FocusScreenState> {
     activeTab: isViewTab(tab) ? tab : DEFAULT_VIEW_TAB,
     selectedClientId,
     selectedWorkItemId,
+    selectedInteractionId,
     assistantOpen: params.get("assistant") === "1",
   };
 }
@@ -90,7 +93,13 @@ function readInitialStateFromUrl(): Partial<FocusScreenState> {
 export function syncFocusScreenStateToUrl(
   state: Pick<
     FocusScreenState,
-    "activeTab" | "assistantOpen" | "managerId" | "mode" | "selectedClientId" | "selectedWorkItemId"
+    | "activeTab"
+    | "assistantOpen"
+    | "managerId"
+    | "mode"
+    | "selectedClientId"
+    | "selectedInteractionId"
+    | "selectedWorkItemId"
   >,
 ) {
   if (typeof window === "undefined") {
@@ -123,6 +132,12 @@ export function syncFocusScreenStateToUrl(
     url.searchParams.delete("item");
   }
 
+  if (state.selectedInteractionId) {
+    url.searchParams.set("interaction", state.selectedInteractionId);
+  } else {
+    url.searchParams.delete("interaction");
+  }
+
   if (state.activeTab !== DEFAULT_VIEW_TAB) {
     url.searchParams.set("tab", state.activeTab);
   } else {
@@ -147,6 +162,7 @@ function createInitialState(): FocusScreenState {
     queueFilters: DEFAULT_QUEUE_FILTERS,
     selectedClientId: null,
     selectedWorkItemId: null,
+    selectedInteractionId: null,
     tourOpen: false,
     assistantOpen: false,
     activeTab: "overview",
@@ -199,6 +215,7 @@ function focusScreenReducer(state: FocusScreenState, action: FocusScreenAction):
         ...state,
         selectedClientId: action.clientId,
         selectedWorkItemId: action.workItemId,
+        selectedInteractionId: null,
         activeTab: "overview",
         assistantOpen: false,
         aiDraft: null,

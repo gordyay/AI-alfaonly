@@ -19,7 +19,7 @@ import { getFrontendFeatureFlags } from "./lib/ui";
 import {
   cloneDraft,
   filterWorkQueue,
-  getConversationForWorkItem,
+  getInteractionForCase,
   getRecommendationStatusLabel,
   groupWorkQueue,
   type WorkQueueFilters,
@@ -125,9 +125,15 @@ export function App() {
     () => getSelectedWorkItem(workQueue, selectedDetail, screenState.selectedWorkItemId),
     [workQueue, selectedDetail, screenState.selectedWorkItemId],
   );
-  const selectedConversation = useMemo(
-    () => (selectedDetail ? getConversationForWorkItem(selectedDetail.conversations, selectedWorkItem) : null),
-    [selectedDetail, selectedWorkItem],
+  const selectedInteraction = useMemo(
+    () =>
+      selectedDetail
+        ? getInteractionForCase(
+            selectedDetail.interactions,
+            screenState.selectedInteractionId || selectedDetail.selected_interaction_id,
+          )
+        : null,
+    [screenState.selectedInteractionId, selectedDetail],
   );
   const latestScriptArtifact = selectedDetail?.script_history?.[0] ?? null;
   const latestObjectionArtifact = selectedDetail?.objection_history?.[0] ?? null;
@@ -192,7 +198,7 @@ export function App() {
     dispatch,
     selectedDetail,
     selectedWorkItem,
-    selectedConversation,
+    selectedInteraction,
     latestScriptArtifact,
     latestObjectionArtifact,
     savedFeedbackDecision: effectiveSavedFeedbackDecision,
@@ -371,6 +377,7 @@ export function App() {
       mode: screenState.mode,
       selectedClientId: screenState.selectedClientId,
       selectedWorkItemId: screenState.selectedWorkItemId,
+      selectedInteractionId: screenState.selectedInteractionId,
       activeTab: screenState.activeTab,
       assistantOpen: screenState.assistantOpen,
     });
@@ -380,6 +387,7 @@ export function App() {
     screenState.managerId,
     screenState.mode,
     screenState.selectedClientId,
+    screenState.selectedInteractionId,
     screenState.selectedWorkItemId,
   ]);
 
@@ -419,6 +427,25 @@ export function App() {
       },
     });
   }, [dispatch, selectedDetail, screenState.aiDraft]);
+
+  useEffect(() => {
+    if (!selectedDetail) {
+      return;
+    }
+
+    const preferredInteractionId = screenState.selectedInteractionId || selectedDetail.selected_interaction_id || null;
+    const nextInteraction =
+      getInteractionForCase(selectedDetail.interactions, preferredInteractionId) ??
+      getInteractionForCase(selectedDetail.interactions, null);
+    if (nextInteraction && nextInteraction.id !== screenState.selectedInteractionId) {
+      dispatch({
+        type: "patch",
+        patch: {
+          selectedInteractionId: nextInteraction.id,
+        },
+      });
+    }
+  }, [dispatch, screenState.selectedInteractionId, selectedDetail]);
 
   useEffect(() => {
     dispatch({
@@ -693,7 +720,7 @@ export function App() {
             <FocusPanel
               detail={selectedDetail}
               workItem={selectedWorkItem}
-              conversation={selectedConversation}
+              interaction={selectedInteraction}
               aiEnabled={aiEnabled}
               aiUnavailableMessage={aiUnavailableMessage}
               assistantEnabled={assistantEnabled}
@@ -705,6 +732,15 @@ export function App() {
                   type: "patch",
                   patch: {
                     activeTab: tab,
+                  },
+                })
+              }
+              onSelectInteraction={(interactionId) =>
+                dispatch({
+                  type: "patch",
+                  patch: {
+                    selectedInteractionId: interactionId,
+                    replyStatus: null,
                   },
                 })
               }

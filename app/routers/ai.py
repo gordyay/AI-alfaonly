@@ -21,15 +21,31 @@ from ..router_support import get_runtime
 router = APIRouter()
 
 
-def _get_client_and_conversation(runtime, client_id: str, conversation_id: str):
-    client = runtime.storage.get_client(client_id)
+def _get_client_and_interaction(
+    runtime,
+    *,
+    case_id: str | None = None,
+    client_id: str | None = None,
+    source_interaction_id: str | None = None,
+    conversation_id: str | None = None,
+):
+    resolved_client_id = case_id or client_id
+    if not resolved_client_id:
+        raise HTTPException(status_code=422, detail="case_id or client_id is required")
+
+    client = runtime.storage.get_client(resolved_client_id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
 
-    conversations = runtime.storage.list_client_conversations(client_id)
-    conversation = next((item for item in conversations if item.id == conversation_id), None)
+    interaction_id = source_interaction_id or conversation_id
+    conversations = runtime.storage.list_client_conversations(client.id)
+    conversation = next((item for item in conversations if item.id == interaction_id), None) if interaction_id else None
+    if conversation is None:
+        conversation = next((item for item in conversations if item.channel.value == "chat"), None) or (
+            conversations[0] if conversations else None
+        )
     if not conversation:
-        raise HTTPException(status_code=404, detail="Conversation not found")
+        raise HTTPException(status_code=404, detail="Interaction not found")
 
     return client, conversation
 
@@ -37,19 +53,25 @@ def _get_client_and_conversation(runtime, client_id: str, conversation_id: str):
 @router.post("/ai/generate-script")
 async def generate_script(request: Request, payload: GenerateScriptRequest):
     runtime = get_runtime(request)
-    client, conversation = _get_client_and_conversation(runtime, payload.client_id, payload.conversation_id)
+    client, conversation = _get_client_and_interaction(
+        runtime,
+        case_id=payload.case_id,
+        client_id=payload.client_id,
+        source_interaction_id=payload.source_interaction_id,
+        conversation_id=payload.conversation_id,
+    )
     recommendation = runtime.dialog_service.build_recommendation(client=client, conversation=conversation)
     work_item = resolve_case_work_item(
         runtime,
         client_id=client.id,
         manager_id=payload.manager_id,
         recommendation_id=payload.recommendation_id,
-        conversation_id=payload.conversation_id,
+        conversation_id=conversation.id,
     )
     recommendation_id = (
         payload.recommendation_id
         or (work_item.recommendation_id if work_item else None)
-        or f"rec:communication:{payload.conversation_id}"
+        or f"rec:case:{client.id}"
     )
     crm_notes = runtime.storage.list_client_crm_notes(client.id)
     propensity = runtime.propensity_service.build_client_propensity(storage=runtime.storage, client=client)
@@ -74,10 +96,12 @@ async def generate_script(request: Request, payload: GenerateScriptRequest):
         artifact = runtime.storage.add_script_generation(
             ScriptGenerationRecord(
                 id=str(uuid4()),
-                client_id=payload.client_id,
+                client_id=client.id,
                 manager_id=payload.manager_id,
                 recommendation_id=recommendation_id,
-                conversation_id=payload.conversation_id,
+                conversation_id=conversation.id,
+                case_id=client.id,
+                source_interaction_id=conversation.id,
                 contact_goal=result.draft.contact_goal or payload.contact_goal,
                 draft=result.draft,
                 created_at=result.generated_at,
@@ -86,9 +110,11 @@ async def generate_script(request: Request, payload: GenerateScriptRequest):
         log_activity(
             runtime,
             recommendation_type="sales_script",
-            client_id=payload.client_id,
+            client_id=client.id,
             recommendation_id=recommendation_id,
-            conversation_id=payload.conversation_id,
+            conversation_id=conversation.id,
+            case_id=client.id,
+            source_interaction_id=conversation.id,
             manager_id=payload.manager_id,
             action="script_generated",
             payload_excerpt=result.draft.ready_script,
@@ -99,9 +125,11 @@ async def generate_script(request: Request, payload: GenerateScriptRequest):
         log_activity(
             runtime,
             recommendation_type="sales_script",
-            client_id=payload.client_id,
+            client_id=client.id,
             recommendation_id=recommendation_id,
-            conversation_id=payload.conversation_id,
+            conversation_id=conversation.id,
+            case_id=client.id,
+            source_interaction_id=conversation.id,
             manager_id=payload.manager_id,
             action="generation_failed",
             payload_excerpt=str(exc),
@@ -143,6 +171,8 @@ async def select_script_variant(request: Request, payload: ScriptSelectionReques
         client_id=updated.client_id,
         recommendation_id=updated.recommendation_id,
         conversation_id=updated.conversation_id,
+        case_id=updated.case_id or updated.client_id,
+        source_interaction_id=updated.source_interaction_id or updated.conversation_id,
         manager_id=payload.manager_id,
         action="script_variant_selected",
         payload_excerpt=payload.variant_label,
@@ -154,18 +184,24 @@ async def select_script_variant(request: Request, payload: ScriptSelectionReques
 @router.post("/ai/objection-workflow")
 async def generate_objection_workflow(request: Request, payload: ObjectionWorkflowRequest):
     runtime = get_runtime(request)
-    client, conversation = _get_client_and_conversation(runtime, payload.client_id, payload.conversation_id)
+    client, conversation = _get_client_and_interaction(
+        runtime,
+        case_id=payload.case_id,
+        client_id=payload.client_id,
+        source_interaction_id=payload.source_interaction_id,
+        conversation_id=payload.conversation_id,
+    )
     work_item = resolve_case_work_item(
         runtime,
         client_id=client.id,
         manager_id=payload.manager_id,
         recommendation_id=payload.recommendation_id,
-        conversation_id=payload.conversation_id,
+        conversation_id=conversation.id,
     )
     recommendation_id = (
         payload.recommendation_id
         or (work_item.recommendation_id if work_item else None)
-        or f"rec:communication:{payload.conversation_id}"
+        or f"rec:case:{client.id}"
     )
     try:
         result = runtime.objection_service.build_workflow(
@@ -177,10 +213,12 @@ async def generate_objection_workflow(request: Request, payload: ObjectionWorkfl
         artifact = runtime.storage.add_objection_workflow(
             ObjectionWorkflowRecord(
                 id=str(uuid4()),
-                client_id=payload.client_id,
+                client_id=client.id,
                 manager_id=payload.manager_id,
                 recommendation_id=recommendation_id,
-                conversation_id=payload.conversation_id,
+                conversation_id=conversation.id,
+                case_id=client.id,
+                source_interaction_id=conversation.id,
                 draft=result.draft,
                 created_at=result.generated_at,
             )
@@ -188,9 +226,11 @@ async def generate_objection_workflow(request: Request, payload: ObjectionWorkfl
         log_activity(
             runtime,
             recommendation_type="objection_workflow",
-            client_id=payload.client_id,
+            client_id=client.id,
             recommendation_id=recommendation_id,
-            conversation_id=payload.conversation_id,
+            conversation_id=conversation.id,
+            case_id=client.id,
+            source_interaction_id=conversation.id,
             manager_id=payload.manager_id,
             action="objection_generated",
             payload_excerpt=result.draft.analysis.objection_label,
@@ -201,9 +241,11 @@ async def generate_objection_workflow(request: Request, payload: ObjectionWorkfl
         log_activity(
             runtime,
             recommendation_type="objection_workflow",
-            client_id=payload.client_id,
+            client_id=client.id,
             recommendation_id=recommendation_id,
-            conversation_id=payload.conversation_id,
+            conversation_id=conversation.id,
+            case_id=client.id,
+            source_interaction_id=conversation.id,
             manager_id=payload.manager_id,
             action="generation_failed",
             payload_excerpt=str(exc),
@@ -242,6 +284,8 @@ async def select_objection_option(request: Request, payload: ObjectionSelectionR
         client_id=updated.client_id,
         recommendation_id=updated.recommendation_id,
         conversation_id=updated.conversation_id,
+        case_id=updated.case_id or updated.client_id,
+        source_interaction_id=updated.source_interaction_id or updated.conversation_id,
         manager_id=payload.manager_id,
         action="objection_option_selected",
         payload_excerpt=payload.option_title,
@@ -253,19 +297,25 @@ async def select_objection_option(request: Request, payload: ObjectionSelectionR
 @router.post("/ai/summarize-dialog")
 async def summarize_dialog(request: Request, payload: SummarizeDialogRequest):
     runtime = get_runtime(request)
-    client, conversation = _get_client_and_conversation(runtime, payload.client_id, payload.conversation_id)
+    client, conversation = _get_client_and_interaction(
+        runtime,
+        case_id=payload.case_id,
+        client_id=payload.client_id,
+        source_interaction_id=payload.source_interaction_id,
+        conversation_id=payload.conversation_id,
+    )
     recommendation = runtime.dialog_service.build_recommendation(client=client, conversation=conversation)
     work_item = resolve_case_work_item(
         runtime,
         client_id=client.id,
         manager_id=payload.manager_id,
         recommendation_id=payload.recommendation_id,
-        conversation_id=payload.conversation_id,
+        conversation_id=conversation.id,
     )
     recommendation_id = (
         payload.recommendation_id
         or (work_item.recommendation_id if work_item else None)
-        or f"rec:communication:{payload.conversation_id}"
+        or f"rec:case:{client.id}"
     )
 
     try:
@@ -276,17 +326,19 @@ async def summarize_dialog(request: Request, payload: SummarizeDialogRequest):
             recommendation=recommendation,
         )
         runtime.storage.update_client_ai_summary(
-            client_id=payload.client_id,
+            client_id=client.id,
             summary_text=result.draft.contact_summary,
             generated_at=result.generated_at,
         )
         runtime.storage.add_crm_draft_revision(
             CRMDraftRevision(
                 id=str(uuid4()),
-                client_id=payload.client_id,
+                client_id=client.id,
                 manager_id=payload.manager_id,
                 recommendation_id=recommendation_id,
-                conversation_id=payload.conversation_id,
+                conversation_id=conversation.id,
+                case_id=client.id,
+                source_interaction_id=conversation.id,
                 stage="ai_generated",
                 draft=result.draft,
                 created_at=result.generated_at,
@@ -300,9 +352,11 @@ async def summarize_dialog(request: Request, payload: SummarizeDialogRequest):
         log_activity(
             runtime,
             recommendation_type="mini_summary",
-            client_id=payload.client_id,
+            client_id=client.id,
             recommendation_id=recommendation_id,
-            conversation_id=payload.conversation_id,
+            conversation_id=conversation.id,
+            case_id=client.id,
+            source_interaction_id=conversation.id,
             manager_id=payload.manager_id,
             action="summary_generated",
             payload_excerpt=result.draft.contact_summary,
@@ -311,9 +365,11 @@ async def summarize_dialog(request: Request, payload: SummarizeDialogRequest):
         log_activity(
             runtime,
             recommendation_type="crm_note_draft",
-            client_id=payload.client_id,
+            client_id=client.id,
             recommendation_id=recommendation_id,
-            conversation_id=payload.conversation_id,
+            conversation_id=conversation.id,
+            case_id=client.id,
+            source_interaction_id=conversation.id,
             manager_id=payload.manager_id,
             action="crm_draft_generated",
             payload_excerpt=result.draft.crm_note_draft,
@@ -324,9 +380,11 @@ async def summarize_dialog(request: Request, payload: SummarizeDialogRequest):
         log_activity(
             runtime,
             recommendation_type="mini_summary",
-            client_id=payload.client_id,
+            client_id=client.id,
             recommendation_id=recommendation_id,
-            conversation_id=payload.conversation_id,
+            conversation_id=conversation.id,
+            case_id=client.id,
+            source_interaction_id=conversation.id,
             manager_id=payload.manager_id,
             action="generation_failed",
             payload_excerpt=str(exc),
@@ -334,9 +392,11 @@ async def summarize_dialog(request: Request, payload: SummarizeDialogRequest):
         log_activity(
             runtime,
             recommendation_type="crm_note_draft",
-            client_id=payload.client_id,
+            client_id=client.id,
             recommendation_id=recommendation_id,
-            conversation_id=payload.conversation_id,
+            conversation_id=conversation.id,
+            case_id=client.id,
+            source_interaction_id=conversation.id,
             manager_id=payload.manager_id,
             action="generation_failed",
             payload_excerpt=str(exc),

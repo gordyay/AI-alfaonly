@@ -1,10 +1,10 @@
 import { getChannelLabel } from "../../lib/utils";
 import type { UiStatus } from "../../lib/ui";
-import type { Conversation, ReplySource } from "../../types";
+import type { CaseInteraction, ReplySource } from "../../types";
 import { StatusMessage } from "../StatusMessage";
 
 interface CaseReplyComposerProps {
-  conversation?: Conversation | null;
+  interaction?: CaseInteraction | null;
   replyDraftText: string;
   replySource: ReplySource;
   replySending: boolean;
@@ -29,7 +29,7 @@ function getReplySourceLabel(source: ReplySource) {
 }
 
 export function CaseReplyComposer({
-  conversation,
+  interaction,
   replyDraftText,
   replySource,
   replySending,
@@ -42,7 +42,7 @@ export function CaseReplyComposer({
   onClearReplyDraft,
   onSendReply,
 }: CaseReplyComposerProps) {
-  const canSend = Boolean(replyDraftText.trim()) && conversation?.channel === "chat" && !replySending;
+  const canSend = Boolean(replyDraftText.trim()) && interaction?.is_text_based && !replySending;
 
   return (
     <section className="content-card reply-composer">
@@ -52,20 +52,20 @@ export function CaseReplyComposer({
           <h3>Черновик и отправка сообщения</h3>
         </div>
         <div className="reply-composer__meta">
-          <span className="badge badge--accent">{conversation ? getChannelLabel(conversation.channel) : "Без канала"}</span>
+          <span className="badge badge--accent">{interaction ? getChannelLabel(interaction.channel) : "Без канала"}</span>
           <span className="badge">{getReplySourceLabel(replySource)}</span>
         </div>
       </div>
 
       <p className="insight">
-        После отправки сообщение сразу попадёт в историю контакта и сохранится в CRM как исходящий ответ.
+        После отправки сообщение сразу попадёт в историю кейса и сохранится в CRM как исходящий ответ.
       </p>
 
-      {conversation?.channel && conversation.channel !== "chat" ? (
+      {interaction && !interaction.is_text_based ? (
         <StatusMessage
           compact
           type="error"
-          message="В первой версии отправка доступна только для chat-диалогов. Для звонка и встречи можно только подготовить текст."
+          message="Для звонка и встречи нет буквальной отправки сообщения. Выберите текстовый interaction кейса, чтобы ответить клиенту."
         />
       ) : null}
       <StatusMessage compact type={replyStatus?.type} message={replyStatus?.text} />

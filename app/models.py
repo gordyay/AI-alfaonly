@@ -37,6 +37,7 @@ class ChannelType(str, Enum):
     chat = "chat"
     call = "call"
     meeting = "meeting"
+    email = "email"
 
 
 class FeedbackDecision(str, Enum):
@@ -257,6 +258,8 @@ class WorkItem(BaseModel):
     product_code: Optional[str] = None
     product_name: Optional[str] = None
     client_churn_risk: Optional[str] = None
+    case_id: Optional[str] = None
+    source_interaction_id: Optional[str] = None
 
 
 class CockpitSection(BaseModel):
@@ -284,6 +287,36 @@ class ManagerCockpit(BaseModel):
     work_queue: List[WorkItem] = Field(default_factory=list)
 
 
+class CaseInteraction(BaseModel):
+    id: str
+    case_id: str
+    client_id: str
+    channel: ChannelType
+    title: str
+    started_at: datetime
+    summary: str
+    outcome: Optional[str] = None
+    next_step: Optional[str] = None
+    is_text_based: bool = False
+    message_count: int = 0
+    last_activity_at: Optional[datetime] = None
+    messages: List[Message] = Field(default_factory=list)
+    insights: Optional[ConversationInsights] = None
+
+
+class CaseTimelineEvent(BaseModel):
+    id: str
+    case_id: str
+    interaction_id: str
+    channel: ChannelType
+    event_type: str
+    created_at: datetime
+    title: str
+    text: str
+    sender: Optional[str] = None
+    is_outbound: bool = False
+
+
 class GeneratedArtifact(BaseModel):
     id: str
     artifact_type: GeneratedArtifactType
@@ -293,6 +326,8 @@ class GeneratedArtifact(BaseModel):
     created_at: datetime
     source_conversation_id: Optional[str] = None
     source_task_id: Optional[str] = None
+    case_id: Optional[str] = None
+    source_interaction_id: Optional[str] = None
 
 
 class ProductPropensityFactors(BaseModel):
@@ -400,15 +435,19 @@ class ObjectionWorkflowDraft(BaseModel):
 
 
 class SummarizeDialogRequest(BaseModel):
-    client_id: str
-    conversation_id: str
+    client_id: Optional[str] = None
+    case_id: Optional[str] = None
+    conversation_id: Optional[str] = None
+    source_interaction_id: Optional[str] = None
     manager_id: str = "m1"
     recommendation_id: Optional[str] = None
 
 
 class GenerateScriptRequest(BaseModel):
-    client_id: str
-    conversation_id: str
+    client_id: Optional[str] = None
+    case_id: Optional[str] = None
+    conversation_id: Optional[str] = None
+    source_interaction_id: Optional[str] = None
     manager_id: str = "m1"
     instruction: Optional[str] = None
     contact_goal: Optional[str] = None
@@ -416,8 +455,10 @@ class GenerateScriptRequest(BaseModel):
 
 
 class ObjectionWorkflowRequest(BaseModel):
-    client_id: str
-    conversation_id: str
+    client_id: Optional[str] = None
+    case_id: Optional[str] = None
+    conversation_id: Optional[str] = None
+    source_interaction_id: Optional[str] = None
     manager_id: str = "m1"
     objection_text: Optional[str] = None
     recommendation_id: Optional[str] = None
@@ -469,6 +510,8 @@ class ScriptGenerationRecord(BaseModel):
     manager_id: str
     recommendation_id: Optional[str] = None
     conversation_id: Optional[str] = None
+    case_id: Optional[str] = None
+    source_interaction_id: Optional[str] = None
     contact_goal: Optional[str] = None
     selected_variant_label: Optional[str] = None
     selected_text: Optional[str] = None
@@ -483,6 +526,8 @@ class ObjectionWorkflowRecord(BaseModel):
     manager_id: str
     recommendation_id: Optional[str] = None
     conversation_id: Optional[str] = None
+    case_id: Optional[str] = None
+    source_interaction_id: Optional[str] = None
     selected_option_title: Optional[str] = None
     selected_response: Optional[str] = None
     draft: ObjectionWorkflowDraft
@@ -496,6 +541,8 @@ class CRMDraftRevision(BaseModel):
     manager_id: str
     recommendation_id: Optional[str] = None
     conversation_id: Optional[str] = None
+    case_id: Optional[str] = None
+    source_interaction_id: Optional[str] = None
     stage: str
     changed_fields: List[str] = Field(default_factory=list)
     draft: AISummaryDraft
@@ -562,6 +609,8 @@ class AssistantActionResult(BaseModel):
     action_type: str
     client_id: Optional[str] = None
     conversation_id: Optional[str] = None
+    case_id: Optional[str] = None
+    source_interaction_id: Optional[str] = None
     draft: Optional[AISummaryDraft] = None
     sales_script_draft: Optional[SalesScriptDraft] = None
     objection_workflow_draft: Optional[ObjectionWorkflowDraft] = None
@@ -610,6 +659,8 @@ class CRMNote(BaseModel):
     follow_up_reason: Optional[str] = None
     summary_text: Optional[str] = None
     source_conversation_id: Optional[str] = None
+    case_id: Optional[str] = None
+    source_interaction_id: Optional[str] = None
     ai_generated: bool = False
     ai_draft_payload: Optional[AISummaryDraft] = None
     note_type: CRMNoteType = CRMNoteType.crm_summary
@@ -633,6 +684,8 @@ class RecommendationFeedback(BaseModel):
     recommendation_type: str = "manual_review"
     client_id: Optional[str] = None
     conversation_id: Optional[str] = None
+    case_id: Optional[str] = None
+    source_interaction_id: Optional[str] = None
     decision: FeedbackDecision
     comment: Optional[str] = None
     selected_variant: Optional[str] = None
@@ -645,6 +698,8 @@ class ActivityLogEntry(BaseModel):
     client_id: str
     recommendation_id: Optional[str] = None
     conversation_id: Optional[str] = None
+    case_id: Optional[str] = None
+    source_interaction_id: Optional[str] = None
     manager_id: str
     action: str
     decision: Optional[str] = None
@@ -654,7 +709,8 @@ class ActivityLogEntry(BaseModel):
 
 
 class CreateCRMNoteRequest(BaseModel):
-    client_id: str
+    client_id: Optional[str] = None
+    case_id: Optional[str] = None
     manager_id: str = "m1"
     task_id: Optional[str] = None
     recommendation_id: Optional[str] = None
@@ -667,6 +723,7 @@ class CreateCRMNoteRequest(BaseModel):
     follow_up_reason: Optional[str] = None
     summary_text: Optional[str] = None
     source_conversation_id: Optional[str] = None
+    source_interaction_id: Optional[str] = None
     ai_generated: bool = False
     ai_draft_payload: Optional[AISummaryDraft] = None
     note_type: CRMNoteType = CRMNoteType.crm_summary
@@ -674,8 +731,10 @@ class CreateCRMNoteRequest(BaseModel):
 
 
 class ClientReplyRequest(BaseModel):
-    client_id: str
-    conversation_id: str
+    client_id: Optional[str] = None
+    case_id: Optional[str] = None
+    conversation_id: Optional[str] = None
+    source_interaction_id: Optional[str] = None
     manager_id: str = "m1"
     text: str
     recommendation_id: Optional[str] = None
@@ -694,9 +753,46 @@ class FeedbackRequest(BaseModel):
     recommendation_type: str = "manual_review"
     client_id: Optional[str] = None
     conversation_id: Optional[str] = None
+    case_id: Optional[str] = None
+    source_interaction_id: Optional[str] = None
     decision: FeedbackDecision
     comment: Optional[str] = None
     selected_variant: Optional[str] = None
+
+
+class CreateInteractionLogRequest(BaseModel):
+    manager_id: str = "m1"
+    case_id: Optional[str] = None
+    client_id: Optional[str] = None
+    source_interaction_id: Optional[str] = None
+    channel: ChannelType
+    title: str
+    summary: str
+    outcome: Optional[str] = None
+    next_step: Optional[str] = None
+    recommendation_id: Optional[str] = None
+
+
+class CaseDetailResponse(BaseModel):
+    client: Client
+    case_id: str
+    tasks: List[Task] = Field(default_factory=list)
+    interactions: List[CaseInteraction] = Field(default_factory=list)
+    timeline: List[CaseTimelineEvent] = Field(default_factory=list)
+    selected_work_item_id: Optional[str] = None
+    selected_interaction_id: Optional[str] = None
+    work_items: List[WorkItem] = Field(default_factory=list)
+    product_propensity: Optional[ProductPropensityResponse] = None
+    objection_workflow: Optional[ObjectionWorkflowResponse] = None
+    crm_notes: List[CRMNote] = Field(default_factory=list)
+    follow_ups: List[FollowUp] = Field(default_factory=list)
+    recommendation_feedback: List[RecommendationFeedback] = Field(default_factory=list)
+    activity_log: List[ActivityLogEntry] = Field(default_factory=list)
+    generated_artifacts: List[GeneratedArtifact] = Field(default_factory=list)
+    saved_ai_draft: Optional[AISummaryDraft] = None
+    script_history: List[ScriptGenerationRecord] = Field(default_factory=list)
+    objection_history: List[ObjectionWorkflowRecord] = Field(default_factory=list)
+    crm_draft_history: List[CRMDraftRevision] = Field(default_factory=list)
 
 
 class SupervisorMetricCard(BaseModel):

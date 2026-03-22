@@ -1,6 +1,6 @@
 import { formatDateTime, getFocusPropensityLabel, getMiniSummaryCopy, getRecommendationStatusLabel, getWorkItemTypeLabel } from "../lib/utils";
 import type { UiStatus } from "../lib/ui";
-import type { AISummaryDraft, ClientDetailResponse, Conversation, RecommendationStatus, ViewTab, WorkItem } from "../types";
+import type { AISummaryDraft, CaseInteraction, ClientDetailResponse, RecommendationStatus, ViewTab, WorkItem } from "../types";
 import { CaseAction } from "./focus-panel/CaseAction";
 import { CaseCRM } from "./focus-panel/CaseCRM";
 import { CasePortfolio } from "./focus-panel/CasePortfolio";
@@ -10,7 +10,7 @@ import { CaseSummary } from "./focus-panel/CaseSummary";
 interface FocusPanelProps {
   detail?: ClientDetailResponse | null;
   workItem?: WorkItem | null;
-  conversation?: Conversation | null;
+  interaction?: CaseInteraction | null;
   aiEnabled: boolean;
   aiUnavailableMessage?: string | null;
   assistantEnabled?: boolean;
@@ -18,6 +18,7 @@ interface FocusPanelProps {
   propensityEnabled?: boolean;
   activeTab: ViewTab;
   onChangeTab: (tab: ViewTab) => void;
+  onSelectInteraction: (interactionId: string) => void;
   aiDraft?: AISummaryDraft | null;
   aiLoading: boolean;
   aiSaving: boolean;
@@ -72,7 +73,7 @@ const TABS: Array<{ id: ViewTab; label: string }> = [
 export function FocusPanel({
   detail,
   workItem,
-  conversation,
+  interaction,
   aiEnabled,
   aiUnavailableMessage,
   assistantEnabled = true,
@@ -80,6 +81,7 @@ export function FocusPanel({
   propensityEnabled = true,
   activeTab,
   onChangeTab,
+  onSelectInteraction,
   aiDraft,
   aiLoading,
   aiSaving,
@@ -137,7 +139,7 @@ export function FocusPanel({
   const latestScriptArtifact = detail.script_history[0] ?? null;
   const latestObjectionArtifact = detail.objection_history[0] ?? null;
   const nextContact =
-    workItem.due_at || conversation?.insights?.next_contact_due_at || client.next_contact_due_at || null;
+    workItem.due_at || interaction?.insights?.next_contact_due_at || client.next_contact_due_at || null;
 
   return (
     <section className="panel focus-panel">
@@ -204,7 +206,7 @@ export function FocusPanel({
         <CaseSummary
           detail={detail}
           workItem={workItem}
-          conversation={conversation}
+          interaction={interaction}
           aiEnabled={aiEnabled}
           aiUnavailableMessage={aiUnavailableMessage}
           assistantEnabled={assistantEnabled}
@@ -226,6 +228,7 @@ export function FocusPanel({
           )}
           canPrefillReplyFromObjection={Boolean(latestObjectionArtifact?.selected_response)}
           onChangeTab={onChangeTab}
+          onSelectInteraction={onSelectInteraction}
           onFeedbackCommentChange={onFeedbackCommentChange}
           onFeedbackDecisionChange={onFeedbackDecisionChange}
           onSubmitFeedback={onSubmitFeedback}
@@ -243,7 +246,7 @@ export function FocusPanel({
           <CaseAction
             detail={detail}
             workItem={workItem}
-            conversation={conversation}
+            interaction={interaction}
             aiEnabled={aiEnabled}
             aiUnavailableMessage={aiUnavailableMessage}
             assistantEnabled={assistantEnabled}
@@ -268,7 +271,7 @@ export function FocusPanel({
           <CaseAction
             detail={detail}
             workItem={workItem}
-            conversation={conversation}
+            interaction={interaction}
             aiEnabled={aiEnabled}
             aiUnavailableMessage={aiUnavailableMessage}
             assistantEnabled={assistantEnabled}
@@ -297,7 +300,7 @@ export function FocusPanel({
         <CaseCRM
           detail={detail}
           workItem={workItem}
-          conversation={conversation}
+          interaction={interaction}
           aiEnabled={aiEnabled}
           aiUnavailableMessage={aiUnavailableMessage}
           assistantEnabled={assistantEnabled}
@@ -321,7 +324,7 @@ export function FocusPanel({
           <CaseProfile
             detail={detail}
             workItem={workItem}
-            conversation={conversation}
+            interaction={interaction}
             aiEnabled={aiEnabled}
             aiUnavailableMessage={aiUnavailableMessage}
             assistantEnabled={assistantEnabled}
@@ -331,7 +334,7 @@ export function FocusPanel({
           <CasePortfolio
             detail={detail}
             workItem={workItem}
-            conversation={conversation}
+            interaction={interaction}
             aiEnabled={aiEnabled}
             aiUnavailableMessage={aiUnavailableMessage}
             assistantEnabled={assistantEnabled}

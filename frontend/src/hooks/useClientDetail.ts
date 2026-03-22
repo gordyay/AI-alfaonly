@@ -28,7 +28,7 @@ export function useClientDetail(selectedClientId: string | null, selectedWorkIte
     setDetailLoading(true);
     try {
       const query = workItemId ? `?work_item_id=${encodeURIComponent(workItemId)}` : "";
-      const detail = await apiGet<ClientDetailResponse>(`/client/${clientId}${query}`);
+      const detail = await apiGet<ClientDetailResponse>(`/cases/${clientId}${query}`);
       setClientDetails((current) => ({ ...current, [cacheKey]: detail }));
       return detail;
     } finally {
@@ -38,7 +38,7 @@ export function useClientDetail(selectedClientId: string | null, selectedWorkIte
 
   async function reloadClientDetail(clientId: string, workItemId?: string | null) {
     const query = workItemId ? `?work_item_id=${encodeURIComponent(workItemId)}` : "";
-    const detail = await apiGet<ClientDetailResponse>(`/client/${clientId}${query}`);
+    const detail = await apiGet<ClientDetailResponse>(`/cases/${clientId}${query}`);
     setClientDetails((current) => ({ ...current, [getDetailCacheKey(clientId, workItemId)]: detail }));
     return detail;
   }

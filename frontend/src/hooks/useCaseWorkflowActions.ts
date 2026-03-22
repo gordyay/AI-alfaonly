@@ -4,9 +4,9 @@ import { cloneDraft, formatDateTime } from "../lib/utils";
 import { getErrorText } from "../lib/ui";
 import type {
   AssistantActionResult,
+  CaseInteraction,
   ClientDetailResponse,
   ClientReplyResponse,
-  Conversation,
   GenerateScriptResponse,
   ManagerCockpit,
   ObjectionWorkflowResponse,
@@ -19,12 +19,12 @@ import type {
 import type { FocusScreenAction, FocusScreenState } from "./useFocusScreenReducer";
 
 function findWorkItemByConversation(items: WorkItem[], clientId: string, conversationId?: string | null) {
-  if (!conversationId) {
-    return items.find((item) => item.client_id === clientId) ?? null;
-  }
-
   return (
-    items.find((item) => item.client_id === clientId && item.conversation_id === conversationId) ??
+    items.find(
+      (item) =>
+        item.client_id === clientId &&
+        (item.source_interaction_id === conversationId || item.conversation_id === conversationId),
+    ) ??
     items.find((item) => item.client_id === clientId) ??
     null
   );
@@ -35,7 +35,7 @@ interface UseCaseWorkflowActionsOptions {
   dispatch: Dispatch<FocusScreenAction>;
   selectedDetail: ClientDetailResponse | null;
   selectedWorkItem: WorkItem | null;
-  selectedConversation: Conversation | null;
+  selectedInteraction: CaseInteraction | null;
   latestScriptArtifact: ScriptGenerationRecord | null;
   latestObjectionArtifact: ObjectionWorkflowRecord | null;
   savedFeedbackDecision: WorkItem["recommendation_status"] | null;
@@ -68,7 +68,7 @@ export function useCaseWorkflowActions({
   dispatch,
   selectedDetail,
   selectedWorkItem,
-  selectedConversation,
+  selectedInteraction,
   latestScriptArtifact,
   latestObjectionArtifact,
   savedFeedbackDecision,
@@ -96,6 +96,7 @@ export function useCaseWorkflowActions({
       type: "patch",
       patch: {
         aiDraft: cloneDraft(detail.saved_ai_draft),
+        selectedInteractionId: detail.selected_interaction_id ?? null,
       },
     });
   }
@@ -122,6 +123,7 @@ export function useCaseWorkflowActions({
       patch: {
         selectedClientId: null,
         selectedWorkItemId: null,
+        selectedInteractionId: null,
       },
     });
   }
@@ -143,6 +145,8 @@ export function useCaseWorkflowActions({
         patch: {
           aiDraft: cloneDraft(actionResult.draft),
           activeTab: "crm",
+          selectedInteractionId:
+            actionResult.source_interaction_id ?? actionResult.conversation_id ?? state.selectedInteractionId,
           aiStatus: { type: "success", text: "Черновик для CRM подготовлен через помощника." },
         },
       });
@@ -174,7 +178,7 @@ export function useCaseWorkflowActions({
   }
 
   async function handleGenerateSummary() {
-    if (!selectedDetail || !selectedConversation) {
+    if (!selectedDetail || !selectedInteraction) {
       dispatch({
         type: "patch",
         patch: {
@@ -196,10 +200,10 @@ export function useCaseWorkflowActions({
     try {
       const response = await apiPost<
         SummarizeDialogResponse,
-        { client_id: string; conversation_id: string; manager_id: string }
+        { case_id: string; source_interaction_id: string; manager_id: string }
       >("/ai/summarize-dialog", {
-        client_id: selectedDetail.client.id,
-        conversation_id: selectedConversation.id,
+        case_id: selectedDetail.client.id,
+        source_interaction_id: selectedInteraction.id,
         manager_id: state.managerId,
       });
 
@@ -235,7 +239,7 @@ export function useCaseWorkflowActions({
   }
 
   async function handleGenerateScript() {
-    if (!selectedDetail || !selectedConversation || !selectedWorkItem) {
+    if (!selectedDetail || !selectedInteraction || !selectedWorkItem) {
       dispatch({
         type: "patch",
         patch: {
@@ -256,10 +260,10 @@ export function useCaseWorkflowActions({
     try {
       const response = await apiPost<
         GenerateScriptResponse,
-        { client_id: string; conversation_id: string; manager_id: string; contact_goal: string | null; recommendation_id: string }
+        { case_id: string; source_interaction_id: string; manager_id: string; contact_goal: string | null; recommendation_id: string }
       >("/ai/generate-script", {
-        client_id: selectedDetail.client.id,
-        conversation_id: selectedConversation.id,
+        case_id: selectedDetail.client.id,
+        source_interaction_id: selectedInteraction.id,
         manager_id: state.managerId,
         contact_goal: state.scriptGoal || selectedWorkItem.next_best_action,
         recommendation_id: selectedWorkItem.recommendation_id,
@@ -341,7 +345,7 @@ export function useCaseWorkflowActions({
   }
 
   async function handleGenerateObjectionWorkflow() {
-    if (!selectedDetail || !selectedConversation || !selectedWorkItem) {
+    if (!selectedDetail || !selectedInteraction || !selectedWorkItem) {
       dispatch({
         type: "patch",
         patch: {
@@ -362,10 +366,10 @@ export function useCaseWorkflowActions({
     try {
       const response = await apiPost<
         ObjectionWorkflowResponse,
-        { client_id: string; conversation_id: string; manager_id: string; objection_text: string | null; recommendation_id: string }
+        { case_id: string; source_interaction_id: string; manager_id: string; objection_text: string | null; recommendation_id: string }
       >("/ai/objection-workflow", {
-        client_id: selectedDetail.client.id,
-        conversation_id: selectedConversation.id,
+        case_id: selectedDetail.client.id,
+        source_interaction_id: selectedInteraction.id,
         manager_id: state.managerId,
         objection_text: state.objectionInput || null,
         recommendation_id: selectedWorkItem.recommendation_id,
@@ -450,7 +454,7 @@ export function useCaseWorkflowActions({
   }
 
   async function handleSaveSummary() {
-    if (!selectedDetail || !selectedWorkItem || !selectedConversation || !state.aiDraft) {
+    if (!selectedDetail || !selectedWorkItem || !selectedInteraction || !state.aiDraft) {
       return;
     }
 
@@ -464,7 +468,7 @@ export function useCaseWorkflowActions({
 
     try {
       await apiPost<unknown, Record<string, unknown>>("/crm-note", {
-        client_id: selectedDetail.client.id,
+        case_id: selectedDetail.client.id,
         manager_id: state.managerId,
         task_id: selectedWorkItem.task_id,
         recommendation_id: selectedWorkItem.recommendation_id,
@@ -472,11 +476,11 @@ export function useCaseWorkflowActions({
         decision_comment: state.feedbackComment || null,
         note_text: state.aiDraft.crm_note_draft,
         outcome: state.aiDraft.outcome,
-        channel: selectedConversation.channel,
+        channel: selectedInteraction.channel,
         follow_up_date: state.aiDraft.follow_up_required ? state.aiDraft.follow_up_date : null,
         follow_up_reason: state.aiDraft.follow_up_reason,
         summary_text: state.aiDraft.contact_summary,
-        source_conversation_id: selectedConversation.id,
+        source_interaction_id: selectedInteraction.id,
         ai_generated: true,
         ai_draft_payload: state.aiDraft,
       });
@@ -528,7 +532,8 @@ export function useCaseWorkflowActions({
         manager_id: state.managerId,
         recommendation_type: "manager_work_item",
         client_id: selectedDetail.client.id,
-        conversation_id: selectedWorkItem.conversation_id,
+        case_id: selectedDetail.client.id,
+        conversation_id: selectedInteraction?.id ?? selectedWorkItem.source_interaction_id ?? selectedWorkItem.conversation_id,
         decision: state.feedbackDecision,
         comment: state.feedbackComment || null,
         selected_variant: state.aiDraft?.crm_note_draft || state.aiDraft?.contact_summary || selectedWorkItem.next_best_action,
@@ -620,7 +625,7 @@ export function useCaseWorkflowActions({
   }
 
   async function handleSendReply() {
-    if (!selectedDetail || !selectedConversation || !selectedWorkItem) {
+    if (!selectedDetail || !selectedInteraction || !selectedWorkItem) {
       dispatch({
         type: "patch",
         patch: {
@@ -630,11 +635,11 @@ export function useCaseWorkflowActions({
       return;
     }
 
-    if (selectedConversation.channel !== "chat") {
+    if (!selectedInteraction.is_text_based) {
       dispatch({
         type: "patch",
         patch: {
-          replyStatus: { type: "error", text: "В этой версии отправка доступна только для chat-диалогов." },
+          replyStatus: { type: "error", text: "Для ответа нужен текстовый interaction кейса." },
         },
       });
       return;
@@ -662,16 +667,16 @@ export function useCaseWorkflowActions({
       const response = await apiPost<
         ClientReplyResponse,
         {
-          client_id: string;
-          conversation_id: string;
+          case_id: string;
+          source_interaction_id: string;
           manager_id: string;
           recommendation_id: string;
           source: ReplySource;
           text: string;
         }
-      >("/client/reply", {
-        client_id: selectedDetail.client.id,
-        conversation_id: selectedConversation.id,
+      >(`/cases/${encodeURIComponent(selectedDetail.client.id)}/reply`, {
+        case_id: selectedDetail.client.id,
+        source_interaction_id: selectedInteraction.id,
         manager_id: state.managerId,
         recommendation_id: selectedWorkItem.recommendation_id,
         source: state.replySource,
@@ -686,7 +691,7 @@ export function useCaseWorkflowActions({
           replySource: "manual",
           replyStatus: {
             type: "success",
-            text: `Сообщение отправлено. Чат с клиентом и CRM обновлены (${formatDateTime(response.message.created_at)}).`,
+            text: `Сообщение отправлено. История кейса и CRM обновлены (${formatDateTime(response.message.created_at)}).`,
           },
         },
       });

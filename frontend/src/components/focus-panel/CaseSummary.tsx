@@ -1,6 +1,7 @@
 import {
   formatDateTime,
   getActivityActionLabel,
+  getChannelLabel,
   getPriorityFactorLabel,
   getRecommendationStatusLabel,
   getRecommendationTypeLabel,
@@ -12,7 +13,7 @@ import { getRecentAuditEntries, type CaseSummaryProps, type VisibleActivityEntry
 export function CaseSummary({
   detail,
   workItem,
-  conversation,
+  interaction,
   aiEnabled,
   aiUnavailableMessage,
   assistantEnabled = true,
@@ -30,6 +31,7 @@ export function CaseSummary({
   canPrefillReplyFromScript,
   canPrefillReplyFromObjection,
   onChangeTab,
+  onSelectInteraction,
   onFeedbackCommentChange,
   onFeedbackDecisionChange,
   onSubmitFeedback,
@@ -52,6 +54,11 @@ export function CaseSummary({
     feedbackComment.trim() !== savedFeedbackComment.trim();
   const hasFeedbackInHistory = recentAuditEntries.some((item) => item.action === "feedback_saved");
   const hasCRMInHistory = recentAuditEntries.some((item) => item.action === "crm_note_saved");
+  const timelineItems = [...detail.timeline].sort(
+    (left, right) => new Date(left.created_at).getTime() - new Date(right.created_at).getTime(),
+  );
+  const textInteractions = detail.interactions.filter((item) => item.is_text_based);
+  const replyInteraction = interaction?.is_text_based ? interaction : textInteractions[0] ?? null;
   const visibleActivityEntries: VisibleActivityEntry[] = recentAuditEntries.map((item) => ({
     id: item.id,
     title: `${getRecommendationTypeLabel(item.recommendation_type)} · ${getActivityActionLabel(item.action)}${
@@ -94,42 +101,95 @@ export function CaseSummary({
   return (
     <div className="overview-stack">
       <section className="content-card content-card--history">
-        <h3>Чат с клиентом</h3>
-        <div className="message-thread">
-          {conversation?.messages.length ? (
-            conversation.messages.map((message) => (
-              <article
-                className={`message-bubble message-bubble--${message.sender === "manager" ? "manager" : "client"}`}
-                key={message.id}
-              >
-                <div className="message-bubble__meta">
-                  <span>{message.sender === "manager" ? "Менеджер" : client.full_name}</span>
-                  <span>{formatDateTime(message.created_at)}</span>
-                </div>
-                <p>{message.text}</p>
-              </article>
-            ))
+        <div className="section-title">
+          <div>
+            <h3>История взаимодействий</h3>
+            <p className="insight">Чаты, звонки и встречи показаны в одной ленте кейса, в хронологическом порядке.</p>
+          </div>
+        </div>
+
+        <div className="message-thread message-thread--case">
+          {timelineItems.length ? (
+            timelineItems.map((event) =>
+              event.event_type === "chat_message" ? (
+                <article
+                  className={`message-bubble message-bubble--${event.sender === "manager" ? "manager" : "client"}`}
+                  key={event.id}
+                >
+                  <div className="message-bubble__meta">
+                    <span>{event.sender === "manager" ? "Менеджер" : client.full_name}</span>
+                    <span>{formatDateTime(event.created_at)}</span>
+                  </div>
+                  <p>{event.text}</p>
+                </article>
+              ) : (
+                <article className="timeline-event-card" key={event.id}>
+                  <div className="timeline-event-card__meta">
+                    <span className="badge badge--accent">{getChannelLabel(event.channel)}</span>
+                    <span>{formatDateTime(event.created_at)}</span>
+                  </div>
+                  <strong>{event.title}</strong>
+                  <p>{event.text}</p>
+                  {detail.interactions.find((item) => item.id === event.interaction_id)?.next_step ? (
+                    <small>
+                      Следующий шаг: {detail.interactions.find((item) => item.id === event.interaction_id)?.next_step}
+                    </small>
+                  ) : null}
+                </article>
+              ),
+            )
           ) : (
             <div className="empty-state empty-state--small">
-              <strong>Истории сообщений нет</strong>
-              <p>Для кейса не найден диалог.</p>
+              <strong>История пуста</strong>
+              <p>Для кейса ещё не зафиксированы события.</p>
             </div>
           )}
         </div>
-        <CaseReplyComposer
-          conversation={conversation}
-          replyDraftText={replyDraftText}
-          replySource={replySource}
-          replySending={replySending}
-          replyStatus={replyStatus}
-          canPrefillFromScript={canPrefillReplyFromScript}
-          canPrefillFromObjection={canPrefillReplyFromObjection}
-          onReplyDraftChange={onReplyDraftChange}
-          onPrefillFromScript={onPrefillReplyFromScript}
-          onPrefillFromObjection={onPrefillReplyFromObjection}
-          onClearReplyDraft={onClearReplyDraft}
-          onSendReply={onSendReply}
-        />
+
+        {replyInteraction ? (
+          <section className="reply-target-block">
+            {textInteractions.length > 1 ? (
+              <div className="reply-target-picker">
+                {textInteractions.map((item) => (
+                  <button
+                    className={`interaction-pill interaction-pill--compact${replyInteraction.id === item.id ? " is-active" : ""}`}
+                    key={item.id}
+                    type="button"
+                    onClick={() => onSelectInteraction(item.id)}
+                  >
+                    <span className="badge badge--subtle">{getChannelLabel(item.channel)}</span>
+                    <strong>{item.title}</strong>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            <p className="insight">
+              Ответ будет отправлен в текстовый канал: <strong>{replyInteraction.title}</strong>.
+            </p>
+            <CaseReplyComposer
+              interaction={replyInteraction}
+              replyDraftText={replyDraftText}
+              replySource={replySource}
+              replySending={replySending}
+              replyStatus={replyStatus}
+              canPrefillFromScript={canPrefillReplyFromScript}
+              canPrefillFromObjection={canPrefillReplyFromObjection}
+              onReplyDraftChange={onReplyDraftChange}
+              onPrefillFromScript={onPrefillReplyFromScript}
+              onPrefillFromObjection={onPrefillReplyFromObjection}
+              onClearReplyDraft={onClearReplyDraft}
+              onSendReply={onSendReply}
+            />
+          </section>
+        ) : (
+          <section className="content-card reply-unavailable-card">
+            <h4>Ответ клиенту</h4>
+            <p className="insight">
+              В кейсе нет текстового канала. Звонки и встречи остаются событиями истории, но отправить сообщение отсюда
+              нельзя.
+            </p>
+          </section>
+        )}
       </section>
 
       <div className="overview-grid">

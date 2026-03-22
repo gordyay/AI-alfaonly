@@ -1037,6 +1037,8 @@ class SQLiteStorage:
             recommendation_type=payload.recommendation_type,
             client_id=payload.client_id,
             conversation_id=payload.conversation_id,
+            case_id=payload.case_id,
+            source_interaction_id=payload.source_interaction_id or payload.conversation_id,
             decision=payload.decision,
             comment=payload.comment,
             selected_variant=payload.selected_variant,
@@ -1426,6 +1428,11 @@ class SQLiteStorage:
             existing.recommendation_type == payload.recommendation_type
             and existing.client_id == payload.client_id
             and existing.conversation_id == payload.conversation_id
+            and (existing.case_id or payload.case_id or None) == (payload.case_id or existing.case_id or None)
+            and (
+                (existing.source_interaction_id or existing.conversation_id or None)
+                == ((payload.source_interaction_id or payload.conversation_id) or None)
+            )
             and existing.decision == payload.decision
             and (existing.comment or None) == (payload.comment or None)
             and (existing.selected_variant or None) == (payload.selected_variant or None)

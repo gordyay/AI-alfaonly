@@ -2,8 +2,8 @@ import type { UiStatus } from "../../lib/ui";
 import type {
   ActivityLogEntry,
   AISummaryDraft,
+  CaseInteraction,
   ClientDetailResponse,
-  Conversation,
   RecommendationStatus,
   ReplySource,
   ViewTab,
@@ -20,7 +20,7 @@ export interface VisibleActivityEntry {
 export interface FocusCaseBaseProps {
   detail: ClientDetailResponse;
   workItem: WorkItem;
-  conversation?: Conversation | null;
+  interaction?: CaseInteraction | null;
   aiEnabled: boolean;
   aiUnavailableMessage?: string | null;
   assistantEnabled?: boolean;
@@ -43,6 +43,7 @@ export interface CaseSummaryProps extends FocusCaseBaseProps {
   canPrefillReplyFromScript: boolean;
   canPrefillReplyFromObjection: boolean;
   onChangeTab: (tab: ViewTab) => void;
+  onSelectInteraction: (interactionId: string) => void;
   onFeedbackCommentChange: (value: string) => void;
   onFeedbackDecisionChange: (decision: RecommendationStatus) => void;
   onSubmitFeedback: () => void;
@@ -93,6 +94,8 @@ export function getRecentAuditEntries(detail: ClientDetailResponse, workItem: Wo
   return detail.activity_log.filter(
     (item) =>
       item.recommendation_id === workItem.recommendation_id ||
+      item.case_id === detail.case_id ||
+      (workItem.source_interaction_id && item.source_interaction_id === workItem.source_interaction_id) ||
       (workItem.conversation_id && item.conversation_id === workItem.conversation_id),
   );
 }

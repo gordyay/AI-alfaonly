@@ -1,7 +1,7 @@
 import type {
   AISummaryDraft,
+  CaseInteraction,
   CockpitSection,
-  Conversation,
   ProductPropensityResponse,
   WorkItem,
   WorkItemType,
@@ -114,19 +114,19 @@ export function fromFollowUpInputValue(dateValue: string, timeValue: string): st
   return new Date(`${dateValue}T${normalizedTime}:00`).toISOString();
 }
 
-export function getConversationForWorkItem(
-  conversations: Conversation[],
-  workItem?: WorkItem | null,
-): Conversation | null {
-  if (!conversations.length) {
+export function getInteractionForCase(
+  interactions: CaseInteraction[],
+  interactionId?: string | null,
+): CaseInteraction | null {
+  if (!interactions.length) {
     return null;
   }
 
-  if (workItem?.conversation_id) {
-    return conversations.find((conversation) => conversation.id === workItem.conversation_id) ?? null;
+  if (interactionId) {
+    return interactions.find((interaction) => interaction.id === interactionId) ?? null;
   }
 
-  return null;
+  return interactions.find((interaction) => interaction.is_text_based) ?? interactions[0] ?? null;
 }
 
 export function getMiniSummaryCopy(args: {

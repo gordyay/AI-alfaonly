@@ -13,7 +13,7 @@ export function useCockpit(managerId: string) {
     setCockpitError(null);
 
     try {
-      const response = await apiGet<ManagerCockpit>(`/cockpit?manager_id=${encodeURIComponent(managerId)}`);
+      const response = await apiGet<ManagerCockpit>(`/cases?manager_id=${encodeURIComponent(managerId)}`);
       setCockpit(response);
       return response;
     } catch (error) {

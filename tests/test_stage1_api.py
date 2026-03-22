@@ -51,8 +51,8 @@ async def test_tasks_list_returns_seeded_manager_tasks(client: AsyncClient):
 
 
 @pytest.mark.anyio
-async def test_cockpit_returns_unified_work_queue(client: AsyncClient):
-    response = await client.get('/cockpit?manager_id=m1')
+async def test_cases_endpoint_returns_case_first_work_queue(client: AsyncClient):
+    response = await client.get('/cases?manager_id=m1')
     assert response.status_code == 200
     body = response.json()
     assert body['manager_id'] == 'm1'
@@ -61,10 +61,11 @@ async def test_cockpit_returns_unified_work_queue(client: AsyncClient):
     assert {'actionable_items', 'urgent_items', 'due_today_items', 'opportunity_items', 'clients_in_focus'}.issubset(
         body['stats'].keys()
     )
-    item_types = {item['item_type'] for item in body['work_queue']}
-    assert {'task', 'communication', 'opportunity'}.issubset(item_types)
+    assert len({item['client_id'] for item in body['work_queue']}) == len(body['work_queue'])
     first_item = body['work_queue'][0]
     assert {'expected_benefit', 'recommendation_status', 'factor_breakdown'}.issubset(first_item.keys())
+    assert first_item['id'].startswith('case:')
+    assert first_item['recommendation_id'].startswith('rec:case:')
     assert {'urgency', 'client_value', 'engagement', 'commercial_potential', 'churn_risk', 'ai_context'}.issubset(
         first_item['factor_breakdown'].keys()
     )
@@ -149,23 +150,23 @@ async def test_dialogs_feed_can_sort_by_last_message(client: AsyncClient):
 
 @pytest.mark.anyio
 async def test_client_card_found(client: AsyncClient):
-    response = await client.get('/client/c1')
+    response = await client.get('/cases/c1')
     assert response.status_code == 200
     body = response.json()
     assert body['client']['id'] == 'c1'
+    assert body['case_id'] == 'c1'
     assert body['work_items']
     assert body['generated_artifacts'] is not None
     assert body['product_propensity']['items']
     assert body['objection_workflow']['draft']['handling_options']
     assert 'recommendation_feedback' in body
     assert 'activity_log' in body
-    assert body['dialog_recommendation'] is not None
-    assert body['dialog_recommendation']['client_id'] == 'c1'
-    assert body['conversations']
-    conversation = body['conversations'][0]
-    assert len(conversation['messages']) >= 7
-    assert 'insights' in conversation
-    assert conversation['insights'] is not None
+    assert body['interactions']
+    assert body['timeline']
+    interaction = next(item for item in body['interactions'] if item['id'] == 'conv1')
+    assert len(interaction['messages']) >= 7
+    assert 'insights' in interaction
+    assert interaction['insights'] is not None
     assert set(
         [
             'tone_label',
@@ -182,25 +183,20 @@ async def test_client_card_found(client: AsyncClient):
             'mentioned_product_codes',
             'action_hints',
         ]
-    ).issubset(conversation['insights'].keys())
-    assert conversation['insights']['next_contact_due_at'] is not None
-    assert conversation['insights']['objection_tags']
+    ).issubset(interaction['insights'].keys())
+    assert interaction['insights']['next_contact_due_at'] is not None
+    assert interaction['insights']['objection_tags']
 
 
 @pytest.mark.anyio
-async def test_client_detail_can_be_scoped_to_specific_work_item(client: AsyncClient):
-    investment_case = await client.get('/client/c1?work_item_id=task:task-2')
-    assert investment_case.status_code == 200
-    investment_body = investment_case.json()
-    assert investment_body['selected_work_item_id'] == 'task:task-2'
-    assert investment_body['selected_conversation_id'] == 'conv1'
-
-    service_case = await client.get('/client/c1?work_item_id=task:task-9')
-    assert service_case.status_code == 200
-    service_body = service_case.json()
-    assert service_body['selected_work_item_id'] == 'task:task-9'
-    assert service_body['selected_conversation_id'] == 'conv1b'
-    assert service_body['selected_conversation_id'] != investment_body['selected_conversation_id']
+async def test_case_detail_aggregates_multiple_interactions_for_one_client(client: AsyncClient):
+    response = await client.get('/cases/c1')
+    assert response.status_code == 200
+    body = response.json()
+    assert body['selected_work_item_id'] == 'case:c1'
+    interaction_ids = {item['id'] for item in body['interactions']}
+    assert {'conv1', 'conv1b'}.issubset(interaction_ids)
+    assert body['selected_interaction_id'] in interaction_ids
 
 
 @pytest.mark.anyio
@@ -214,11 +210,11 @@ async def test_seeded_conversation_signals(client: AsyncClient):
     clients = response.json()['items']
 
     for client_item in clients:
-        detail_response = await client.get(f"/client/{client_item['id']}")
+        detail_response = await client.get(f"/cases/{client_item['id']}")
         assert detail_response.status_code == 200
         detail = detail_response.json()
-        for conversation in detail['conversations']:
-            insights = conversation.get('insights') or {}
+        for interaction in detail['interactions']:
+            insights = interaction.get('insights') or {}
             if insights.get('responsiveness_pattern') == 'speed_sensitive':
                 speed_sensitive_found = True
             if insights.get('next_contact_due_at'):
@@ -247,10 +243,11 @@ async def test_create_crm_note(client: AsyncClient):
 @pytest.mark.anyio
 async def test_feedback(client: AsyncClient):
     payload = {
-        'recommendation_id': 'rec:communication:conv1',
+        'recommendation_id': 'rec:case:c1',
         'manager_id': 'm1',
         'recommendation_type': 'manager_work_item',
         'client_id': 'c1',
+        'case_id': 'c1',
         'conversation_id': 'conv1',
         'decision': 'accepted',
         'comment': 'Ок',
@@ -261,19 +258,20 @@ async def test_feedback(client: AsyncClient):
     assert body['feedback']['decision'] == 'accepted'
     assert body['created'] is True
 
-    detail_response = await client.get('/client/c1?work_item_id=task:task-2')
+    detail_response = await client.get('/cases/c1')
     detail = detail_response.json()
-    assert any(item['recommendation_id'] == 'rec:communication:conv1' for item in detail['recommendation_feedback'])
+    assert any(item['recommendation_id'] == 'rec:case:c1' for item in detail['recommendation_feedback'])
     assert any(item['action'] == 'feedback_saved' for item in detail['activity_log'])
 
 
 @pytest.mark.anyio
 async def test_feedback_deduplicates_identical_events(client: AsyncClient):
     payload = {
-        'recommendation_id': 'rec:communication:conv1',
+        'recommendation_id': 'rec:case:c1',
         'manager_id': 'm1',
         'recommendation_type': 'manager_work_item',
         'client_id': 'c1',
+        'case_id': 'c1',
         'conversation_id': 'conv1',
         'decision': 'accepted',
         'comment': 'Ок',
@@ -286,11 +284,11 @@ async def test_feedback_deduplicates_identical_events(client: AsyncClient):
     assert first.json()['created'] is True
     assert second.json()['created'] is False
 
-    detail_response = await client.get('/client/c1?work_item_id=task:task-2')
+    detail_response = await client.get('/cases/c1')
     detail = detail_response.json()
     matching_actions = [
         item for item in detail['activity_log']
-        if item['recommendation_id'] == 'rec:communication:conv1' and item['action'] == 'feedback_saved'
+        if item['recommendation_id'] == 'rec:case:c1' and item['action'] == 'feedback_saved'
     ]
     assert len(matching_actions) == 1
 
@@ -298,36 +296,36 @@ async def test_feedback_deduplicates_identical_events(client: AsyncClient):
 @pytest.mark.anyio
 async def test_crm_note_can_close_feedback_loop(client: AsyncClient):
     payload = {
-        'client_id': 'c1',
+        'case_id': 'c1',
         'manager_id': 'm1',
-        'recommendation_id': 'rec:communication:conv1',
+        'recommendation_id': 'rec:case:c1',
         'recommendation_decision': 'edited',
         'decision_comment': 'Нужен более мягкий follow-up, чем в базовой рекомендации.',
         'note_text': 'Подготовить более мягкий follow-up и вернуться с кратким сравнением.',
         'outcome': 'follow_up',
-        'source_conversation_id': 'conv1',
+        'source_interaction_id': 'conv1',
     }
     response = await client.post('/crm-note', json=payload)
     assert response.status_code == 200
     created = response.json()['crm_note']
-    assert created['recommendation_id'] == 'rec:communication:conv1'
+    assert created['recommendation_id'] == 'rec:case:c1'
     assert created['recommendation_decision'] == 'edited'
 
-    detail_response = await client.get('/client/c1?work_item_id=task:task-2')
+    detail_response = await client.get('/cases/c1')
     detail = detail_response.json()
-    assert any(item['recommendation_id'] == 'rec:communication:conv1' for item in detail['recommendation_feedback'])
-    assert detail['crm_notes'][0]['recommendation_id'] == 'rec:communication:conv1'
+    assert any(item['recommendation_id'] == 'rec:case:c1' for item in detail['recommendation_feedback'])
+    assert detail['crm_notes'][0]['recommendation_id'] == 'rec:case:c1'
 
 
 @pytest.mark.anyio
 async def test_client_reply_creates_message_activity_and_crm_note(client: AsyncClient):
     response = await client.post(
-        '/client/reply',
+        '/cases/c1/reply',
         json={
-            'client_id': 'c1',
-            'conversation_id': 'conv1',
+            'case_id': 'c1',
+            'source_interaction_id': 'conv1',
             'manager_id': 'm1',
-            'recommendation_id': 'rec:communication:conv1',
+            'recommendation_id': 'rec:case:c1',
             'source': 'script',
             'text': 'Подготовил короткий ответ по тарифу и пришлю детали сегодня до 18:00.',
         },
@@ -339,11 +337,11 @@ async def test_client_reply_creates_message_activity_and_crm_note(client: AsyncC
     assert body['crm_note']['outbound_message_text'] == body['message']['text']
     assert body['activity_log_entry']['action'] == 'client_reply_sent'
 
-    detail_response = await client.get('/client/c1?work_item_id=task:task-2')
+    detail_response = await client.get('/cases/c1')
     assert detail_response.status_code == 200
     detail = detail_response.json()
-    conversation = next(item for item in detail['conversations'] if item['id'] == 'conv1')
-    assert conversation['messages'][-1]['text'] == body['message']['text']
+    interaction = next(item for item in detail['interactions'] if item['id'] == 'conv1')
+    assert interaction['messages'][-1]['text'] == body['message']['text']
     assert any(note['note_type'] == 'outbound_reply' for note in detail['crm_notes'])
     assert any(item['action'] == 'client_reply_sent' for item in detail['activity_log'])
 
@@ -351,20 +349,21 @@ async def test_client_reply_creates_message_activity_and_crm_note(client: AsyncC
 @pytest.mark.anyio
 async def test_client_reply_rejects_non_chat_conversation(client: AsyncClient):
     response = await client.post(
-        '/client/reply',
+        '/cases/c2/reply',
         json={
-            'client_id': 'c2',
-            'conversation_id': 'conv2',
+            'case_id': 'c2',
+            'source_interaction_id': 'conv2',
             'manager_id': 'm1',
             'text': 'Подтверждаю звонок и отправляю детали.',
         },
     )
     assert response.status_code == 409
 
-    detail_response = await client.get('/client/c2')
+    detail_response = await client.get('/cases/c2')
     detail = detail_response.json()
-    conversation = next(item for item in detail['conversations'] if item['id'] == 'conv2')
-    assert all(message['text'] != 'Подтверждаю звонок и отправляю детали.' for message in conversation['messages'])
+    interaction = next(item for item in detail['interactions'] if item['id'] == 'conv2')
+    assert interaction['is_text_based'] is False
+    assert interaction['messages'] == []
 
 
 @pytest.mark.anyio

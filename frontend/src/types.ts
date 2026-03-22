@@ -44,6 +44,8 @@ export interface WorkItem {
   product_code?: string | null;
   product_name?: string | null;
   client_churn_risk?: string | null;
+  case_id?: string | null;
+  source_interaction_id?: string | null;
 }
 
 export interface CockpitSection {
@@ -130,6 +132,36 @@ export interface Conversation {
   started_at: string;
   messages: Message[];
   insights?: ConversationInsights | null;
+}
+
+export interface CaseInteraction {
+  id: string;
+  case_id: string;
+  client_id: string;
+  channel: string;
+  title: string;
+  started_at: string;
+  summary: string;
+  outcome?: string | null;
+  next_step?: string | null;
+  is_text_based: boolean;
+  message_count: number;
+  last_activity_at?: string | null;
+  messages: Message[];
+  insights?: ConversationInsights | null;
+}
+
+export interface CaseTimelineEvent {
+  id: string;
+  case_id: string;
+  interaction_id: string;
+  channel: string;
+  event_type: string;
+  created_at: string;
+  title: string;
+  text: string;
+  sender?: string | null;
+  is_outbound: boolean;
 }
 
 export interface ProductPropensityFactors {
@@ -251,6 +283,8 @@ export interface ScriptGenerationRecord {
   manager_id: string;
   recommendation_id?: string | null;
   conversation_id?: string | null;
+  case_id?: string | null;
+  source_interaction_id?: string | null;
   contact_goal?: string | null;
   selected_variant_label?: string | null;
   selected_text?: string | null;
@@ -265,6 +299,8 @@ export interface ObjectionWorkflowRecord {
   manager_id: string;
   recommendation_id?: string | null;
   conversation_id?: string | null;
+  case_id?: string | null;
+  source_interaction_id?: string | null;
   selected_option_title?: string | null;
   selected_response?: string | null;
   draft: ObjectionWorkflowDraft;
@@ -278,6 +314,8 @@ export interface CRMDraftRevision {
   manager_id: string;
   recommendation_id?: string | null;
   conversation_id?: string | null;
+  case_id?: string | null;
+  source_interaction_id?: string | null;
   stage: string;
   changed_fields: string[];
   draft: AISummaryDraft;
@@ -329,6 +367,8 @@ export interface AssistantActionResult {
   action_type: string;
   client_id?: string | null;
   conversation_id?: string | null;
+  case_id?: string | null;
+  source_interaction_id?: string | null;
   draft?: AISummaryDraft | null;
   sales_script_draft?: SalesScriptDraft | null;
   objection_workflow_draft?: ObjectionWorkflowDraft | null;
@@ -358,6 +398,8 @@ export interface CRMNote {
   follow_up_reason?: string | null;
   summary_text?: string | null;
   source_conversation_id?: string | null;
+  case_id?: string | null;
+  source_interaction_id?: string | null;
   ai_generated: boolean;
   ai_draft_payload?: AISummaryDraft | null;
   note_type?: "crm_summary" | "outbound_reply";
@@ -380,6 +422,8 @@ export interface GeneratedArtifact {
   created_at: string;
   source_conversation_id?: string | null;
   source_task_id?: string | null;
+  case_id?: string | null;
+  source_interaction_id?: string | null;
 }
 
 export interface RecommendationFeedbackRecord {
@@ -389,6 +433,8 @@ export interface RecommendationFeedbackRecord {
   recommendation_type: string;
   client_id?: string | null;
   conversation_id?: string | null;
+  case_id?: string | null;
+  source_interaction_id?: string | null;
   decision: RecommendationStatus;
   comment?: string | null;
   selected_variant?: string | null;
@@ -401,6 +447,8 @@ export interface ActivityLogEntry {
   client_id: string;
   recommendation_id?: string | null;
   conversation_id?: string | null;
+  case_id?: string | null;
+  source_interaction_id?: string | null;
   manager_id: string;
   action: string;
   decision?: string | null;
@@ -420,11 +468,12 @@ export interface FollowUp {
 
 export interface ClientDetailResponse {
   client: Client;
+  case_id: string;
   tasks: Array<Record<string, unknown>>;
-  conversations: Conversation[];
+  interactions: CaseInteraction[];
+  timeline: CaseTimelineEvent[];
   selected_work_item_id?: string | null;
-  selected_conversation_id?: string | null;
-  dialog_recommendation?: WorkItem | null;
+  selected_interaction_id?: string | null;
   work_items: WorkItem[];
   product_propensity?: ProductPropensityResponse | null;
   objection_workflow?: ObjectionWorkflowResponse | null;
