@@ -438,7 +438,13 @@ export interface HealthResponse {
   stage: string;
   storage: string;
   version: string;
-  feature_flags: Record<string, boolean>;
+  feature_flags: {
+    supervisor_dashboard?: boolean;
+    assistant_panel?: boolean;
+    feedback_loop?: boolean;
+    propensity_module?: boolean;
+    [key: string]: boolean | undefined;
+  };
   ai: {
     available: boolean;
     provider: string;

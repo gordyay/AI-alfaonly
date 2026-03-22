@@ -53,6 +53,6 @@ class AppSettings:
             version=os.getenv("APP_VERSION", "0.10.0"),
             db_path=db_path or os.getenv("APP_DB_PATH"),
             static_dir=static_dir or Path(__file__).resolve().parent / "static",
-            stage_label=os.getenv("APP_STAGE_LABEL", "stage-14-production-like-mvp"),
+            stage_label=os.getenv("APP_STAGE_LABEL", "stage-14-demo-mvp"),
             features=FeatureFlags.from_env(),
         )

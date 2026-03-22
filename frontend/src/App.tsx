@@ -1,32 +1,15 @@
 import { startTransition, useDeferredValue, useEffect, useRef, useState } from "react";
-import { apiGet, apiPost } from "./lib/api";
+import { apiGet } from "./lib/api";
+import { getFrontendFeatureFlags } from "./lib/ui";
 import {
   cloneDraft,
   filterWorkQueue,
-  formatDateTime,
   getConversationForWorkItem,
-  groupWorkQueue,
   getRecommendationStatusLabel,
+  groupWorkQueue,
   type WorkQueueFilters,
 } from "./lib/utils";
-import type {
-  AISummaryDraft,
-  AssistantChatResponse,
-  AssistantThread,
-  AssistantThreadDetail,
-  ClientDetailResponse,
-  GenerateScriptResponse,
-  HealthResponse,
-  ManagerCockpit,
-  ObjectionWorkflowResponse,
-  RecommendationStatus,
-  SortMode,
-  SupervisorDashboardResponse,
-  SummarizeDialogResponse,
-  ThreadListResponse,
-  ViewTab,
-  WorkItem,
-} from "./types";
+import type { AssistantActionResult, ClientDetailResponse, HealthResponse, SortMode, WorkItem } from "./types";
 import { AssistantPanel } from "./components/AssistantPanel";
 import { FocusPanel } from "./components/FocusPanel";
 import { GuidedTour, type GuidedTourStep } from "./components/GuidedTour";
@@ -36,18 +19,15 @@ import { OnboardingPanel } from "./components/OnboardingPanel";
 import { StatusMessage } from "./components/StatusMessage";
 import { SupervisorPanel } from "./components/SupervisorPanel";
 import { WorkQueueRail } from "./components/WorkQueueRail";
+import { useAssistant } from "./hooks/useAssistant";
+import { useCaseWorkflowActions } from "./hooks/useCaseWorkflowActions";
+import { useClientDetail } from "./hooks/useClientDetail";
+import { useCockpit } from "./hooks/useCockpit";
+import { useFocusScreenReducer } from "./hooks/useFocusScreenReducer";
+import { useSupervisorDashboard } from "./hooks/useSupervisorDashboard";
 
-type UiStatus = { type: "loading" | "success" | "error"; text: string } | null;
 const ONBOARDING_STORAGE_KEY = "alfa_only_onboarding_hidden";
 const TOUR_SEEN_STORAGE_KEY = "alfa_only_guided_tour_seen";
-const DEFAULT_QUEUE_FILTERS: WorkQueueFilters = {
-  itemType: "all",
-  productCode: "all",
-  priorityLabel: "all",
-  recommendationStatus: "all",
-  churnRisk: "all",
-  channel: "all",
-};
 
 const TOUR_STEPS: GuidedTourStep[] = [
   {
@@ -118,94 +98,33 @@ function getSelectedWorkItem(
   );
 }
 
-function getDetailCacheKey(clientId: string, workItemId?: string | null) {
-  return `${clientId}::${workItemId || "default"}`;
-}
-
-function findWorkItemByConversation(items: WorkItem[], clientId: string, conversationId?: string | null) {
-  if (!conversationId) {
-    return items.find((item) => item.client_id === clientId) ?? null;
-  }
-
-  return (
-    items.find((item) => item.client_id === clientId && item.conversation_id === conversationId) ??
-    items.find((item) => item.client_id === clientId) ??
-    null
-  );
-}
-
-function createDraftThread(managerId: string, selectedClientName?: string | null): AssistantThread {
-  const now = new Date().toISOString();
-  return {
-    id: "draft",
-    manager_id: managerId,
-    title: selectedClientName || "Новый диалог",
-    last_selected_client_id: null,
-    memory_summary: null,
-    created_at: now,
-    updated_at: now,
-  };
-}
-
 export function App() {
-  const [managerId, setManagerId] = useState("m1");
-  const [sortMode, setSortMode] = useState<SortMode>("priority");
-  const [filterQuery, setFilterQuery] = useState("");
-  const [queueFilters, setQueueFilters] = useState<WorkQueueFilters>(DEFAULT_QUEUE_FILTERS);
-  const deferredQuery = useDeferredValue(filterQuery.trim().toLowerCase());
-  const [onboardingCollapsed, setOnboardingCollapsed] = useState(true);
-  const [tourOpen, setTourOpen] = useState(false);
+  const [screenState, dispatch] = useFocusScreenReducer();
   const [health, setHealth] = useState<HealthResponse | null>(null);
-
-  const [cockpit, setCockpit] = useState<ManagerCockpit | null>(null);
-  const [cockpitLoading, setCockpitLoading] = useState(true);
-  const [cockpitError, setCockpitError] = useState<string | null>(null);
-  const [supervisorDashboard, setSupervisorDashboard] = useState<SupervisorDashboardResponse | null>(null);
-
-  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
-  const [selectedWorkItemId, setSelectedWorkItemId] = useState<string | null>(null);
-  const [clientDetails, setClientDetails] = useState<Record<string, ClientDetailResponse>>({});
-  const [detailLoading, setDetailLoading] = useState(false);
-
-  const [activeTab, setActiveTab] = useState<ViewTab>("summary");
-  const [aiDraft, setAiDraft] = useState<AISummaryDraft | null>(null);
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiSaving, setAiSaving] = useState(false);
-  const [aiStatus, setAiStatus] = useState<UiStatus>(null);
-  const [aiSaveStatus, setAiSaveStatus] = useState<UiStatus>(null);
-  const [scriptGoal, setScriptGoal] = useState("");
-  const [scriptLoading, setScriptLoading] = useState(false);
-  const [scriptSelecting, setScriptSelecting] = useState(false);
-  const [scriptStatus, setScriptStatus] = useState<UiStatus>(null);
-  const [objectionInput, setObjectionInput] = useState("");
-  const [objectionLoading, setObjectionLoading] = useState(false);
-  const [objectionSelecting, setObjectionSelecting] = useState(false);
-  const [objectionStatus, setObjectionStatus] = useState<UiStatus>(null);
-  const [feedbackDecision, setFeedbackDecision] = useState<RecommendationStatus | null>(null);
-  const [feedbackComment, setFeedbackComment] = useState("");
-  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
-  const [feedbackStatus, setFeedbackStatus] = useState<UiStatus>(null);
-
-  const [assistantThreads, setAssistantThreads] = useState<AssistantThread[]>([]);
-  const [assistantSelectedThreadId, setAssistantSelectedThreadId] = useState<string | null>(null);
-  const [assistantThreadDetail, setAssistantThreadDetail] = useState<AssistantThreadDetail | null>(null);
-  const [assistantLoading, setAssistantLoading] = useState(false);
-  const [assistantSending, setAssistantSending] = useState(false);
-  const [assistantStatus, setAssistantStatus] = useState<UiStatus>(null);
-  const [assistantInput, setAssistantInput] = useState("");
-  const [pendingFocusJump, setPendingFocusJump] = useState(false);
   const focusPanelRef = useRef<HTMLDivElement | null>(null);
+  const deferredQuery = useDeferredValue(screenState.filterQuery.trim().toLowerCase());
+
+  const { cockpit, cockpitLoading, cockpitError, loadCockpit } = useCockpit(screenState.managerId);
+  const { supervisorDashboard, loadSupervisorDashboard } = useSupervisorDashboard(screenState.managerId);
+  const { selectedDetail, detailLoading, loadClientDetail, reloadClientDetail, resetClientDetails } = useClientDetail(
+    screenState.selectedClientId,
+    screenState.selectedWorkItemId,
+  );
+
+  const featureFlags = health ? getFrontendFeatureFlags(health) : null;
+  const assistantEnabled = featureFlags?.assistantPanel ?? false;
+  const supervisorEnabled = featureFlags?.supervisorDashboard ?? false;
+  const feedbackEnabled = featureFlags?.feedbackLoop ?? false;
+  const propensityEnabled = featureFlags?.propensityModule ?? false;
 
   const workQueue = cockpit?.work_queue ?? [];
-  const selectedDetailKey = selectedClientId ? getDetailCacheKey(selectedClientId, selectedWorkItemId) : null;
-  const selectedDetail = selectedDetailKey ? clientDetails[selectedDetailKey] ?? null : null;
-  const selectedWorkItem = getSelectedWorkItem(workQueue, selectedDetail, selectedWorkItemId);
+  const selectedWorkItem = getSelectedWorkItem(workQueue, selectedDetail, screenState.selectedWorkItemId);
   const selectedConversation = selectedDetail
     ? getConversationForWorkItem(selectedDetail.conversations, selectedWorkItem)
     : null;
   const latestScriptArtifact = selectedDetail?.script_history?.[0] ?? null;
   const latestObjectionArtifact = selectedDetail?.objection_history?.[0] ?? null;
-  const filteredWorkQueue = filterWorkQueue(workQueue, deferredQuery, queueFilters);
+  const filteredWorkQueue = filterWorkQueue(workQueue, deferredQuery, screenState.queueFilters);
   const filteredSections = groupWorkQueue(filteredWorkQueue);
   const productOptions = [
     { value: "all", label: "Все продукты" },
@@ -223,12 +142,43 @@ export function App() {
   const savedFeedbackDecision =
     currentFeedback?.decision ??
     (selectedWorkItem?.recommendation_status !== "pending" ? selectedWorkItem?.recommendation_status : null);
+  const effectiveSavedFeedbackDecision = feedbackEnabled ? (savedFeedbackDecision ?? null) : null;
   const savedCRMNote =
     selectedDetail?.crm_notes.find((note) => note.recommendation_id === selectedWorkItem?.recommendation_id) ??
     selectedDetail?.crm_notes[0] ??
     null;
   const aiEnabled = health?.ai.available ?? false;
   const aiUnavailableMessage = health?.ai.reason ?? "AI-функции временно недоступны.";
+
+  async function handleAssistantActionResult(actionResult?: AssistantActionResult | null) {
+    await workflowActions.syncAssistantAction(actionResult);
+  }
+
+  const assistant = useAssistant({
+    managerId: screenState.managerId,
+    selectedClientId: screenState.selectedClientId,
+    selectedClientName: selectedDetail?.client.full_name ?? null,
+    selectedWorkItemId: screenState.selectedWorkItemId,
+    onActionResult: handleAssistantActionResult,
+  });
+
+  const workflowActions = useCaseWorkflowActions({
+    state: screenState,
+    dispatch,
+    selectedDetail,
+    selectedWorkItem,
+    selectedConversation,
+    latestScriptArtifact,
+    latestObjectionArtifact,
+    savedFeedbackDecision: effectiveSavedFeedbackDecision,
+    workQueue,
+    loadCockpit,
+    loadClientDetail,
+    reloadClientDetail,
+    loadSupervisorDashboard: supervisorEnabled ? loadSupervisorDashboard : async () => undefined,
+    prepareAssistantDraftThread: assistant.prepareDraftThread,
+  });
+
   const journeySteps = [
     {
       id: "select",
@@ -237,26 +187,30 @@ export function App() {
       done: Boolean(selectedWorkItem),
       active: !selectedWorkItem,
     },
-    {
-      id: "decide",
-      title: "Принять решение",
-      description: savedFeedbackDecision
-        ? `Решение сохранено: ${getRecommendationStatusLabel(savedFeedbackDecision)}`
-        : feedbackDecision
-          ? `Готово к сохранению: ${getRecommendationStatusLabel(feedbackDecision)}`
-        : "Выберите: принять, доработать или отклонить.",
-      done: Boolean(savedFeedbackDecision),
-      active: Boolean(selectedWorkItem) && !savedFeedbackDecision,
-    },
+    ...(feedbackEnabled
+      ? [
+          {
+            id: "decide",
+            title: "Принять решение",
+            description: effectiveSavedFeedbackDecision
+              ? `Решение сохранено: ${getRecommendationStatusLabel(effectiveSavedFeedbackDecision)}`
+              : screenState.feedbackDecision
+                ? `Готово к сохранению: ${getRecommendationStatusLabel(screenState.feedbackDecision)}`
+                : "Выберите: принять, доработать или отклонить.",
+            done: Boolean(effectiveSavedFeedbackDecision),
+            active: Boolean(selectedWorkItem) && !effectiveSavedFeedbackDecision,
+          },
+        ]
+      : []),
     {
       id: "prepare",
       title: "Подготовить артефакт",
       description:
-        aiDraft || latestScriptArtifact || latestObjectionArtifact
+        screenState.aiDraft || latestScriptArtifact || latestObjectionArtifact
           ? "Сценарий, разбор возражения или CRM-черновик готовы к проверке."
           : "Подготовьте сценарий, разбор возражения или CRM-черновик по кейсу.",
-      done: Boolean(aiDraft || latestScriptArtifact || latestObjectionArtifact),
-      active: Boolean(selectedWorkItem) && !aiDraft && !latestScriptArtifact && !latestObjectionArtifact,
+      done: Boolean(screenState.aiDraft || latestScriptArtifact || latestObjectionArtifact),
+      active: Boolean(selectedWorkItem) && !screenState.aiDraft && !latestScriptArtifact && !latestObjectionArtifact,
     },
     {
       id: "save",
@@ -269,470 +223,19 @@ export function App() {
     },
   ];
 
+  const tourSteps = TOUR_STEPS.filter((step) => {
+    if (step.id === "assistant") {
+      return assistantEnabled;
+    }
+    if (step.id === "supervisor") {
+      return supervisorEnabled;
+    }
+    return true;
+  });
+
   async function loadHealth() {
     const response = await apiGet<HealthResponse>("/health");
     setHealth(response);
-  }
-
-  async function loadSupervisorDashboard() {
-    const response = await apiGet<SupervisorDashboardResponse>(
-      `/supervisor/dashboard?manager_id=${encodeURIComponent(managerId)}`,
-    );
-    setSupervisorDashboard(response);
-  }
-
-  async function loadCockpit(preferredWorkItemId?: string | null, preferredClientId?: string | null) {
-    setCockpitLoading(true);
-    setCockpitError(null);
-
-    try {
-      const response = await apiGet<ManagerCockpit>(`/cockpit?manager_id=${encodeURIComponent(managerId)}`);
-      setCockpit(response);
-
-      const availableQueue = response.work_queue ?? [];
-      const nextItem =
-        (preferredWorkItemId && availableQueue.find((item) => item.id === preferredWorkItemId)) ||
-        response.focus_item ||
-        availableQueue[0] ||
-        null;
-
-      if (nextItem) {
-        await selectWorkItem(nextItem, preferredClientId ?? nextItem.client_id);
-      } else {
-        setSelectedClientId(null);
-        setSelectedWorkItemId(null);
-      }
-    } catch (error) {
-      setCockpitError(error instanceof Error ? error.message : "Не удалось загрузить cockpit.");
-    } finally {
-      setCockpitLoading(false);
-    }
-  }
-
-  async function loadClientDetail(clientId: string, workItemId?: string | null): Promise<ClientDetailResponse> {
-    const cacheKey = getDetailCacheKey(clientId, workItemId);
-    const cachedDetail = clientDetails[cacheKey];
-    if (cachedDetail) {
-      return cachedDetail;
-    }
-
-    setDetailLoading(true);
-    try {
-      const query = workItemId ? `?work_item_id=${encodeURIComponent(workItemId)}` : "";
-      const detail = await apiGet<ClientDetailResponse>(`/client/${clientId}${query}`);
-      setClientDetails((current) => ({ ...current, [cacheKey]: detail }));
-      return detail;
-    } finally {
-      setDetailLoading(false);
-    }
-  }
-
-  async function selectWorkItem(item: WorkItem, forcedClientId?: string) {
-    const nextClientId = forcedClientId ?? item.client_id;
-
-    startTransition(() => {
-      setSelectedClientId(nextClientId);
-      setSelectedWorkItemId(item.id);
-      setActiveTab("summary");
-      setAiDraft(null);
-      setAiStatus(null);
-      setAiSaveStatus(null);
-      setScriptStatus(null);
-      setObjectionStatus(null);
-      setAssistantSelectedThreadId("draft");
-      setAssistantThreadDetail({
-        thread: createDraftThread(managerId, item.client_name),
-        messages: [],
-      });
-      setAssistantInput("");
-      setAssistantStatus(null);
-    });
-
-    const detail = await loadClientDetail(nextClientId, item.id);
-    setAiDraft(cloneDraft(detail.saved_ai_draft));
-  }
-
-  async function reloadClientDetail(clientId: string, workItemId?: string | null) {
-    const query = workItemId ? `?work_item_id=${encodeURIComponent(workItemId)}` : "";
-    const detail = await apiGet<ClientDetailResponse>(`/client/${clientId}${query}`);
-    setClientDetails((current) => ({ ...current, [getDetailCacheKey(clientId, workItemId)]: detail }));
-    return detail;
-  }
-
-  async function loadAssistantThreads(preferredThreadId?: string | null) {
-    setAssistantLoading(true);
-    try {
-      const response = await apiGet<ThreadListResponse>(`/assistant/threads?manager_id=${encodeURIComponent(managerId)}`);
-      const items = response.items ?? [];
-      setAssistantThreads(items);
-      const nextThreadId = preferredThreadId ?? items[0]?.id ?? null;
-      if (nextThreadId) {
-        await loadAssistantThread(nextThreadId);
-      } else {
-        setAssistantThreadDetail(null);
-      }
-      setAssistantStatus(null);
-    } catch (error) {
-      setAssistantStatus({
-        type: "error",
-        text: error instanceof Error ? error.message : "Не удалось загрузить историю ассистента.",
-      });
-    } finally {
-      setAssistantLoading(false);
-    }
-  }
-
-  async function loadAssistantThread(threadId: string) {
-    const detail = await apiGet<AssistantThreadDetail>(`/assistant/threads/${encodeURIComponent(threadId)}`);
-    setAssistantSelectedThreadId(threadId);
-    setAssistantThreadDetail(detail);
-    setAssistantThreads((current) =>
-      current.some((thread) => thread.id === detail.thread.id)
-        ? current.map((thread) => (thread.id === detail.thread.id ? detail.thread : thread))
-        : [detail.thread, ...current],
-    );
-  }
-
-  async function createAssistantThread() {
-    const response = await apiPost<{ thread: AssistantThread }, { manager_id: string; selected_client_id: string | null; title: string | null }>(
-      "/assistant/threads",
-      {
-        manager_id: managerId,
-        selected_client_id: selectedClientId,
-        title: selectedDetail?.client.full_name ?? null,
-      },
-    );
-
-    setAssistantThreads((current) => [response.thread, ...current.filter((thread) => thread.id !== response.thread.id)]);
-    setAssistantSelectedThreadId(response.thread.id);
-    setAssistantThreadDetail({ thread: response.thread, messages: [] });
-    return response.thread.id;
-  }
-
-  async function syncAssistantAction(actionResult?: AssistantChatResponse["action_result"] | null) {
-    if (!actionResult?.client_id) {
-      return;
-    }
-
-    const nextWorkItem = findWorkItemByConversation(workQueue, actionResult.client_id, actionResult.conversation_id);
-    const detail = await reloadClientDetail(actionResult.client_id, nextWorkItem?.id ?? null);
-    setSelectedClientId(actionResult.client_id);
-    setSelectedWorkItemId(detail.selected_work_item_id ?? nextWorkItem?.id ?? null);
-    await loadCockpit(detail.selected_work_item_id ?? nextWorkItem?.id ?? null, actionResult.client_id);
-
-    if (actionResult.draft) {
-      setAiDraft(cloneDraft(actionResult.draft));
-      setActiveTab("crm");
-      setAiStatus({ type: "success", text: "Черновик для CRM подготовлен через помощника." });
-    }
-    if (actionResult.sales_script_draft) {
-      setActiveTab("script");
-      setScriptStatus({ type: "success", text: "Ассистент подготовил скрипт. Выберите и сохраните вариант в центре кейса." });
-    }
-    if (actionResult.objection_workflow_draft) {
-      setActiveTab("objections");
-      setObjectionStatus({
-        type: "success",
-        text: "Ассистент подготовил разбор возражения. Зафиксируйте выбранный ответ в центре кейса.",
-      });
-    }
-  }
-
-  async function handleSendAssistantMessage(prefilledMessage?: string) {
-    const message = (prefilledMessage ?? assistantInput).trim();
-    if (!message) {
-      return;
-    }
-
-    setAssistantSending(true);
-    setAssistantStatus({ type: "loading", text: "Ассистент готовит ответ..." });
-
-    try {
-      const threadId = assistantSelectedThreadId === "draft" ? await createAssistantThread() : assistantSelectedThreadId || (await createAssistantThread());
-      const response = await apiPost<
-        AssistantChatResponse,
-        { manager_id: string; thread_id: string; message: string; selected_client_id: string | null }
-      >("/assistant/chat", {
-        manager_id: managerId,
-        thread_id: threadId,
-        message,
-        selected_client_id: selectedClientId,
-        selected_work_item_id: selectedWorkItemId,
-      });
-
-      setAssistantInput("");
-      await loadAssistantThread(response.thread.id);
-      await syncAssistantAction(response.action_result);
-      setAssistantStatus({
-        type: "success",
-        text: response.action_result?.draft
-          ? "Сводка и CRM-черновик готовы."
-          : response.action_result?.sales_script_draft
-            ? "Скрипт продажи готов."
-            : response.action_result?.objection_workflow_draft
-              ? "Варианты отработки возражения готовы."
-              : "Ответ ассистента готов.",
-      });
-    } catch (error) {
-      setAssistantStatus({
-        type: "error",
-        text: error instanceof Error ? error.message : "Не удалось получить ответ ассистента.",
-      });
-    } finally {
-      setAssistantSending(false);
-    }
-  }
-
-  async function handleGenerateSummary() {
-    if (!selectedDetail || !selectedConversation) {
-      setAiStatus({ type: "error", text: "Для выбранного кейса нет коммуникации для обработки." });
-      return;
-    }
-
-    setAiLoading(true);
-    setAiStatus({ type: "loading", text: "Готовим сводку и запись для CRM..." });
-    setAiSaveStatus(null);
-
-    try {
-      const response = await apiPost<
-        SummarizeDialogResponse,
-        { client_id: string; conversation_id: string; manager_id: string }
-      >("/ai/summarize-dialog", {
-        client_id: selectedDetail.client.id,
-        conversation_id: selectedConversation.id,
-        manager_id: managerId,
-      });
-
-      setAiDraft(response.draft);
-      const refreshedDetail = await reloadClientDetail(selectedDetail.client.id, selectedWorkItem?.id ?? null);
-      await loadCockpit(selectedWorkItem?.id ?? null, selectedDetail.client.id);
-      setAiDraft(cloneDraft(refreshedDetail.saved_ai_draft) ?? cloneDraft(response.draft));
-      setActiveTab("crm");
-      setAiStatus({
-        type: "success",
-        text: `Черновик готов (${response.model_name}, ${formatDateTime(response.generated_at)}).`,
-      });
-    } catch (error) {
-      setAiStatus({ type: "error", text: error instanceof Error ? error.message : "Не удалось сгенерировать черновик." });
-    } finally {
-      setAiLoading(false);
-    }
-  }
-
-  async function handleGenerateScript() {
-    if (!selectedDetail || !selectedConversation || !selectedWorkItem) {
-      setScriptStatus({ type: "error", text: "Для кейса не выбрана коммуникация." });
-      return;
-    }
-
-    setScriptLoading(true);
-    setScriptStatus({ type: "loading", text: "Готовим скрипт по выбранному кейсу..." });
-
-    try {
-      const response = await apiPost<
-        GenerateScriptResponse,
-        { client_id: string; conversation_id: string; manager_id: string; contact_goal: string | null; recommendation_id: string }
-      >("/ai/generate-script", {
-        client_id: selectedDetail.client.id,
-        conversation_id: selectedConversation.id,
-        manager_id: managerId,
-        contact_goal: scriptGoal || selectedWorkItem.next_best_action,
-        recommendation_id: selectedWorkItem.recommendation_id,
-      });
-
-      await reloadClientDetail(selectedDetail.client.id, selectedWorkItem.id);
-      await loadCockpit(selectedWorkItem.id, selectedDetail.client.id);
-      setActiveTab("script");
-      setScriptStatus({
-        type: "success",
-        text: `Скрипт сохранён в историю кейса (${formatDateTime(response.generated_at)}).`,
-      });
-    } catch (error) {
-      setScriptStatus({ type: "error", text: error instanceof Error ? error.message : "Не удалось подготовить скрипт." });
-    } finally {
-      setScriptLoading(false);
-    }
-  }
-
-  async function handleSelectScriptVariant(variantLabel: string, selectedText: string) {
-    if (!latestScriptArtifact || !selectedDetail || !selectedWorkItem) {
-      return;
-    }
-
-    setScriptSelecting(true);
-    setScriptStatus({ type: "loading", text: "Фиксируем выбранный вариант скрипта..." });
-
-    try {
-      await apiPost<unknown, Record<string, string>>("/ai/script-selection", {
-        artifact_id: latestScriptArtifact.id,
-        manager_id: managerId,
-        variant_label: variantLabel,
-        selected_text: selectedText,
-      });
-      await reloadClientDetail(selectedDetail.client.id, selectedWorkItem.id);
-      await loadSupervisorDashboard();
-      setScriptStatus({ type: "success", text: "Выбранный вариант скрипта сохранён в кейсе." });
-    } catch (error) {
-      setScriptStatus({
-        type: "error",
-        text: error instanceof Error ? error.message : "Не удалось сохранить вариант скрипта.",
-      });
-    } finally {
-      setScriptSelecting(false);
-    }
-  }
-
-  async function handleGenerateObjectionWorkflow() {
-    if (!selectedDetail || !selectedConversation || !selectedWorkItem) {
-      setObjectionStatus({ type: "error", text: "Для кейса не выбрана коммуникация." });
-      return;
-    }
-
-    setObjectionLoading(true);
-    setObjectionStatus({ type: "loading", text: "Готовим варианты отработки возражения..." });
-
-    try {
-      const response = await apiPost<
-        ObjectionWorkflowResponse,
-        { client_id: string; conversation_id: string; manager_id: string; objection_text: string | null; recommendation_id: string }
-      >("/ai/objection-workflow", {
-        client_id: selectedDetail.client.id,
-        conversation_id: selectedConversation.id,
-        manager_id: managerId,
-        objection_text: objectionInput || null,
-        recommendation_id: selectedWorkItem.recommendation_id,
-      });
-
-      await reloadClientDetail(selectedDetail.client.id, selectedWorkItem.id);
-      await loadCockpit(selectedWorkItem.id, selectedDetail.client.id);
-      setActiveTab("objections");
-      setObjectionStatus({
-        type: "success",
-        text: `Варианты ответа сохранены (${formatDateTime(response.generated_at)}).`,
-      });
-    } catch (error) {
-      setObjectionStatus({
-        type: "error",
-        text: error instanceof Error ? error.message : "Не удалось подготовить разбор возражения.",
-      });
-    } finally {
-      setObjectionLoading(false);
-    }
-  }
-
-  async function handleSelectObjectionOption(optionTitle: string, selectedResponse: string) {
-    if (!latestObjectionArtifact || !selectedDetail || !selectedWorkItem) {
-      return;
-    }
-
-    setObjectionSelecting(true);
-    setObjectionStatus({ type: "loading", text: "Фиксируем выбранный ответ..." });
-
-    try {
-      await apiPost<unknown, Record<string, string>>("/ai/objection-selection", {
-        artifact_id: latestObjectionArtifact.id,
-        manager_id: managerId,
-        option_title: optionTitle,
-        selected_response: selectedResponse,
-      });
-      await reloadClientDetail(selectedDetail.client.id, selectedWorkItem.id);
-      await loadSupervisorDashboard();
-      setObjectionStatus({ type: "success", text: "Выбранный вариант ответа сохранён." });
-    } catch (error) {
-      setObjectionStatus({
-        type: "error",
-        text: error instanceof Error ? error.message : "Не удалось сохранить вариант ответа.",
-      });
-    } finally {
-      setObjectionSelecting(false);
-    }
-  }
-
-  async function handleSaveSummary() {
-    if (!selectedDetail || !selectedWorkItem || !selectedConversation || !aiDraft) {
-      return;
-    }
-
-    setAiSaving(true);
-    setAiSaveStatus({ type: "loading", text: "Сохраняем CRM-заметку..." });
-
-    try {
-      await apiPost<unknown, Record<string, unknown>>("/crm-note", {
-        client_id: selectedDetail.client.id,
-        manager_id: managerId,
-        task_id: selectedWorkItem.task_id,
-        recommendation_id: selectedWorkItem.recommendation_id,
-        recommendation_decision: savedFeedbackDecision ?? null,
-        decision_comment: feedbackComment || null,
-        note_text: aiDraft.crm_note_draft,
-        outcome: aiDraft.outcome,
-        channel: selectedConversation.channel,
-        follow_up_date: aiDraft.follow_up_required ? aiDraft.follow_up_date : null,
-        follow_up_reason: aiDraft.follow_up_reason,
-        summary_text: aiDraft.contact_summary,
-        source_conversation_id: selectedConversation.id,
-        ai_generated: true,
-        ai_draft_payload: aiDraft,
-      });
-
-      const detail = await reloadClientDetail(selectedDetail.client.id, selectedWorkItem.id);
-      setAiDraft(cloneDraft(detail.saved_ai_draft) ?? cloneDraft(aiDraft));
-      await loadCockpit(selectedWorkItem.id, selectedDetail.client.id);
-      await loadSupervisorDashboard();
-      setAiSaveStatus({ type: "success", text: "CRM-заметка сохранена." });
-    } catch (error) {
-      setAiSaveStatus({ type: "error", text: error instanceof Error ? error.message : "Не удалось сохранить запись в CRM." });
-    } finally {
-      setAiSaving(false);
-    }
-  }
-
-  async function handleRecordFeedback() {
-    if (!selectedDetail || !selectedWorkItem || !feedbackDecision) {
-      return;
-    }
-
-    setFeedbackSubmitting(true);
-    setFeedbackStatus({ type: "loading", text: "Сохраняем решение менеджера..." });
-
-    try {
-      await apiPost<unknown, Record<string, unknown>>("/feedback", {
-        recommendation_id: selectedWorkItem.recommendation_id,
-        manager_id: managerId,
-        recommendation_type: "manager_work_item",
-        client_id: selectedDetail.client.id,
-        conversation_id: selectedWorkItem.conversation_id,
-        decision: feedbackDecision,
-        comment: feedbackComment || null,
-        selected_variant:
-          aiDraft?.crm_note_draft || aiDraft?.contact_summary || selectedWorkItem.next_best_action,
-      });
-
-      await reloadClientDetail(selectedDetail.client.id, selectedWorkItem.id);
-      await loadCockpit(selectedWorkItem.id, selectedDetail.client.id);
-      await loadSupervisorDashboard();
-      setFeedbackStatus({ type: "success", text: "Решение менеджера сохранено." });
-    } catch (error) {
-      setFeedbackStatus({
-        type: "error",
-        text: error instanceof Error ? error.message : "Не удалось сохранить решение менеджера.",
-      });
-    } finally {
-      setFeedbackSubmitting(false);
-    }
-  }
-
-  async function handleCopyCRM() {
-    if (!aiDraft?.crm_note_draft) {
-      return;
-    }
-
-    try {
-      await navigator.clipboard.writeText(aiDraft.crm_note_draft);
-      setAiSaveStatus({ type: "success", text: "Текст CRM-заметки скопирован." });
-    } catch {
-      setAiSaveStatus({ type: "error", text: "Не удалось скопировать текст в буфер обмена." });
-    }
   }
 
   useEffect(() => {
@@ -740,56 +243,84 @@ export function App() {
     if (savedValue !== "true") {
       window.localStorage.setItem(ONBOARDING_STORAGE_KEY, "true");
     }
-    setOnboardingCollapsed(true);
     loadHealth().catch(() => undefined);
   }, []);
 
   useEffect(() => {
-    setClientDetails({});
-    setSelectedClientId(null);
-    setSelectedWorkItemId(null);
-    setAiDraft(null);
-    setScriptGoal("");
-    setScriptStatus(null);
-    setObjectionInput("");
-    setObjectionStatus(null);
-    setFilterQuery("");
-    setQueueFilters(DEFAULT_QUEUE_FILTERS);
-    loadCockpit().catch(() => undefined);
-    loadSupervisorDashboard().catch(() => undefined);
-    setAssistantThreads([]);
-    setAssistantSelectedThreadId(null);
-    setAssistantThreadDetail({
-      thread: createDraftThread(managerId, null),
-      messages: [],
-    });
-    loadAssistantThreads(null).catch(() => undefined);
-  }, [managerId]);
+    let ignore = false;
+
+    resetClientDetails();
+    assistant.resetAssistantState();
+
+    async function initializeManagerScreen() {
+      try {
+        const cockpitResponse = await loadCockpit();
+        if (!ignore) {
+          await workflowActions.applyCockpitSelection(cockpitResponse);
+        }
+      } catch {
+        return;
+      }
+    }
+
+    initializeManagerScreen().catch(() => undefined);
+
+    return () => {
+      ignore = true;
+    };
+  }, [screenState.managerId]);
 
   useEffect(() => {
-    if (!selectedClientId) {
+    if (!supervisorEnabled) {
       return;
     }
-    const detail = clientDetails[getDetailCacheKey(selectedClientId, selectedWorkItemId)];
-    if (detail) {
-      setAiDraft((current) => current ?? cloneDraft(detail.saved_ai_draft));
-    }
-  }, [clientDetails, selectedClientId, selectedWorkItemId]);
+    loadSupervisorDashboard().catch(() => undefined);
+  }, [screenState.managerId, supervisorEnabled]);
 
   useEffect(() => {
-    setScriptGoal(selectedWorkItem?.next_best_action || "");
-    setObjectionInput("");
-    setScriptStatus(null);
-    setObjectionStatus(null);
+    if (!assistantEnabled) {
+      return;
+    }
+    assistant.loadAssistantThreads(null).catch(() => undefined);
+  }, [screenState.managerId, assistantEnabled]);
+
+  useEffect(() => {
+    if (!selectedDetail || screenState.aiDraft) {
+      return;
+    }
+
+    dispatch({
+      type: "patch",
+      patch: {
+        aiDraft: cloneDraft(selectedDetail.saved_ai_draft),
+      },
+    });
+  }, [selectedDetail, screenState.aiDraft]);
+
+  useEffect(() => {
+    dispatch({
+      type: "patch",
+      patch: {
+        scriptGoal: selectedWorkItem?.next_best_action || "",
+        objectionInput: "",
+        scriptStatus: null,
+        objectionStatus: null,
+      },
+    });
   }, [selectedWorkItem?.id]);
 
   useEffect(() => {
-    if (!pendingFocusJump || cockpitLoading || detailLoading) {
+    if (!screenState.pendingFocusJump || cockpitLoading || detailLoading) {
       return;
     }
 
     if (!window.matchMedia("(max-width: 1080px)").matches) {
-      setPendingFocusJump(false);
+      dispatch({
+        type: "patch",
+        patch: {
+          pendingFocusJump: false,
+        },
+      });
       return;
     }
 
@@ -797,40 +328,67 @@ export function App() {
       behavior: "smooth",
       block: "start",
     });
-    setPendingFocusJump(false);
-  }, [pendingFocusJump, cockpitLoading, detailLoading, selectedWorkItem?.id]);
+    dispatch({
+      type: "patch",
+      patch: {
+        pendingFocusJump: false,
+      },
+    });
+  }, [screenState.pendingFocusJump, cockpitLoading, detailLoading, selectedWorkItem?.id]);
 
   useEffect(() => {
+    if (!feedbackEnabled) {
+      dispatch({
+        type: "syncFeedback",
+        decision: null,
+        comment: "",
+      });
+      return;
+    }
+
     if (!selectedDetail || !selectedWorkItem) {
-      setFeedbackDecision(null);
-      setFeedbackComment("");
-      setFeedbackStatus(null);
+      dispatch({
+        type: "syncFeedback",
+        decision: null,
+        comment: "",
+      });
       return;
     }
 
     const latestFeedback =
       selectedDetail.recommendation_feedback.find((item) => item.recommendation_id === selectedWorkItem.recommendation_id) ??
       null;
-    setFeedbackDecision(
-      latestFeedback?.decision ??
+    dispatch({
+      type: "syncFeedback",
+      decision:
+        latestFeedback?.decision ??
         (selectedWorkItem.recommendation_status !== "pending" ? selectedWorkItem.recommendation_status : null),
-    );
-    setFeedbackComment(latestFeedback?.comment || "");
-    setFeedbackStatus(null);
-  }, [selectedDetail, selectedWorkItem]);
+      comment: latestFeedback?.comment || "",
+    });
+  }, [selectedDetail, selectedWorkItem, feedbackEnabled]);
 
   return (
     <div className="app-shell">
       <div data-tour="hero">
         <Hero
           stats={cockpit?.stats}
-          managerId={managerId}
-          sortMode={sortMode}
+          managerId={screenState.managerId}
+          sortMode={screenState.sortMode}
           loading={cockpitLoading && !cockpit}
-          onToggleSort={() => setSortMode((current) => getNextSortMode(current))}
+          onToggleSort={() =>
+            dispatch({
+              type: "patch",
+              patch: {
+                sortMode: getNextSortMode(screenState.sortMode),
+              },
+            })
+          }
           onToggleManager={() =>
             startTransition(() => {
-              setManagerId((current) => getNextManagerId(current));
+              dispatch({
+                type: "resetForManagerChange",
+                managerId: getNextManagerId(screenState.managerId),
+              });
             })
           }
         />
@@ -839,34 +397,59 @@ export function App() {
       {cockpitError ? <StatusMessage type="error" message={cockpitError} /> : null}
 
       <OnboardingPanel
-        collapsed={onboardingCollapsed}
+        collapsed={screenState.onboardingCollapsed}
         onDismiss={() => {
-          setOnboardingCollapsed(true);
+          dispatch({
+            type: "patch",
+            patch: {
+              onboardingCollapsed: true,
+            },
+          });
           window.localStorage.setItem(ONBOARDING_STORAGE_KEY, "true");
         }}
         onExpand={() => {
-          setOnboardingCollapsed(false);
+          dispatch({
+            type: "patch",
+            patch: {
+              onboardingCollapsed: false,
+            },
+          });
           window.localStorage.removeItem(ONBOARDING_STORAGE_KEY);
         }}
         onStartTour={() => {
-          setTourOpen(true);
-          setOnboardingCollapsed(true);
+          dispatch({
+            type: "patch",
+            patch: {
+              tourOpen: true,
+              onboardingCollapsed: true,
+            },
+          });
           window.localStorage.setItem(ONBOARDING_STORAGE_KEY, "true");
         }}
       />
 
       <GuidedTour
-        open={tourOpen}
-        steps={TOUR_STEPS}
+        open={screenState.tourOpen}
+        steps={tourSteps}
         onClose={() => {
-          setTourOpen(false);
-          setOnboardingCollapsed(true);
+          dispatch({
+            type: "patch",
+            patch: {
+              tourOpen: false,
+              onboardingCollapsed: true,
+            },
+          });
           window.localStorage.setItem(TOUR_SEEN_STORAGE_KEY, "true");
           window.localStorage.setItem(ONBOARDING_STORAGE_KEY, "true");
         }}
         onComplete={() => {
-          setTourOpen(false);
-          setOnboardingCollapsed(true);
+          dispatch({
+            type: "patch",
+            patch: {
+              tourOpen: false,
+              onboardingCollapsed: true,
+            },
+          });
           window.localStorage.setItem(TOUR_SEEN_STORAGE_KEY, "true");
           window.localStorage.setItem(ONBOARDING_STORAGE_KEY, "true");
         }}
@@ -879,22 +462,38 @@ export function App() {
             totalItems={workQueue.length}
             visibleItems={filteredWorkQueue.length}
             loading={cockpitLoading}
-            selectedWorkItemId={selectedWorkItemId}
+            selectedWorkItemId={screenState.selectedWorkItemId}
             selectedWorkItemTitle={selectedWorkItem?.title ?? null}
             onJumpToFocus={() => {
               focusPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
             }}
-            filterValue={filterQuery}
-            onFilterChange={setFilterQuery}
+            filterValue={screenState.filterQuery}
+            onFilterChange={(value) =>
+              dispatch({
+                type: "patch",
+                patch: {
+                  filterQuery: value,
+                },
+              })
+            }
             onSelectWorkItem={(item) => {
-              setPendingFocusJump(true);
-              selectWorkItem(item).catch(() => undefined);
+              dispatch({
+                type: "patch",
+                patch: {
+                  pendingFocusJump: true,
+                },
+              });
+              workflowActions.selectWorkItem(item).catch(() => undefined);
             }}
-            sortMode={sortMode}
-            filters={queueFilters}
+            sortMode={screenState.sortMode}
+            filters={screenState.queueFilters}
             productOptions={productOptions}
-            onChangeQueueFilter={(name, value) => {
-              setQueueFilters((current) => ({ ...current, [name]: value }));
+            onChangeQueueFilter={(name: keyof WorkQueueFilters, value: string) => {
+              dispatch({
+                type: "setQueueFilter",
+                name,
+                value,
+              });
             }}
           />
         </div>
@@ -913,105 +512,152 @@ export function App() {
               conversation={selectedConversation}
               aiEnabled={aiEnabled}
               aiUnavailableMessage={aiUnavailableMessage}
-              activeTab={activeTab}
-              onChangeTab={setActiveTab}
-              aiDraft={aiDraft}
-              aiLoading={aiLoading}
-              aiSaving={aiSaving}
-              aiStatus={aiStatus}
-              aiSaveStatus={aiSaveStatus}
+              assistantEnabled={assistantEnabled}
+              feedbackEnabled={feedbackEnabled}
+              propensityEnabled={propensityEnabled}
+              activeTab={screenState.activeTab}
+              onChangeTab={(tab) =>
+                dispatch({
+                  type: "patch",
+                  patch: {
+                    activeTab: tab,
+                  },
+                })
+              }
+              aiDraft={screenState.aiDraft}
+              aiLoading={screenState.aiLoading}
+              aiSaving={screenState.aiSaving}
+              aiStatus={screenState.aiStatus}
+              aiSaveStatus={screenState.aiSaveStatus}
               onGenerateSummary={() => {
-                handleGenerateSummary().catch(() => undefined);
+                workflowActions.handleGenerateSummary().catch(() => undefined);
               }}
               onSaveSummary={() => {
-                handleSaveSummary().catch(() => undefined);
+                workflowActions.handleSaveSummary().catch(() => undefined);
               }}
               onCopyCRM={() => {
-                handleCopyCRM().catch(() => undefined);
+                workflowActions.handleCopyCRM().catch(() => undefined);
               }}
               onUpdateDraft={(draft) => {
-                setAiDraft(draft);
+                dispatch({
+                  type: "patch",
+                  patch: {
+                    aiDraft: draft,
+                  },
+                });
               }}
-              scriptGoal={scriptGoal}
-              onScriptGoalChange={setScriptGoal}
-              scriptLoading={scriptLoading}
-              scriptSelecting={scriptSelecting}
-              scriptStatus={scriptStatus}
+              scriptGoal={screenState.scriptGoal}
+              onScriptGoalChange={(value) =>
+                dispatch({
+                  type: "patch",
+                  patch: {
+                    scriptGoal: value,
+                  },
+                })
+              }
+              scriptLoading={screenState.scriptLoading}
+              scriptSelecting={screenState.scriptSelecting}
+              scriptStatus={screenState.scriptStatus}
               onGenerateScript={() => {
-                handleGenerateScript().catch(() => undefined);
+                workflowActions.handleGenerateScript().catch(() => undefined);
               }}
               onSelectScriptVariant={(variantLabel, selectedText) => {
-                handleSelectScriptVariant(variantLabel, selectedText).catch(() => undefined);
+                workflowActions.handleSelectScriptVariant(variantLabel, selectedText).catch(() => undefined);
               }}
-              objectionInput={objectionInput}
-              onObjectionInputChange={setObjectionInput}
-              objectionLoading={objectionLoading}
-              objectionSelecting={objectionSelecting}
-              objectionStatus={objectionStatus}
+              objectionInput={screenState.objectionInput}
+              onObjectionInputChange={(value) =>
+                dispatch({
+                  type: "patch",
+                  patch: {
+                    objectionInput: value,
+                  },
+                })
+              }
+              objectionLoading={screenState.objectionLoading}
+              objectionSelecting={screenState.objectionSelecting}
+              objectionStatus={screenState.objectionStatus}
               onGenerateObjectionWorkflow={() => {
-                handleGenerateObjectionWorkflow().catch(() => undefined);
+                workflowActions.handleGenerateObjectionWorkflow().catch(() => undefined);
               }}
               onSelectObjectionOption={(optionTitle, selectedResponse) => {
-                handleSelectObjectionOption(optionTitle, selectedResponse).catch(() => undefined);
+                workflowActions.handleSelectObjectionOption(optionTitle, selectedResponse).catch(() => undefined);
               }}
-              feedbackDecision={feedbackDecision}
-              savedFeedbackDecision={savedFeedbackDecision}
-              feedbackComment={feedbackComment}
-              feedbackSubmitting={feedbackSubmitting}
-              feedbackStatus={feedbackStatus}
-              assistantSending={assistantSending}
-              onFeedbackCommentChange={setFeedbackComment}
-              onFeedbackDecisionChange={setFeedbackDecision}
+              feedbackDecision={screenState.feedbackDecision}
+              savedFeedbackDecision={effectiveSavedFeedbackDecision}
+              feedbackComment={screenState.feedbackComment}
+              feedbackSubmitting={screenState.feedbackSubmitting}
+              feedbackStatus={screenState.feedbackStatus}
+              assistantSending={assistant.assistantSending}
+              onFeedbackCommentChange={(value) =>
+                dispatch({
+                  type: "patch",
+                  patch: {
+                    feedbackComment: value,
+                  },
+                })
+              }
+              onFeedbackDecisionChange={(decision) =>
+                dispatch({
+                  type: "patch",
+                  patch: {
+                    feedbackDecision: decision,
+                  },
+                })
+              }
               onSubmitFeedback={() => {
-                handleRecordFeedback().catch(() => undefined);
+                workflowActions.handleRecordFeedback().catch(() => undefined);
               }}
               onQuickAssistantAction={(message) => {
-                handleSendAssistantMessage(message).catch(() => undefined);
+                assistant.sendAssistantMessage(message).catch(() => undefined);
               }}
             />
           )}
         </div>
 
-        <div data-tour="assistant">
-          <AssistantPanel
-            selectedClientName={selectedDetail?.client.full_name}
-            threads={assistantThreads}
-            selectedThreadId={assistantSelectedThreadId}
-            threadDetail={assistantThreadDetail}
-            aiEnabled={aiEnabled}
-            aiUnavailableMessage={aiUnavailableMessage}
-            loading={assistantLoading}
-            sending={assistantSending}
-            status={assistantStatus}
-            inputValue={assistantInput}
-            onInputChange={setAssistantInput}
-            onCreateThread={() => {
-              setAssistantSelectedThreadId("draft");
-              setAssistantThreadDetail({
-                thread: createDraftThread(managerId, selectedDetail?.client.full_name),
-                messages: [],
-              });
-            }}
-            onSelectThread={(threadId) => {
-              loadAssistantThread(threadId).catch(() => undefined);
-            }}
-            onSendMessage={(message) => {
-              handleSendAssistantMessage(message).catch(() => undefined);
-            }}
-          />
-        </div>
+        {assistantEnabled ? (
+          <div data-tour="assistant">
+            <AssistantPanel
+              selectedClientName={selectedDetail?.client.full_name}
+              threads={assistant.assistantThreads}
+              selectedThreadId={assistant.assistantSelectedThreadId}
+              threadDetail={assistant.assistantThreadDetail}
+              aiEnabled={aiEnabled}
+              aiUnavailableMessage={aiUnavailableMessage}
+              loading={assistant.assistantLoading}
+              sending={assistant.assistantSending}
+              status={assistant.assistantStatus}
+              inputValue={assistant.assistantInput}
+              onInputChange={assistant.setAssistantInput}
+              onCreateThread={() => {
+                assistant.prepareDraftThread(selectedDetail?.client.full_name ?? null);
+              }}
+              onSelectThread={(threadId) => {
+                assistant.loadAssistantThread(threadId).catch(() => undefined);
+              }}
+              onSendMessage={(message) => {
+                assistant.sendAssistantMessage(message).catch(() => undefined);
+              }}
+            />
+          </div>
+        ) : null}
       </main>
 
       <div data-tour="journey">
         <JourneyBar
           steps={journeySteps}
-          note="Шаги можно проходить в удобном порядке. Цикл считается завершённым, когда решение зафиксировано и итог сохранён в CRM."
+          note={
+            feedbackEnabled
+              ? "Шаги можно проходить в удобном порядке. Цикл считается завершённым, когда решение зафиксировано и итог сохранён в CRM."
+              : "Шаги можно проходить в удобном порядке. Цикл считается завершённым, когда итог по кейсу подготовлен и сохранён в CRM."
+          }
         />
       </div>
 
-      <div data-tour="supervisor">
-        <SupervisorPanel dashboard={supervisorDashboard} />
-      </div>
+      {supervisorEnabled ? (
+        <div data-tour="supervisor">
+          <SupervisorPanel dashboard={supervisorDashboard} />
+        </div>
+      ) : null}
     </div>
   );
 }

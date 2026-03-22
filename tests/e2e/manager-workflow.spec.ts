@@ -2,7 +2,6 @@ import { expect, test } from "@playwright/test";
 
 test("manager can review a work item and save feedback loop state", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Пропустить" }).click();
 
   await expect(page.getByRole("heading", { name: "План дня менеджера" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Полная очередь кейсов" })).toBeVisible();
@@ -18,13 +17,12 @@ test("manager can review a work item and save feedback loop state", async ({ pag
 
   await expect(page.getByText("Решение менеджера сохранено.")).toBeVisible();
   const supervisorPanel = page.locator(".supervisor-panel");
-  await expect(supervisorPanel.getByText("Как используется помощник")).toBeVisible();
-  await expect(supervisorPanel.getByText("Рекомендация менеджеру", { exact: true }).first()).toBeVisible();
+  await expect(supervisorPanel.getByRole("heading", { name: "Сводка по использованию и качеству решений" })).toBeVisible();
+  await expect(supervisorPanel.getByText("Показать аналитику")).toBeVisible();
 });
 
 test("search empty state is explicit and recoverable", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Пропустить" }).click();
 
   const search = page.getByPlaceholder("Например, премиум карта, ликвидность или Елена Смирнова");
   await search.fill("несуществующий кейс");
