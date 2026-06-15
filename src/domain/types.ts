@@ -5,6 +5,12 @@
 // аналитические инсайты, CRM-заметки, follow-up, обратная связь.
 // ============================================================================
 
+export interface Manager {
+  id: string;
+  fullName: string;
+  role: string;
+}
+
 export type ChannelType = "chat" | "call" | "meeting";
 
 export type RiskAppetite = "conservative" | "moderate" | "aggressive";

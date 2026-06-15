@@ -1,11 +1,12 @@
 // Очередь кейсов менеджера (UC-01, FR1): поиск, фильтр, сортировка и
 // объяснённые карточки кейсов, сгруппированные по уровню приоритета.
+// Данные очереди приходят с бэкенда (каждый кейс уже несёт флаг handled).
 
 import { useEffect, useMemo, useRef } from "react";
-import type { PriorityLevel, WorkItem } from "../domain/types";
-import { clientById, productById } from "../data/index";
+import type { Client, PriorityLevel } from "../domain/types";
+import type { QueuedItem } from "../api/client";
+import { useReference } from "../api/reference";
 import { CHANNEL_LABEL, dueIn, formatMoney } from "../domain/format";
-import { isWorkItemHandled } from "../domain/workqueue";
 import { useStore } from "../store/store";
 import { Icon } from "./Icon";
 import { LEVEL_COLOR, LEVEL_LABEL, scoreTextColor } from "./visual";
@@ -15,42 +16,41 @@ export type QueueKind = "all" | "communication" | "task";
 
 interface QueueRailProps {
   /** Полная очередь — для общего счётчика в подзаголовке. */
-  items: WorkItem[];
+  items: QueuedItem[];
   /** Отфильтрованный и отсортированный список в том порядке, что видит менеджер. */
-  ordered: WorkItem[];
+  ordered: QueuedItem[];
   selectedId: string | null;
-  onSelect: (item: WorkItem) => void;
+  onSelect: (item: QueuedItem) => void;
   search: string;
   onSearch: (v: string) => void;
   sort: QueueSort;
   onSort: (s: QueueSort) => void;
   kind: QueueKind;
   onKind: (k: QueueKind) => void;
+  loading: boolean;
 }
 
 /**
  * Применяет фильтр (тип кейса + поиск) и сортировку очереди и возвращает список
- * в порядке отображения. Вынесено из компонента, чтобы экран использовал тот же
- * порядок для клавиатурной навигации и перехода к следующему кейсу (единый
- * источник истины — порядок, который видит менеджер).
+ * в порядке отображения. Поиск по имени клиента использует справочную карту.
  */
 export function orderQueue(
-  items: WorkItem[],
+  items: QueuedItem[],
   opts: { search: string; kind: QueueKind; sort: QueueSort; serviceDown: boolean },
-): WorkItem[] {
+  clientById: Map<string, Client>,
+): QueuedItem[] {
   const q = opts.search.trim().toLowerCase();
   let list = items.filter((item) => {
     if (opts.kind !== "all" && item.kind !== opts.kind) return false;
     if (!q) return true;
     const client = clientById.get(item.clientId);
     return (
-      client?.fullName.toLowerCase().includes(q) ||
+      (client?.fullName.toLowerCase().includes(q) ?? false) ||
       item.title.toLowerCase().includes(q) ||
       item.summary.toLowerCase().includes(q)
     );
   });
   if (opts.serviceDown) {
-    // Сервис приоритизации недоступен → очередь по времени ожидания (UC-01).
     list = [...list].sort((a, b) => new Date(a.createdAtIso).getTime() - new Date(b.createdAtIso).getTime());
   } else if (opts.sort === "due") {
     list = [...list].sort((a, b) => new Date(a.dueAtIso).getTime() - new Date(b.dueAtIso).getTime());
@@ -67,19 +67,18 @@ function QueueCard({
   onSelect,
   serviceDown = false,
 }: {
-  item: WorkItem;
+  item: QueuedItem;
   selected: boolean;
   onSelect: () => void;
   serviceDown?: boolean;
 }) {
-  const { state } = useStore();
-  const client = clientById.get(item.clientId)!;
+  const { clientById, productById } = useReference();
+  const client = clientById.get(item.clientId);
+  if (!client) return null;
   const product = item.productCode ? productById.get(item.productCode) : null;
   const due = dueIn(item.dueAtIso);
   const needsData = item.priority.dataGaps.length > 0;
-
-  // Признак «обработано» в текущей сессии — для ощущения прогресса по очереди.
-  const handled = isWorkItemHandled(item, state.sentMessages, state.feedback, state.managerId);
+  const handled = item.handled;
 
   return (
     <button
@@ -113,8 +112,6 @@ function QueueCard({
           {item.hasIncoming && <span className="queue-card__incoming">Входящее ·</span>} {item.summary}
         </span>
 
-        {/* Главный фактор приоритета — объяснимость прямо в очереди (NFR2),
-            без открытия кейса. Прячем у обработанных и при сбое сервиса. */}
         {!handled && !serviceDown && item.priority.reasons[0] && (
           <span className="queue-card__driver">{item.priority.reasons[0]}</span>
         )}
@@ -157,6 +154,7 @@ export function QueueRail({
   onSort,
   kind,
   onKind,
+  loading,
 }: QueueRailProps) {
   const { state, setPriorityService } = useStore();
   const serviceDown = state.priorityServiceDown;
@@ -164,20 +162,16 @@ export function QueueRail({
 
   const filtered = ordered;
   const filtersActive = search.trim() !== "" || kind !== "all";
-  // При активном фильтре счётчик показывает видимое число кейсов — иначе он
-  // рассинхронизировался бы с числом высокого приоритета и со списком карточек.
   const displayCount = filtersActive ? filtered.length : items.length;
 
   const grouped = useMemo(() => {
-    const map: Record<PriorityLevel, WorkItem[]> = { high: [], medium: [], low: [] };
+    const map: Record<PriorityLevel, QueuedItem[]> = { high: [], medium: [], low: [] };
     for (const item of filtered) map[item.priority.level].push(item);
     return map;
   }, [filtered]);
 
   const highCount = grouped.high.length;
 
-  // При смене выбора (в т.ч. клавишами J/K) подводим выбранную карточку в зону
-  // видимости — иначе при навигации с клавиатуры выбор мог бы уйти за пределы.
   useEffect(() => {
     if (!selectedId) return;
     const el = listRef.current?.querySelector<HTMLElement>('[aria-pressed="true"]');
@@ -219,33 +213,17 @@ export function QueueRail({
 
         <div className="queue-rail__controls">
           <div className="segmented" role="group" aria-label="Фильтр кейсов">
-            <button
-              className={`segmented__item${kind === "all" ? " segmented__item--active" : ""}`}
-              onClick={() => onKind("all")}
-              aria-pressed={kind === "all"}
-            >
+            <button className={`segmented__item${kind === "all" ? " segmented__item--active" : ""}`} onClick={() => onKind("all")} aria-pressed={kind === "all"}>
               Все
             </button>
-            <button
-              className={`segmented__item${kind === "communication" ? " segmented__item--active" : ""}`}
-              onClick={() => onKind("communication")}
-              aria-pressed={kind === "communication"}
-            >
+            <button className={`segmented__item${kind === "communication" ? " segmented__item--active" : ""}`} onClick={() => onKind("communication")} aria-pressed={kind === "communication"}>
               Входящие
             </button>
-            <button
-              className={`segmented__item${kind === "task" ? " segmented__item--active" : ""}`}
-              onClick={() => onKind("task")}
-              aria-pressed={kind === "task"}
-            >
+            <button className={`segmented__item${kind === "task" ? " segmented__item--active" : ""}`} onClick={() => onKind("task")} aria-pressed={kind === "task"}>
               Задачи
             </button>
           </div>
-          <button
-            className="queue-rail__sort"
-            onClick={() => onSort(sort === "priority" ? "due" : "priority")}
-            title="Изменить сортировку"
-          >
+          <button className="queue-rail__sort" onClick={() => onSort(sort === "priority" ? "due" : "priority")} title="Изменить сортировку">
             <Icon name="layers" size={14} />
             {sort === "priority" ? "По приоритету" : "По сроку"}
           </button>
@@ -255,11 +233,7 @@ export function QueueRail({
           <p className="queue-rail__legend" title="Методика приоритизации (раздел 6.2)">
             Приоритет по 5 факторам: ожидание · ценность · срочность · потенциал · риск оттока
           </p>
-          <button
-            className="queue-rail__svc"
-            onClick={() => setPriorityService(!serviceDown)}
-            title="Имитировать недоступность сервиса приоритизации (UC-01)"
-          >
+          <button className="queue-rail__svc" onClick={() => setPriorityService(!serviceDown)} title="Имитировать недоступность сервиса приоритизации (UC-01)">
             {serviceDown ? "восстановить сервис" : "сбой сервиса"}
           </button>
         </div>
@@ -273,20 +247,23 @@ export function QueueRail({
       </div>
 
       <div className="queue-rail__list" ref={listRef}>
-        {filtered.length === 0 ? (
+        {loading && items.length === 0 ? (
+          <div className="empty-state">
+            <span className="empty-state__icon">
+              <Icon name="layers" size={22} />
+            </span>
+            <span className="empty-state__title">Загрузка очереди…</span>
+          </div>
+        ) : filtered.length === 0 ? (
           filtersActive ? (
             <div className="empty-state">
-              <span className="empty-state__icon">
-                <Icon name="search" size={22} />
-              </span>
+              <span className="empty-state__icon"><Icon name="search" size={22} /></span>
               <span className="empty-state__title">Ничего не найдено</span>
               <span className="empty-state__text">Измените запрос или сбросьте фильтр кейсов.</span>
             </div>
           ) : (
             <div className="empty-state">
-              <span className="empty-state__icon">
-                <Icon name="inbox" size={22} />
-              </span>
+              <span className="empty-state__icon"><Icon name="inbox" size={22} /></span>
               <span className="empty-state__title">В очереди нет кейсов</span>
               <span className="empty-state__text">Вы разобрали очередь или новые кейсы ещё не поступили.</span>
             </div>
@@ -299,13 +276,7 @@ export function QueueRail({
               <span className="queue-group__count">{filtered.length}</span>
             </div>
             {filtered.map((item) => (
-              <QueueCard
-                key={item.id}
-                item={item}
-                selected={item.id === selectedId}
-                onSelect={() => onSelect(item)}
-                serviceDown
-              />
+              <QueueCard key={item.id} item={item} selected={item.id === selectedId} onSelect={() => onSelect(item)} serviceDown />
             ))}
           </section>
         ) : sort === "due" ? (
@@ -316,12 +287,7 @@ export function QueueRail({
               <span className="queue-group__count">{filtered.length}</span>
             </div>
             {filtered.map((item) => (
-              <QueueCard
-                key={item.id}
-                item={item}
-                selected={item.id === selectedId}
-                onSelect={() => onSelect(item)}
-              />
+              <QueueCard key={item.id} item={item} selected={item.id === selectedId} onSelect={() => onSelect(item)} />
             ))}
           </section>
         ) : (
@@ -334,12 +300,7 @@ export function QueueRail({
                   <span className="queue-group__count">{grouped[level].length}</span>
                 </div>
                 {grouped[level].map((item) => (
-                  <QueueCard
-                    key={item.id}
-                    item={item}
-                    selected={item.id === selectedId}
-                    onSelect={() => onSelect(item)}
-                  />
+                  <QueueCard key={item.id} item={item} selected={item.id === selectedId} onSelect={() => onSelect(item)} />
                 ))}
               </section>
             ),

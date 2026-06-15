@@ -607,6 +607,44 @@ textarea.field {
   padding: 1px 5px;
 }
 
+/* --- Загрузочный / ошибочный экран (ожидание данных с бэкенда) --- */
+.boot-screen {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  color: var(--text-secondary);
+  background: var(--canvas);
+  text-align: center;
+  padding: var(--space-6);
+}
+.boot-screen .brand__mark {
+  width: 46px;
+  height: 46px;
+  font-size: 24px;
+  animation: boot-pulse 1.4s ease-in-out infinite;
+}
+.boot-screen p {
+  margin: 0;
+}
+.boot-screen--error {
+  color: var(--danger);
+}
+.boot-screen--error svg {
+  color: var(--danger);
+}
+@keyframes boot-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
 /* ==========================================================================
    Раскладка экранов
    ========================================================================== */

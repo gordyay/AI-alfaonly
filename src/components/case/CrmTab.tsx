@@ -1,11 +1,10 @@
 // Вкладка «Итог и CRM»: фиксация решения по рекомендации (FR8, отдельно от
 // сохранения заметки — PR4/PR5), сводка контакта и черновик CRM-заметки (FR6),
-// история заметок и follow-up.
+// история заметок. Сводку готовит бэкенд; заметка/решение уходят на бэкенд.
 
 import { useState } from "react";
 import type { CrmNote, FeedbackDecision, SummaryResult } from "../../domain/types";
-import type { AIContext } from "../../ai/context";
-import { generateSummary } from "../../ai";
+import { api } from "../../api/client";
 import { clockTime, timeAgo } from "../../domain/format";
 import { Icon } from "../Icon";
 
@@ -22,21 +21,17 @@ const DECISION_VERB: Record<FeedbackDecision, string> = {
 };
 
 export function CrmTab({
-  ctx,
+  wid,
   notes,
   savedDecision,
   onRecordFeedback,
   onSaveNote,
 }: {
-  ctx: AIContext;
+  wid: string;
   notes: CrmNote[];
   savedDecision: FeedbackDecision | null;
-  onRecordFeedback: (
-    decision: FeedbackDecision,
-    comment: string,
-    opts?: { recommendationId?: string; kind?: string },
-  ) => void;
-  onSaveNote: (text: string, nextContactIso: string) => void;
+  onRecordFeedback: (decision: FeedbackDecision, comment: string, opts?: { kind?: string }) => Promise<boolean>;
+  onSaveNote: (text: string, nextContactIso: string) => Promise<boolean>;
 }) {
   const [decision, setDecision] = useState<FeedbackDecision | null>(savedDecision);
   const [comment, setComment] = useState("");
@@ -50,14 +45,15 @@ export function CrmTab({
   const [draft, setDraft] = useState("");
   const [saved, setSaved] = useState(false);
 
-  function runSummary() {
+  async function runSummary() {
     setSummaryLoading(true);
-    window.setTimeout(() => {
-      const result = generateSummary(ctx);
+    try {
+      const result = await api.generateSummary(wid);
       setSummary(result);
       setDraft(result.crmDraft);
+    } finally {
       setSummaryLoading(false);
-    }, 520);
+    }
   }
 
   return (
@@ -77,9 +73,7 @@ export function CrmTab({
               {DECISION_VERB[savedDecision]}
             </span>
           )}
-          {decision !== savedDecision && (
-            <span className="badge badge--neutral">Не сохранено</span>
-          )}
+          {decision !== savedDecision && <span className="badge badge--neutral">Не сохранено</span>}
         </div>
 
         <div className="decision-row">
@@ -99,9 +93,7 @@ export function CrmTab({
           className="field"
           aria-label="Комментарий к решению"
           placeholder={
-            decision === "edited"
-              ? "Что именно изменили в рекомендации…"
-              : "Комментарий к решению (необязательно)…"
+            decision === "edited" ? "Что именно изменили в рекомендации…" : "Комментарий к решению (необязательно)…"
           }
           value={comment}
           onChange={(e) => setComment(e.target.value)}
@@ -187,18 +179,15 @@ export function CrmTab({
             <div className="work-card__inline work-card__inline--end">
               <button
                 className="btn btn--ghost btn--sm"
-                onClick={() =>
-                  onRecordFeedback("rejected", "Черновик CRM отклонён", { kind: "crm_draft" })
-                }
+                onClick={() => onRecordFeedback("rejected", "Черновик CRM отклонён", { kind: "crm_draft" })}
               >
                 Отклонить черновик
               </button>
               <button
                 className="btn btn--primary btn--sm"
                 disabled={!draft.trim() || saved}
-                onClick={() => {
-                  onSaveNote(draft.trim(), summary.nextContactIso);
-                  setSaved(true);
+                onClick={async () => {
+                  if (await onSaveNote(draft.trim(), summary.nextContactIso)) setSaved(true);
                 }}
               >
                 <Icon name="check" size={15} /> {saved ? "Сохранено" : "Сохранить в CRM"}
@@ -227,7 +216,7 @@ export function CrmTab({
             {notes.map((n) => (
               <li key={n.id} className="note-history__item">
                 <div className="note-history__top">
-                  <span className={`badge badge--${n.outcome === "follow_up" ? "neutral" : n.outcome === "resolved" ? "success" : "neutral"}`}>
+                  <span className={`badge badge--${n.outcome === "resolved" ? "success" : "neutral"}`}>
                     {n.outcome === "follow_up" ? "Follow-up" : n.outcome === "resolved" ? "Закрыто" : "В работе"}
                   </span>
                   <span className="u-faint">

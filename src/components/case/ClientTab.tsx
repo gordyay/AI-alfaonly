@@ -1,11 +1,10 @@
 // Вкладка «Клиент»: профиль, портфель продуктов и оценка склонности к покупке
-// по каждому продукту (FR7) с разбором по факторам.
+// по каждому продукту (FR7) с разбором по факторам. Склонность считает бэкенд.
 
 import { useState } from "react";
-import type { Client } from "../../domain/types";
+import type { Client, PropensityScore } from "../../domain/types";
 import type { AIContext } from "../../ai/context";
-import { scoreClientProducts } from "../../domain/contextBuilders";
-import { productById } from "../../data/index";
+import { useReference } from "../../api/reference";
 import { formatMoney, formatMoneyExact, CHANNEL_LABEL, timeAgo } from "../../domain/format";
 import { Icon } from "../Icon";
 import { FactorList, ScoreRing } from "../Primitives";
@@ -17,11 +16,13 @@ const RISK_LABEL: Record<Client["riskAppetite"], string> = {
   aggressive: "Агрессивный",
 };
 
-export function ClientTab({ ctx }: { ctx: AIContext }) {
+export function ClientTab({ ctx, propensities }: { ctx: AIContext; propensities: PropensityScore[] }) {
+  const { productById } = useReference();
   const { client, ownedProducts } = ctx;
-  const propensities = scoreClientProducts(client.id);
   const ownedIds = new Set(ownedProducts.map((o) => o.product.id));
-  const [expanded, setExpanded] = useState<string | null>(propensities.find((p) => !ownedIds.has(p.productId))?.productId ?? null);
+  const [expanded, setExpanded] = useState<string | null>(
+    propensities.find((p) => !ownedIds.has(p.productId))?.productId ?? null,
+  );
 
   return (
     <div className="client-tab">
@@ -109,7 +110,8 @@ export function ClientTab({ ctx }: { ctx: AIContext }) {
 
         <div className="propensity-list">
           {propensities.map((p) => {
-            const product = productById.get(p.productId)!;
+            const product = productById.get(p.productId);
+            if (!product) return null;
             const owned = ownedIds.has(p.productId);
             const isOpen = expanded === p.productId;
             return (

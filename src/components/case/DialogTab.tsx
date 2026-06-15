@@ -1,10 +1,10 @@
 // Вкладка «Диалог»: переписка с клиентом + сборка и отправка ответа.
-// Принцип участия человека: сообщение уходит только после подтверждения (FR11).
+// Черновики готовит бэкенд; сообщение уходит только после подтверждения (FR11).
 
 import { useEffect, useRef, useState } from "react";
 import type { Message, ReplySource } from "../../domain/types";
 import { firstName, type AIContext } from "../../ai/context";
-import { generateReply } from "../../ai";
+import { api } from "../../api/client";
 import { clockTime } from "../../domain/format";
 import { Icon } from "../Icon";
 import { Avatar } from "../Primitives";
@@ -17,6 +17,7 @@ const SOURCE_LABEL: Record<ReplySource, string> = {
 };
 
 export function DialogTab({
+  wid,
   ctx,
   messages,
   clientName,
@@ -25,39 +26,56 @@ export function DialogTab({
   onDraftChange,
   onSend,
 }: {
+  wid: string;
   ctx: AIContext;
   messages: Message[];
   clientName: string;
   replyDraft: string;
   replySource: ReplySource;
   onDraftChange: (text: string, source: ReplySource) => void;
-  onSend: (text: string) => void;
+  onSend: (text: string) => Promise<boolean>;
 }) {
   const [rationale, setRationale] = useState<{ text: string; sources: string[] } | null>(null);
   const [followUps, setFollowUps] = useState<string[]>([]);
+  const [drafting, setDrafting] = useState(false);
+  const [sending, setSending] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
-  // Показать последнее сообщение после отправки/смены кейса.
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [messages.length]);
 
-  function handleAssistantDraft() {
-    const draft = generateReply(ctx);
-    onDraftChange(draft.text, "assistant");
-    setRationale({ text: draft.rationale, sources: draft.sources });
-    setFollowUps([]);
+  async function handleAssistantDraft() {
+    setDrafting(true);
+    try {
+      const draft = await api.replyDraft(wid);
+      onDraftChange(draft.text, "assistant");
+      setRationale({ text: draft.rationale, sources: draft.sources });
+      setFollowUps([]);
+    } finally {
+      setDrafting(false);
+    }
   }
 
-  function handleSend() {
+  async function handleSend() {
     const sent = replyDraft.trim();
     if (!sent) return;
-    onSend(sent);
-    setRationale(null);
-    // UC-04 шаг 4: после отправки предложить варианты следующего сообщения.
-    const primary = generateReply(ctx).text;
-    const alt = `${firstName(ctx)}, подскажите, удобно ли продолжить здесь, в переписке, или вам комфортнее короткий звонок?`;
-    setFollowUps([primary, alt].filter((t, i, arr) => t !== sent && arr.indexOf(t) === i));
+    setSending(true);
+    try {
+      const ok = await onSend(sent);
+      if (!ok) return;
+      setRationale(null);
+      // UC-04 шаг 4: после отправки предложить варианты следующего сообщения.
+      try {
+        const next = await api.replyDraft(wid);
+        const alt = `${firstName(ctx)}, подскажите, удобно ли продолжить здесь, в переписке, или вам комфортнее короткий звонок?`;
+        setFollowUps([next.text, alt].filter((t, i, arr) => t !== sent && arr.indexOf(t) === i));
+      } catch {
+        /* варианты следующего шага необязательны */
+      }
+    } finally {
+      setSending(false);
+    }
   }
 
   function handleDraftEdit(text: string) {
@@ -123,8 +141,8 @@ export function DialogTab({
         )}
 
         <div className="composer__toolbar">
-          <button className="btn btn--ai btn--sm" onClick={handleAssistantDraft}>
-            <Icon name="sparkles" size={15} /> Черновик ассистента
+          <button className="btn btn--ai btn--sm" onClick={handleAssistantDraft} disabled={drafting}>
+            <Icon name="sparkles" size={15} /> {drafting ? "Готовлю…" : "Черновик ассистента"}
           </button>
           {replyDraft && (
             <button className="btn btn--ghost btn--sm" onClick={() => handleDraftEdit("")}>
@@ -135,8 +153,8 @@ export function DialogTab({
           <span className="composer__guard">
             <Icon name="shieldCheck" size={14} /> Уходит только после подтверждения
           </span>
-          <button className="btn btn--primary btn--sm" onClick={handleSend} disabled={!replyDraft.trim()}>
-            Отправить <Icon name="arrowRight" size={15} />
+          <button className="btn btn--primary btn--sm" onClick={handleSend} disabled={!replyDraft.trim() || sending}>
+            {sending ? "Отправка…" : "Отправить"} <Icon name="arrowRight" size={15} />
           </button>
         </div>
 

@@ -1,0 +1,2556 @@
+{
+  "demoNow": "2026-06-16T06:40:00.000Z",
+  "clients": [
+    {
+      "id": "c1",
+      "fullName": "Иван Петров",
+      "segment": "Alfa Only",
+      "riskAppetite": "moderate",
+      "managerId": "m1",
+      "age": 42,
+      "city": "Москва",
+      "preferredChannel": "chat",
+      "maritalStatus": "married",
+      "occupation": "IT-предприниматель",
+      "aum": 12500000,
+      "liquidBalance": 950000,
+      "churnRisk": "medium",
+      "lastContactIso": "2026-06-09T06:40:00.000Z",
+      "nextContactIso": "2026-06-18T06:40:00.000Z",
+      "note": "Интерес к инвестициям, ценит быстрые ответы и персональные предложения.",
+      "tags": [
+        "investments",
+        "premium-card",
+        "family"
+      ]
+    },
+    {
+      "id": "c2",
+      "fullName": "Ольга Смирнова",
+      "segment": "Alfa Only",
+      "riskAppetite": "conservative",
+      "managerId": "m1",
+      "age": 51,
+      "city": "Санкт-Петербург",
+      "preferredChannel": "call",
+      "maritalStatus": "married",
+      "occupation": "Финансовый директор",
+      "aum": 28700000,
+      "liquidBalance": 2100000,
+      "churnRisk": "low",
+      "lastContactIso": "2026-06-14T06:40:00.000Z",
+      "nextContactIso": "2026-06-16T11:40:00.000Z",
+      "note": "Ожидает проактивного сервиса, интересуется сохранением капитала и структурными решениями.",
+      "tags": [
+        "retention",
+        "deposit",
+        "vip"
+      ]
+    },
+    {
+      "id": "c3",
+      "fullName": "Алексей Орлов",
+      "segment": "Alfa Only",
+      "riskAppetite": "aggressive",
+      "managerId": "m2",
+      "age": 36,
+      "city": "Казань",
+      "preferredChannel": "meeting",
+      "maritalStatus": "single",
+      "occupation": "Основатель e-commerce бизнеса",
+      "aum": 9400000,
+      "liquidBalance": 430000,
+      "churnRisk": "medium",
+      "lastContactIso": "2026-06-06T06:40:00.000Z",
+      "nextContactIso": "2026-06-17T06:40:00.000Z",
+      "note": "Открыт к риску, интересуется валютными инструментами и идеями для роста капитала.",
+      "tags": [
+        "fx",
+        "growth",
+        "brokerage"
+      ]
+    },
+    {
+      "id": "c4",
+      "fullName": "Мария Кузнецова",
+      "segment": "Alfa Only",
+      "riskAppetite": "moderate",
+      "managerId": "m2",
+      "age": 45,
+      "city": "Екатеринбург",
+      "preferredChannel": "chat",
+      "maritalStatus": "married",
+      "occupation": "Юрист",
+      "aum": 6200000,
+      "liquidBalance": 380000,
+      "churnRisk": "high",
+      "lastContactIso": "2026-05-27T06:40:00.000Z",
+      "nextContactIso": "2026-06-16T16:40:00.000Z",
+      "note": "Реже отвечает, нужно мягкое удержание и короткие follow-up сообщения.",
+      "tags": [
+        "churn-risk",
+        "soft-contact",
+        "insurance"
+      ]
+    },
+    {
+      "id": "c5",
+      "fullName": "Дмитрий Волков",
+      "segment": "Alfa Only",
+      "riskAppetite": "conservative",
+      "managerId": "m1",
+      "age": 58,
+      "city": "Москва",
+      "preferredChannel": "call",
+      "maritalStatus": "married",
+      "occupation": "Собственник производства",
+      "aum": 41300000,
+      "liquidBalance": 5100000,
+      "churnRisk": "low",
+      "lastContactIso": "2026-06-13T06:40:00.000Z",
+      "nextContactIso": "2026-06-20T06:40:00.000Z",
+      "note": "Большой остаток на счете, готов обсуждать размещение ликвидности и премиальные сервисы.",
+      "tags": [
+        "liquidity",
+        "deposit",
+        "wealth"
+      ]
+    },
+    {
+      "id": "c6",
+      "fullName": "Елена Федорова",
+      "segment": "Alfa Only",
+      "riskAppetite": "moderate",
+      "managerId": "m2",
+      "age": 33,
+      "city": "Новосибирск",
+      "preferredChannel": "chat",
+      "maritalStatus": "single",
+      "occupation": "Топ-менеджер в IT",
+      "aum": 7700000,
+      "liquidBalance": 620000,
+      "churnRisk": "medium",
+      "lastContactIso": "2026-06-15T06:40:00.000Z",
+      "nextContactIso": "2026-06-19T06:40:00.000Z",
+      "note": "Быстро реагирует в чате, интересуется travel-benefits и инвестиционными подборками.",
+      "tags": [
+        "travel",
+        "premium-card",
+        "active-chat"
+      ]
+    },
+    {
+      "id": "c7",
+      "fullName": "Наталья Белова",
+      "segment": "Alfa Only",
+      "riskAppetite": "moderate",
+      "managerId": "m1",
+      "age": 39,
+      "city": "Москва",
+      "preferredChannel": "chat",
+      "maritalStatus": "married",
+      "occupation": "Партнер в консалтинге",
+      "aum": 11800000,
+      "liquidBalance": 1450000,
+      "churnRisk": "medium",
+      "lastContactIso": "2026-06-12T06:40:00.000Z",
+      "nextContactIso": "2026-06-16T15:40:00.000Z",
+      "note": "Ожидает короткие персональные follow-up, часто реагирует на сервисные и travel-темы.",
+      "tags": [
+        "travel",
+        "service",
+        "campaign"
+      ]
+    },
+    {
+      "id": "c8",
+      "fullName": "Сергей Лебедев",
+      "segment": "Alfa Only",
+      "riskAppetite": "conservative",
+      "managerId": "m1",
+      "age": 54,
+      "city": "Москва",
+      "preferredChannel": "call",
+      "maritalStatus": "married",
+      "occupation": "Управляющий партнер",
+      "aum": 33500000,
+      "liquidBalance": 3800000,
+      "churnRisk": "high",
+      "lastContactIso": "2026-06-07T06:40:00.000Z",
+      "nextContactIso": "2026-06-16T13:40:00.000Z",
+      "note": "Нужен дисциплинированный контакт по ликвидности и удержанию части средств в банке.",
+      "tags": [
+        "retention",
+        "liquidity",
+        "vip"
+      ]
+    },
+    {
+      "id": "c9",
+      "fullName": "Андрей Морозов",
+      "segment": "Alfa Only",
+      "riskAppetite": "aggressive",
+      "managerId": "m1",
+      "age": 41,
+      "city": "Москва",
+      "preferredChannel": "chat",
+      "maritalStatus": "married",
+      "occupation": "Партнер в digital-агентстве",
+      "aum": 15400000,
+      "liquidBalance": 2750000,
+      "churnRisk": "high",
+      "lastContactIso": "2026-06-04T06:40:00.000Z",
+      "nextContactIso": "2026-06-16T12:40:00.000Z",
+      "note": "Интересовался FX и диверсификацией, но резко теряет интерес, если чувствует давление или общее предложение.",
+      "tags": [
+        "fx",
+        "churn-risk",
+        "silent"
+      ]
+    },
+    {
+      "id": "c10",
+      "fullName": "Татьяна Жукова",
+      "segment": "Alfa Only",
+      "riskAppetite": "conservative",
+      "managerId": "m2",
+      "age": 49,
+      "city": "Санкт-Петербург",
+      "preferredChannel": "call",
+      "maritalStatus": "married",
+      "occupation": "COO в производственной группе",
+      "aum": 21900000,
+      "liquidBalance": 4600000,
+      "churnRisk": "high",
+      "lastContactIso": "2026-06-15T06:40:00.000Z",
+      "nextContactIso": "2026-06-16T09:40:00.000Z",
+      "note": "Недовольна качеством сервиса и рассматривает перевод части остатков. Любая активная продажа в такой момент раздражает.",
+      "tags": [
+        "negative-tone",
+        "retention",
+        "service"
+      ]
+    },
+    {
+      "id": "c11",
+      "fullName": "Павел Соколов",
+      "segment": "Alfa Only",
+      "riskAppetite": "moderate",
+      "managerId": "m1",
+      "age": 34,
+      "city": "Нижний Новгород",
+      "preferredChannel": "chat",
+      "maritalStatus": "single",
+      "occupation": "Руководитель продаж",
+      "aum": 3200000,
+      "liquidBalance": 190000,
+      "churnRisk": "medium",
+      "lastContactIso": "2026-06-01T06:40:00.000Z",
+      "nextContactIso": "2026-06-17T06:40:00.000Z",
+      "note": null,
+      "tags": [
+        "insufficient-data",
+        "new-client",
+        "salary"
+      ]
+    },
+    {
+      "id": "c12",
+      "fullName": "Кира Новикова",
+      "segment": "Alfa Only",
+      "riskAppetite": "moderate",
+      "managerId": "m2",
+      "age": 38,
+      "city": "Москва",
+      "preferredChannel": "call",
+      "maritalStatus": "single",
+      "occupation": "Собственник студии дизайна",
+      "aum": 18400000,
+      "liquidBalance": 6800000,
+      "churnRisk": "low",
+      "lastContactIso": "2026-06-15T18:40:00.000Z",
+      "nextContactIso": "2026-06-16T10:40:00.000Z",
+      "note": "Нужна парковка ликвидности перед сделкой, но потом хочет перейти к инвестиционному плану без лишней суеты.",
+      "tags": [
+        "liquidity",
+        "investments",
+        "deal-window"
+      ]
+    },
+    {
+      "id": "c13",
+      "fullName": "Роман Гусев",
+      "segment": "Alfa Only",
+      "riskAppetite": "conservative",
+      "managerId": "m1",
+      "age": 57,
+      "city": "Самара",
+      "preferredChannel": "call",
+      "maritalStatus": "married",
+      "occupation": "Собственник строительной компании",
+      "aum": 24700000,
+      "liquidBalance": 8200000,
+      "churnRisk": "high",
+      "lastContactIso": "2026-05-20T06:40:00.000Z",
+      "nextContactIso": "2026-06-16T08:40:00.000Z",
+      "note": "Почти перестал отвечать, но ранее сам поднимал тему краткосрочной ликвидности. Нужен очень аккуратный возврат в диалог.",
+      "tags": [
+        "silent-client",
+        "liquidity",
+        "retention"
+      ]
+    },
+    {
+      "id": "c14",
+      "fullName": "Анна Троицкая",
+      "segment": "Alfa Only",
+      "riskAppetite": "moderate",
+      "managerId": "m2",
+      "age": 37,
+      "city": "Краснодар",
+      "preferredChannel": "chat",
+      "maritalStatus": "married",
+      "occupation": "Руководитель HR-направления",
+      "aum": 8100000,
+      "liquidBalance": 540000,
+      "churnRisk": "medium",
+      "lastContactIso": "2026-06-11T06:40:00.000Z",
+      "nextContactIso": "2026-06-17T02:40:00.000Z",
+      "note": "Семейный контур, travel и страхование интересны, но реагирует коротко и быстро устает от сложных условий.",
+      "tags": [
+        "family",
+        "travel",
+        "insurance"
+      ]
+    },
+    {
+      "id": "c15",
+      "fullName": "Виктор Самойлов",
+      "segment": "Alfa Only",
+      "riskAppetite": "aggressive",
+      "managerId": "m1",
+      "age": 46,
+      "city": "Москва",
+      "preferredChannel": "meeting",
+      "maritalStatus": "married",
+      "occupation": "Экс-партнер инвестиционной компании",
+      "aum": 31200000,
+      "liquidBalance": 14500000,
+      "churnRisk": "medium",
+      "lastContactIso": "2026-06-13T06:40:00.000Z",
+      "nextContactIso": "2026-06-16T11:40:00.000Z",
+      "note": "После продажи доли в бизнесе хочет инвестиционный план, но опасается плохого тайминга и захода на пике рынка.",
+      "tags": [
+        "investment-intent",
+        "timing-risk",
+        "brokerage"
+      ]
+    }
+  ],
+  "products": [
+    {
+      "id": "p1",
+      "name": "Премиальная карта",
+      "category": "cards",
+      "riskLevel": "low",
+      "margin": "medium",
+      "currency": "RUB",
+      "pitch": "Премиальный сервис, lounge и travel-страховка с повышенным кэшбэком в поездках без скрытых условий."
+    },
+    {
+      "id": "p2",
+      "name": "Инвест-счет",
+      "category": "investment",
+      "riskLevel": "high",
+      "margin": "high",
+      "currency": "RUB",
+      "pitch": "Доступ к диверсифицированным инвестиционным идеям с поэтапным входом и контролем уровня риска."
+    },
+    {
+      "id": "p3",
+      "name": "Премиальный вклад",
+      "category": "deposits",
+      "riskLevel": "low",
+      "margin": "medium",
+      "currency": "RUB",
+      "pitch": "Защита капитала с доходностью выше базового вклада и гибким сроком размещения."
+    },
+    {
+      "id": "p4",
+      "name": "Страхование путешествий",
+      "category": "insurance",
+      "riskLevel": "low",
+      "margin": "high",
+      "currency": "RUB",
+      "pitch": "Надежная страховая защита всей семьи в поездках с быстрым покрытием и понятными условиями."
+    },
+    {
+      "id": "p5",
+      "name": "Брокерский счет",
+      "category": "brokerage",
+      "riskLevel": "high",
+      "margin": "high",
+      "currency": "USD",
+      "pitch": "Выход на валютные и зарубежные инструменты с поэтапным входом частями для умеренного управления риском."
+    }
+  ],
+  "clientProducts": [
+    {
+      "clientId": "c1",
+      "productId": "p1",
+      "status": "active",
+      "balance": 240000,
+      "openedAtIso": "2024-04-07T06:40:00.000Z"
+    },
+    {
+      "clientId": "c1",
+      "productId": "p2",
+      "status": "active",
+      "balance": 3100000,
+      "openedAtIso": "2025-06-01T06:40:00.000Z"
+    },
+    {
+      "clientId": "c2",
+      "productId": "p1",
+      "status": "active",
+      "balance": 520000,
+      "openedAtIso": "2023-03-04T06:40:00.000Z"
+    },
+    {
+      "clientId": "c2",
+      "productId": "p3",
+      "status": "active",
+      "balance": 12500000,
+      "openedAtIso": "2026-01-07T06:40:00.000Z"
+    },
+    {
+      "clientId": "c3",
+      "productId": "p2",
+      "status": "active",
+      "balance": 1850000,
+      "openedAtIso": "2025-11-08T06:40:00.000Z"
+    },
+    {
+      "clientId": "c3",
+      "productId": "p5",
+      "status": "active",
+      "balance": 720000,
+      "openedAtIso": "2026-01-27T06:40:00.000Z"
+    },
+    {
+      "clientId": "c4",
+      "productId": "p4",
+      "status": "active",
+      "balance": 35000,
+      "openedAtIso": "2026-03-13T06:40:00.000Z"
+    },
+    {
+      "clientId": "c5",
+      "productId": "p1",
+      "status": "active",
+      "balance": 610000,
+      "openedAtIso": "2023-12-29T06:40:00.000Z"
+    },
+    {
+      "clientId": "c5",
+      "productId": "p3",
+      "status": "active",
+      "balance": 18900000,
+      "openedAtIso": "2026-04-17T06:40:00.000Z"
+    },
+    {
+      "clientId": "c6",
+      "productId": "p1",
+      "status": "active",
+      "balance": 180000,
+      "openedAtIso": "2025-08-20T06:40:00.000Z"
+    },
+    {
+      "clientId": "c6",
+      "productId": "p2",
+      "status": "active",
+      "balance": 960000,
+      "openedAtIso": "2025-11-28T06:40:00.000Z"
+    },
+    {
+      "clientId": "c6",
+      "productId": "p4",
+      "status": "active",
+      "balance": 42000,
+      "openedAtIso": "2026-05-22T06:40:00.000Z"
+    },
+    {
+      "clientId": "c7",
+      "productId": "p1",
+      "status": "active",
+      "balance": 260000,
+      "openedAtIso": "2025-04-12T06:40:00.000Z"
+    },
+    {
+      "clientId": "c7",
+      "productId": "p4",
+      "status": "active",
+      "balance": 56000,
+      "openedAtIso": "2026-02-16T06:40:00.000Z"
+    },
+    {
+      "clientId": "c8",
+      "productId": "p1",
+      "status": "active",
+      "balance": 720000,
+      "openedAtIso": "2023-10-10T06:40:00.000Z"
+    },
+    {
+      "clientId": "c8",
+      "productId": "p3",
+      "status": "active",
+      "balance": 16400000,
+      "openedAtIso": "2025-11-18T06:40:00.000Z"
+    },
+    {
+      "clientId": "c9",
+      "productId": "p1",
+      "status": "active",
+      "balance": 230000,
+      "openedAtIso": "2024-09-14T06:40:00.000Z"
+    },
+    {
+      "clientId": "c9",
+      "productId": "p5",
+      "status": "active",
+      "balance": 1260000,
+      "openedAtIso": "2025-07-31T06:40:00.000Z"
+    },
+    {
+      "clientId": "c10",
+      "productId": "p1",
+      "status": "active",
+      "balance": 480000,
+      "openedAtIso": "2024-02-17T06:40:00.000Z"
+    },
+    {
+      "clientId": "c10",
+      "productId": "p3",
+      "status": "active",
+      "balance": 9700000,
+      "openedAtIso": "2026-01-27T06:40:00.000Z"
+    },
+    {
+      "clientId": "c11",
+      "productId": "p1",
+      "status": "active",
+      "balance": 92000,
+      "openedAtIso": "2025-11-28T06:40:00.000Z"
+    },
+    {
+      "clientId": "c12",
+      "productId": "p1",
+      "status": "active",
+      "balance": 340000,
+      "openedAtIso": "2025-02-01T06:40:00.000Z"
+    },
+    {
+      "clientId": "c12",
+      "productId": "p3",
+      "status": "active",
+      "balance": 5200000,
+      "openedAtIso": "2026-03-18T06:40:00.000Z"
+    },
+    {
+      "clientId": "c13",
+      "productId": "p1",
+      "status": "active",
+      "balance": 510000,
+      "openedAtIso": "2024-05-17T06:40:00.000Z"
+    },
+    {
+      "clientId": "c13",
+      "productId": "p3",
+      "status": "active",
+      "balance": 10300000,
+      "openedAtIso": "2025-10-19T06:40:00.000Z"
+    },
+    {
+      "clientId": "c14",
+      "productId": "p1",
+      "status": "active",
+      "balance": 210000,
+      "openedAtIso": "2025-05-02T06:40:00.000Z"
+    },
+    {
+      "clientId": "c14",
+      "productId": "p4",
+      "status": "active",
+      "balance": 30000,
+      "openedAtIso": "2026-04-02T06:40:00.000Z"
+    },
+    {
+      "clientId": "c15",
+      "productId": "p5",
+      "status": "active",
+      "balance": 2460000,
+      "openedAtIso": "2026-02-26T06:40:00.000Z"
+    }
+  ],
+  "conversations": [
+    {
+      "id": "conv1",
+      "clientId": "c1",
+      "channel": "chat",
+      "topic": "Инвестиционные идеи",
+      "startedAtIso": "2026-06-14T06:40:00.000Z"
+    },
+    {
+      "id": "conv1b",
+      "clientId": "c1",
+      "channel": "chat",
+      "topic": "Сервис по премиальной карте",
+      "startedAtIso": "2026-06-15T22:40:00.000Z"
+    },
+    {
+      "id": "conv2",
+      "clientId": "c2",
+      "channel": "call",
+      "topic": "Обновление портфеля",
+      "startedAtIso": "2026-06-16T00:40:00.000Z"
+    },
+    {
+      "id": "conv5",
+      "clientId": "c3",
+      "channel": "chat",
+      "topic": "Валютные идеи и брокерский счет",
+      "startedAtIso": "2026-06-14T06:40:00.000Z"
+    },
+    {
+      "id": "conv3",
+      "clientId": "c4",
+      "channel": "chat",
+      "topic": "Возврат в коммуникацию",
+      "startedAtIso": "2026-06-10T06:40:00.000Z"
+    },
+    {
+      "id": "conv6",
+      "clientId": "c5",
+      "channel": "chat",
+      "topic": "Размещение свободной ликвидности",
+      "startedAtIso": "2026-06-15T02:40:00.000Z"
+    },
+    {
+      "id": "conv4",
+      "clientId": "c6",
+      "channel": "chat",
+      "topic": "Премиальные travel-benefits",
+      "startedAtIso": "2026-06-15T12:40:00.000Z"
+    },
+    {
+      "id": "conv7",
+      "clientId": "c7",
+      "channel": "chat",
+      "topic": "Travel-сервис и benefits",
+      "startedAtIso": "2026-06-15T19:40:00.000Z"
+    },
+    {
+      "id": "conv8",
+      "clientId": "c8",
+      "channel": "call",
+      "topic": "Краткосрочное размещение ликвидности",
+      "startedAtIso": "2026-06-15T21:10:00.000Z"
+    },
+    {
+      "id": "conv9",
+      "clientId": "c2",
+      "channel": "chat",
+      "topic": "Сервис премиального сопровождения",
+      "startedAtIso": "2026-06-13T01:40:00.000Z"
+    },
+    {
+      "id": "conv10",
+      "clientId": "c9",
+      "channel": "chat",
+      "topic": "FX-диверсификация после паузы",
+      "startedAtIso": "2026-06-14T02:40:00.000Z"
+    },
+    {
+      "id": "conv11",
+      "clientId": "c10",
+      "channel": "call",
+      "topic": "Негатив по сервису и удержание остатка",
+      "startedAtIso": "2026-06-15T16:40:00.000Z"
+    },
+    {
+      "id": "conv12",
+      "clientId": "c11",
+      "channel": "chat",
+      "topic": "Первичный контакт без полного профиля",
+      "startedAtIso": "2026-06-11T03:40:00.000Z"
+    },
+    {
+      "id": "conv13",
+      "clientId": "c12",
+      "channel": "call",
+      "topic": "Парковка ликвидности перед сделкой",
+      "startedAtIso": "2026-06-15T20:40:00.000Z"
+    },
+    {
+      "id": "conv14",
+      "clientId": "c13",
+      "channel": "call",
+      "topic": "Возврат молчащего клиента",
+      "startedAtIso": "2026-05-29T06:40:00.000Z"
+    },
+    {
+      "id": "conv15",
+      "clientId": "c14",
+      "channel": "chat",
+      "topic": "Семейная страховка и travel-пакет",
+      "startedAtIso": "2026-06-15T08:40:00.000Z"
+    },
+    {
+      "id": "conv16",
+      "clientId": "c15",
+      "channel": "chat",
+      "topic": "Инвестплан после продажи доли",
+      "startedAtIso": "2026-06-15T09:40:00.000Z"
+    },
+    {
+      "id": "conv17",
+      "clientId": "c8",
+      "channel": "chat",
+      "topic": "Премиальный сервис отдельно от ликвидности",
+      "startedAtIso": "2026-06-12T06:40:00.000Z"
+    },
+    {
+      "id": "conv18",
+      "clientId": "c5",
+      "channel": "chat",
+      "topic": "Долгосрочные инвестиционные идеи после предложения по ликвидности",
+      "startedAtIso": "2026-06-13T00:40:00.000Z"
+    },
+    {
+      "id": "conv20",
+      "clientId": "c10",
+      "channel": "chat",
+      "topic": "Компенсационный сервисный follow-up после звонка",
+      "startedAtIso": "2026-06-16T05:00:00.000Z"
+    }
+  ],
+  "messages": [
+    {
+      "id": "conv1-msg-1",
+      "conversationId": "conv1",
+      "sender": "client",
+      "text": "Добрый день. Хочу спокойно обсудить, куда разместить часть свободных средств.",
+      "sentAtIso": "2026-06-15T04:15:00.000Z"
+    },
+    {
+      "id": "conv1-msg-2",
+      "conversationId": "conv1",
+      "sender": "manager",
+      "text": "Добрый день, Иван. Могу собрать 3 сценария: вклад, консервативная облигационная часть и смешанный вариант.",
+      "sentAtIso": "2026-06-15T04:22:00.000Z"
+    },
+    {
+      "id": "conv1-msg-3",
+      "conversationId": "conv1",
+      "sender": "client",
+      "text": "Интересно, но важно не заходить в слишком высокий риск.",
+      "sentAtIso": "2026-06-15T04:33:00.000Z"
+    },
+    {
+      "id": "conv1-msg-4",
+      "conversationId": "conv1",
+      "sender": "manager",
+      "text": "Понял. Тогда акцент сделаю на сохранении ликвидности и доходности выше обычного вклада.",
+      "sentAtIso": "2026-06-15T04:41:00.000Z"
+    },
+    {
+      "id": "conv1-msg-5",
+      "conversationId": "conv1",
+      "sender": "client",
+      "text": "Да, и отдельно хочу увидеть, где можно быстро выйти в кэш без больших потерь.",
+      "sentAtIso": "2026-06-15T04:54:00.000Z"
+    },
+    {
+      "id": "conv1-msg-6",
+      "conversationId": "conv1",
+      "sender": "manager",
+      "text": "Сделаю это отдельной колонкой в сравнении. Также добавлю пример распределения на 6 и 12 месяцев.",
+      "sentAtIso": "2026-06-15T05:01:00.000Z"
+    },
+    {
+      "id": "conv1-msg-7",
+      "conversationId": "conv1",
+      "sender": "client",
+      "text": "Хорошо. И давайте без длинной презентации, лучше коротко и по цифрам.",
+      "sentAtIso": "2026-06-15T05:13:00.000Z"
+    },
+    {
+      "id": "conv1-msg-8",
+      "conversationId": "conv1",
+      "sender": "manager",
+      "text": "Принято. Завтра после 12:00 пришлю компактную таблицу и короткий вывод по каждому сценарию.",
+      "sentAtIso": "2026-06-15T05:20:00.000Z"
+    },
+    {
+      "id": "conv1b-msg-1",
+      "conversationId": "conv1b",
+      "sender": "client",
+      "text": "Добрый день. Ещё отдельно вопрос по премиальной карте: какие сейчас travel-привилегии реально работают в поездках?",
+      "sentAtIso": "2026-06-15T22:06:00.000Z"
+    },
+    {
+      "id": "conv1b-msg-2",
+      "conversationId": "conv1b",
+      "sender": "manager",
+      "text": "Добрый день. Могу прислать короткий список: lounge, страховка, быстрый проход и ограничения по пакетам.",
+      "sentAtIso": "2026-06-15T22:11:00.000Z"
+    },
+    {
+      "id": "conv1b-msg-3",
+      "conversationId": "conv1b",
+      "sender": "client",
+      "text": "Да, только коротко. Не хочу смешивать это с инвестиционным предложением и точно не хочу лишнего риска или сложных условий.",
+      "sentAtIso": "2026-06-15T22:18:00.000Z"
+    },
+    {
+      "id": "conv1b-msg-4",
+      "conversationId": "conv1b",
+      "sender": "manager",
+      "text": "Согласен, вынесу в отдельное сообщение и без лишних деталей.",
+      "sentAtIso": "2026-06-15T22:22:00.000Z"
+    },
+    {
+      "id": "conv1b-msg-5",
+      "conversationId": "conv1b",
+      "sender": "client",
+      "text": "Отлично. Если есть 2-3 самых полезных пункта, этого будет достаточно.",
+      "sentAtIso": "2026-06-15T22:29:00.000Z"
+    },
+    {
+      "id": "conv1b-msg-6",
+      "conversationId": "conv1b",
+      "sender": "manager",
+      "text": "Тогда соберу компактную подборку и пришлю отдельно вечером.",
+      "sentAtIso": "2026-06-15T22:35:00.000Z"
+    },
+    {
+      "id": "conv1b-msg-7",
+      "conversationId": "conv1b",
+      "sender": "client",
+      "text": "Хорошо, тогда жду отдельный короткий сервисный follow-up сегодня вечером.",
+      "sentAtIso": "2026-06-15T22:41:00.000Z"
+    },
+    {
+      "id": "conv2-msg-1",
+      "conversationId": "conv2",
+      "sender": "manager",
+      "text": "Ольга, добрый день. Подтвержу, что сегодня готов обсудить обновление портфеля.",
+      "sentAtIso": "2026-06-16T00:05:00.000Z"
+    },
+    {
+      "id": "conv2-msg-2",
+      "conversationId": "conv2",
+      "sender": "client",
+      "text": "Да, после 16:00 будет удобно.",
+      "sentAtIso": "2026-06-16T00:09:00.000Z"
+    },
+    {
+      "id": "conv2-msg-3",
+      "conversationId": "conv2",
+      "sender": "manager",
+      "text": "Отлично. Подготовлю сравнение по премиальному вкладу, защитной облигационной части и структурной идее.",
+      "sentAtIso": "2026-06-16T00:15:00.000Z"
+    },
+    {
+      "id": "conv2-msg-4",
+      "conversationId": "conv2",
+      "sender": "client",
+      "text": "Прошу без избыточного риска. Для меня важнее сохранность капитала, чем агрессивная доходность.",
+      "sentAtIso": "2026-06-16T00:22:00.000Z"
+    },
+    {
+      "id": "conv2-msg-5",
+      "conversationId": "conv2",
+      "sender": "manager",
+      "text": "Понял. Вынесу в начало только консервативные варианты и отдельно отмечу возможную доходность по каждому.",
+      "sentAtIso": "2026-06-16T00:28:00.000Z"
+    },
+    {
+      "id": "conv2-msg-6",
+      "conversationId": "conv2",
+      "sender": "client",
+      "text": "Хорошо. И если возможно, до звонка пришлите короткую рамку, чтобы я посмотрела между встречами.",
+      "sentAtIso": "2026-06-16T00:35:00.000Z"
+    },
+    {
+      "id": "conv2-msg-7",
+      "conversationId": "conv2",
+      "sender": "manager",
+      "text": "Да, отправлю краткое сравнение до 15:30 и в 16:00 созвонимся, чтобы пройтись по деталям.",
+      "sentAtIso": "2026-06-16T00:43:00.000Z"
+    },
+    {
+      "id": "conv2-msg-8",
+      "conversationId": "conv2",
+      "sender": "client",
+      "text": "Подходит. На звонке хочу отдельно обсудить, стоит ли держать часть ликвидности на коротком сроке.",
+      "sentAtIso": "2026-06-16T00:49:00.000Z"
+    },
+    {
+      "id": "conv5-msg-1",
+      "conversationId": "conv5",
+      "sender": "client",
+      "text": "Добрый вечер. Смотрю на валютные идеи, но не хочу заходить слишком резко.",
+      "sentAtIso": "2026-06-14T05:28:00.000Z"
+    },
+    {
+      "id": "conv5-msg-2",
+      "conversationId": "conv5",
+      "sender": "manager",
+      "text": "Понял вас. Можем зайти постепенно через брокерский счет и заранее ограничить долю валютной части.",
+      "sentAtIso": "2026-06-14T05:38:00.000Z"
+    },
+    {
+      "id": "conv5-msg-3",
+      "conversationId": "conv5",
+      "sender": "client",
+      "text": "Мне нужен понятный план: стартовая сумма, распределение и когда пересматривать позицию.",
+      "sentAtIso": "2026-06-14T05:49:00.000Z"
+    },
+    {
+      "id": "conv5-msg-4",
+      "conversationId": "conv5",
+      "sender": "manager",
+      "text": "Соберу пошаговый сценарий на 3 шага и добавлю ориентиры для пересмотра через 30 и 90 дней.",
+      "sentAtIso": "2026-06-14T05:58:00.000Z"
+    },
+    {
+      "id": "conv5-msg-5",
+      "conversationId": "conv5",
+      "sender": "client",
+      "text": "Хорошо. Важно, чтобы не было ощущения, что я покупаю на пике.",
+      "sentAtIso": "2026-06-14T06:06:00.000Z"
+    },
+    {
+      "id": "conv5-msg-6",
+      "conversationId": "conv5",
+      "sender": "manager",
+      "text": "Тогда предложу поэтапный вход частями и отмечу, какие инструменты подойдут для умеренного риска.",
+      "sentAtIso": "2026-06-14T06:13:00.000Z"
+    },
+    {
+      "id": "conv5-msg-7",
+      "conversationId": "conv5",
+      "sender": "client",
+      "text": "Отлично. И если будет удобно, давайте после вашего сообщения назначим короткую встречу на следующей неделе.",
+      "sentAtIso": "2026-06-14T06:22:00.000Z"
+    },
+    {
+      "id": "conv5-msg-8",
+      "conversationId": "conv5",
+      "sender": "manager",
+      "text": "Сделаю. Завтра пришлю базовый план в чат, а затем предложу слоты на очную встречу.",
+      "sentAtIso": "2026-06-14T06:29:00.000Z"
+    },
+    {
+      "id": "conv3-msg-1",
+      "conversationId": "conv3",
+      "sender": "manager",
+      "text": "Мария, добрый день. Хотел аккуратно вернуться к вопросу страховой защиты перед поездками.",
+      "sentAtIso": "2026-06-10T03:40:00.000Z"
+    },
+    {
+      "id": "conv3-msg-2",
+      "conversationId": "conv3",
+      "sender": "client",
+      "text": "Сейчас в плотном графике, не хочу вникать в длинные описания.",
+      "sentAtIso": "2026-06-10T04:28:00.000Z"
+    },
+    {
+      "id": "conv3-msg-3",
+      "conversationId": "conv3",
+      "sender": "manager",
+      "text": "Понял. Тогда не перегружаю: могу позже прислать совсем короткий вариант на 3 пункта.",
+      "sentAtIso": "2026-06-10T04:40:00.000Z"
+    },
+    {
+      "id": "conv3-msg-4",
+      "conversationId": "conv3",
+      "sender": "client",
+      "text": "Так будет лучше, спасибо.",
+      "sentAtIso": "2026-06-10T04:54:00.000Z"
+    },
+    {
+      "id": "conv3-msg-5",
+      "conversationId": "conv3",
+      "sender": "manager",
+      "text": "Верно ли понимаю, что актуально вернуться к теме уже ближе к поездке?",
+      "sentAtIso": "2026-06-10T08:30:00.000Z"
+    },
+    {
+      "id": "conv3-msg-6",
+      "conversationId": "conv3",
+      "sender": "client",
+      "text": "Да, лучше через несколько дней. И только в сообщении, без звонка.",
+      "sentAtIso": "2026-06-10T16:10:00.000Z"
+    },
+    {
+      "id": "conv3-msg-7",
+      "conversationId": "conv3",
+      "sender": "manager",
+      "text": "Принято. Напишу коротко в чат и без давления, когда срок будет ближе.",
+      "sentAtIso": "2026-06-10T16:28:00.000Z"
+    },
+    {
+      "id": "conv3-msg-8",
+      "conversationId": "conv3",
+      "sender": "client",
+      "text": "Спасибо, такой формат мне комфортен.",
+      "sentAtIso": "2026-06-10T16:42:00.000Z"
+    },
+    {
+      "id": "conv3-msg-9",
+      "conversationId": "conv3",
+      "sender": "manager",
+      "text": "Рад, что так удобно. Тогда вернусь коротким сообщением ближе к сроку, без лишнего.",
+      "sentAtIso": "2026-06-10T16:50:00.000Z"
+    },
+    {
+      "id": "conv6-msg-1",
+      "conversationId": "conv6",
+      "sender": "manager",
+      "text": "Дмитрий, добрый день. Вижу крупный свободный остаток и хотел предложить варианты размещения ликвидности.",
+      "sentAtIso": "2026-06-15T02:00:00.000Z"
+    },
+    {
+      "id": "conv6-msg-2",
+      "conversationId": "conv6",
+      "sender": "client",
+      "text": "Добрый. Да, можно, но без длинной презентации. Нужен быстрый вывод по сути.",
+      "sentAtIso": "2026-06-15T02:05:00.000Z"
+    },
+    {
+      "id": "conv6-msg-3",
+      "conversationId": "conv6",
+      "sender": "manager",
+      "text": "Понял. Подготовлю один короткий блок: срок, ликвидность и ожидаемая доходность по трем вариантам.",
+      "sentAtIso": "2026-06-15T02:11:00.000Z"
+    },
+    {
+      "id": "conv6-msg-4",
+      "conversationId": "conv6",
+      "sender": "client",
+      "text": "Важно, чтобы можно было быстро сравнить вклад и облигационную альтернативу.",
+      "sentAtIso": "2026-06-15T02:16:00.000Z"
+    },
+    {
+      "id": "conv6-msg-5",
+      "conversationId": "conv6",
+      "sender": "manager",
+      "text": "Сделаю это в одном сообщении и отдельно отмечу, где есть быстрый выход.",
+      "sentAtIso": "2026-06-15T02:22:00.000Z"
+    },
+    {
+      "id": "conv6-msg-6",
+      "conversationId": "conv6",
+      "sender": "client",
+      "text": "Хорошо. Если задержитесь, напомните, во сколько ждать. Я буду между встречами.",
+      "sentAtIso": "2026-06-15T02:27:00.000Z"
+    },
+    {
+      "id": "conv6-msg-7",
+      "conversationId": "conv6",
+      "sender": "manager",
+      "text": "Отправлю до 14:30 и, если удобно, потом коротко созвонимся на 10 минут.",
+      "sentAtIso": "2026-06-15T02:31:00.000Z"
+    },
+    {
+      "id": "conv6-msg-8",
+      "conversationId": "conv6",
+      "sender": "client",
+      "text": "Созвон возможен, но только если будет совсем предметно и быстро.",
+      "sentAtIso": "2026-06-15T02:34:00.000Z"
+    },
+    {
+      "id": "conv4-msg-1",
+      "conversationId": "conv4",
+      "sender": "manager",
+      "text": "Елена, вижу, что у вас скоро поездка. Могу подобрать benefits по премиальной карте.",
+      "sentAtIso": "2026-06-15T11:58:00.000Z"
+    },
+    {
+      "id": "conv4-msg-2",
+      "conversationId": "conv4",
+      "sender": "client",
+      "text": "Да, это актуально. Особенно интересуют lounge, страховка и быстрый проход в поездках.",
+      "sentAtIso": "2026-06-15T12:02:00.000Z"
+    },
+    {
+      "id": "conv4-msg-3",
+      "conversationId": "conv4",
+      "sender": "manager",
+      "text": "Хорошо. Подберу пакет, где будут lounge, travel-страховка и приоритетный сервис.",
+      "sentAtIso": "2026-06-15T12:08:00.000Z"
+    },
+    {
+      "id": "conv4-msg-4",
+      "conversationId": "conv4",
+      "sender": "client",
+      "text": "Если можно, пришлите в коротком формате, чтобы я посмотрела с телефона.",
+      "sentAtIso": "2026-06-15T12:12:00.000Z"
+    },
+    {
+      "id": "conv4-msg-5",
+      "conversationId": "conv4",
+      "sender": "manager",
+      "text": "Сделаю компактный формат: 3 преимущества, условия и что включено по страховке.",
+      "sentAtIso": "2026-06-15T12:16:00.000Z"
+    },
+    {
+      "id": "conv4-msg-6",
+      "conversationId": "conv4",
+      "sender": "client",
+      "text": "Отлично. Еще интересно, есть ли что-то по повышенному кэшбэку в поездках.",
+      "sentAtIso": "2026-06-15T12:21:00.000Z"
+    },
+    {
+      "id": "conv4-msg-7",
+      "conversationId": "conv4",
+      "sender": "manager",
+      "text": "Да, добавлю отдельным пунктом travel-расходы и где будут максимальные бонусы.",
+      "sentAtIso": "2026-06-15T12:25:00.000Z"
+    },
+    {
+      "id": "conv4-msg-8",
+      "conversationId": "conv4",
+      "sender": "client",
+      "text": "Супер, спасибо. Если пришлете сегодня, я смогу быстро посмотреть вечером.",
+      "sentAtIso": "2026-06-15T12:28:00.000Z"
+    },
+    {
+      "id": "conv7-msg-1",
+      "conversationId": "conv7",
+      "sender": "client",
+      "text": "Добрый день. Подскажите, можно ли коротко собрать travel-benefits по карте перед поездкой?",
+      "sentAtIso": "2026-06-15T19:22:00.000Z"
+    },
+    {
+      "id": "conv7-msg-2",
+      "conversationId": "conv7",
+      "sender": "manager",
+      "text": "Да, подготовлю короткий список с lounge, страховкой и сервисом в поездках.",
+      "sentAtIso": "2026-06-15T19:28:00.000Z"
+    },
+    {
+      "id": "conv7-msg-3",
+      "conversationId": "conv7",
+      "sender": "client",
+      "text": "Супер. Мне важно, чтобы это было в одном сообщении и без длинных условий.",
+      "sentAtIso": "2026-06-15T19:33:00.000Z"
+    },
+    {
+      "id": "conv7-msg-4",
+      "conversationId": "conv7",
+      "sender": "manager",
+      "text": "Принял. Сделаю подборку в формате 3 пункта плюс что нужно активировать.",
+      "sentAtIso": "2026-06-15T19:39:00.000Z"
+    },
+    {
+      "id": "conv7-msg-5",
+      "conversationId": "conv7",
+      "sender": "client",
+      "text": "И отдельно, если можно, отметьте, где есть реальная сервисная ценность, а не просто формальные опции.",
+      "sentAtIso": "2026-06-15T19:46:00.000Z"
+    },
+    {
+      "id": "conv7-msg-6",
+      "conversationId": "conv7",
+      "sender": "manager",
+      "text": "Да, выделю именно практические benefits и добавлю короткий следующий шаг.",
+      "sentAtIso": "2026-06-15T19:53:00.000Z"
+    },
+    {
+      "id": "conv8-msg-1",
+      "conversationId": "conv8",
+      "sender": "manager",
+      "text": "Сергей, добрый день. Хотел предложить коротко обсудить размещение части свободной ликвидности на коротком сроке.",
+      "sentAtIso": "2026-06-15T21:14:00.000Z"
+    },
+    {
+      "id": "conv8-msg-2",
+      "conversationId": "conv8",
+      "sender": "client",
+      "text": "Добрый день. Можно, но только с очень понятным сравнением и без расплывчатых идей.",
+      "sentAtIso": "2026-06-15T21:20:00.000Z"
+    },
+    {
+      "id": "conv8-msg-3",
+      "conversationId": "conv8",
+      "sender": "manager",
+      "text": "Понял. Подготовлю короткий бриф по вкладу, короткой облигационной альтернативе и срокам выхода.",
+      "sentAtIso": "2026-06-15T21:26:00.000Z"
+    },
+    {
+      "id": "conv8-msg-4",
+      "conversationId": "conv8",
+      "sender": "client",
+      "text": "Хорошо. И отдельно скажите, что имеет смысл удерживать в банке, а что оставить свободным.",
+      "sentAtIso": "2026-06-15T21:30:00.000Z"
+    },
+    {
+      "id": "conv8-msg-5",
+      "conversationId": "conv8",
+      "sender": "manager",
+      "text": "Да, это будет отдельным блоком: сколько держать ликвидным, сколько можно разместить без дискомфорта.",
+      "sentAtIso": "2026-06-15T21:36:00.000Z"
+    },
+    {
+      "id": "conv8-msg-6",
+      "conversationId": "conv8",
+      "sender": "client",
+      "text": "Тогда давайте созвонимся, если успеете прислать короткий ориентир заранее.",
+      "sentAtIso": "2026-06-15T21:42:00.000Z"
+    },
+    {
+      "id": "conv9-msg-1",
+      "conversationId": "conv9",
+      "sender": "client",
+      "text": "Добрый вечер. По премиальному сопровождению есть ощущение, что сервис стал менее предсказуемым.",
+      "sentAtIso": "2026-06-13T02:08:00.000Z"
+    },
+    {
+      "id": "conv9-msg-2",
+      "conversationId": "conv9",
+      "sender": "manager",
+      "text": "Спасибо, что сказали прямо. Давайте я коротко соберу, где именно были сбои, и вернусь с конкретным решением.",
+      "sentAtIso": "2026-06-13T02:22:00.000Z"
+    },
+    {
+      "id": "conv9-msg-3",
+      "conversationId": "conv9",
+      "sender": "client",
+      "text": "Да, лучше так. Пока не хочу, чтобы это смешивалось с портфелем и инвестиционными темами.",
+      "sentAtIso": "2026-06-13T02:34:00.000Z"
+    },
+    {
+      "id": "conv9-msg-4",
+      "conversationId": "conv9",
+      "sender": "manager",
+      "text": "Понял, разведем в отдельные контуры: сначала сервис, затем уже инвестиционный разговор.",
+      "sentAtIso": "2026-06-13T02:42:00.000Z"
+    },
+    {
+      "id": "conv10-msg-1",
+      "conversationId": "conv10",
+      "sender": "client",
+      "text": "Всё ещё думаю про валютную диверсификацию, но рынок выглядит нервно.",
+      "sentAtIso": "2026-06-14T03:18:00.000Z"
+    },
+    {
+      "id": "conv10-msg-2",
+      "conversationId": "conv10",
+      "sender": "manager",
+      "text": "Понимаю. Можем не заходить резко, а собрать поэтапный сценарий: что сейчас, что позже и где границы по риску.",
+      "sentAtIso": "2026-06-14T03:31:00.000Z"
+    },
+    {
+      "id": "conv10-msg-3",
+      "conversationId": "conv10",
+      "sender": "client",
+      "text": "Это уже ближе. Только не хочу длинное предложение и ощущение, что меня торопят.",
+      "sentAtIso": "2026-06-14T03:45:00.000Z"
+    },
+    {
+      "id": "conv10-msg-4",
+      "conversationId": "conv10",
+      "sender": "manager",
+      "text": "Тогда пришлю очень короткую рамку: 2 варианта, уровень риска и что делать, если решите подождать.",
+      "sentAtIso": "2026-06-14T03:59:00.000Z"
+    },
+    {
+      "id": "conv10-msg-5",
+      "conversationId": "conv10",
+      "sender": "client",
+      "text": "Ок. Вернитесь позже, но коротко и без давления.",
+      "sentAtIso": "2026-06-14T04:14:00.000Z"
+    },
+    {
+      "id": "conv11-msg-1",
+      "conversationId": "conv11",
+      "sender": "client",
+      "text": "Добрый день. Сервис по премиальному пакету снова сработал с задержкой, это уже не первый раз.",
+      "sentAtIso": "2026-06-15T16:48:00.000Z"
+    },
+    {
+      "id": "conv11-msg-2",
+      "conversationId": "conv11",
+      "sender": "manager",
+      "text": "Понимаю ваше раздражение и беру ситуацию на себя. Давайте сначала разберу сервисный сбой, а уже потом вернемся к финансовой части.",
+      "sentAtIso": "2026-06-15T16:55:00.000Z"
+    },
+    {
+      "id": "conv11-msg-3",
+      "conversationId": "conv11",
+      "sender": "client",
+      "text": "Именно. Сейчас меня больше волнует не вклад, а почему базовый сервис стал хуже.",
+      "sentAtIso": "2026-06-15T17:04:00.000Z"
+    },
+    {
+      "id": "conv11-msg-4",
+      "conversationId": "conv11",
+      "sender": "manager",
+      "text": "Справедливо. Я коротко вернусь с конкретным статусом и компенсационным решением.",
+      "sentAtIso": "2026-06-15T17:12:00.000Z"
+    },
+    {
+      "id": "conv11-msg-5",
+      "conversationId": "conv11",
+      "sender": "client",
+      "text": "Хорошо. Пока любые новые предложения неуместны, пока это не закрыто.",
+      "sentAtIso": "2026-06-15T17:22:00.000Z"
+    },
+    {
+      "id": "conv12-msg-1",
+      "conversationId": "conv12",
+      "sender": "client",
+      "text": "Добрый день. Хочу понять, какие у вас есть варианты по накоплениям, но пока без конкретики.",
+      "sentAtIso": "2026-06-11T04:18:00.000Z"
+    },
+    {
+      "id": "conv12-msg-2",
+      "conversationId": "conv12",
+      "sender": "manager",
+      "text": "Добрый день. Чтобы не отправлять общее предложение, уточню два вопроса: горизонт и насколько важна ликвидность?",
+      "sentAtIso": "2026-06-11T04:30:00.000Z"
+    },
+    {
+      "id": "conv12-msg-3",
+      "conversationId": "conv12",
+      "sender": "client",
+      "text": "Пока не готов ответить подробно, нужно сначала самому собрать цифры.",
+      "sentAtIso": "2026-06-11T04:43:00.000Z"
+    },
+    {
+      "id": "conv13-msg-1",
+      "conversationId": "conv13",
+      "sender": "client",
+      "text": "Добрый день. Через пару недель будет сделка, и нужно временно припарковать часть денег без жёсткой блокировки.",
+      "sentAtIso": "2026-06-15T20:58:00.000Z"
+    },
+    {
+      "id": "conv13-msg-2",
+      "conversationId": "conv13",
+      "sender": "manager",
+      "text": "Понял. Тогда сначала смотрим на ликвидность и короткий срок, а уже после сделки отдельно возвращаемся к инвестиционному плану.",
+      "sentAtIso": "2026-06-15T21:06:00.000Z"
+    },
+    {
+      "id": "conv13-msg-3",
+      "conversationId": "conv13",
+      "sender": "client",
+      "text": "Да, именно так. Не хочу сейчас смешивать парковку ликвидности и долгосрочные идеи.",
+      "sentAtIso": "2026-06-15T21:14:00.000Z"
+    },
+    {
+      "id": "conv13-msg-4",
+      "conversationId": "conv13",
+      "sender": "manager",
+      "text": "Соберу одно короткое сравнение по двум коротким сценариям и отмечу, когда логично вернуться к инвестиционному разговору.",
+      "sentAtIso": "2026-06-15T21:22:00.000Z"
+    },
+    {
+      "id": "conv13-msg-5",
+      "conversationId": "conv13",
+      "sender": "client",
+      "text": "Отлично. И покажите, где можно выйти быстро, если сроки сделки сдвинутся.",
+      "sentAtIso": "2026-06-15T21:31:00.000Z"
+    },
+    {
+      "id": "conv14-msg-1",
+      "conversationId": "conv14",
+      "sender": "manager",
+      "text": "Роман, добрый день. Возвращаюсь аккуратно к теме краткосрочной ликвидности, которую вы поднимали в прошлый раз.",
+      "sentAtIso": "2026-05-29T05:15:00.000Z"
+    },
+    {
+      "id": "conv14-msg-2",
+      "conversationId": "conv14",
+      "sender": "client",
+      "text": "Сейчас не лучший момент, давайте позже.",
+      "sentAtIso": "2026-05-29T05:27:00.000Z"
+    },
+    {
+      "id": "conv14-msg-3",
+      "conversationId": "conv14",
+      "sender": "manager",
+      "text": "Понял. Тогда позже вернусь очень коротко, без деталей и без звонка, если так удобнее.",
+      "sentAtIso": "2026-05-29T05:37:00.000Z"
+    },
+    {
+      "id": "conv14-msg-4",
+      "conversationId": "conv14",
+      "sender": "client",
+      "text": "Да, только коротко и по существу.",
+      "sentAtIso": "2026-05-29T05:48:00.000Z"
+    },
+    {
+      "id": "conv15-msg-1",
+      "conversationId": "conv15",
+      "sender": "client",
+      "text": "Можно коротко по family travel-пакету? Нужны страховка и понятные benefits для поездок.",
+      "sentAtIso": "2026-06-15T08:54:00.000Z"
+    },
+    {
+      "id": "conv15-msg-2",
+      "conversationId": "conv15",
+      "sender": "manager",
+      "text": "Да, сделаю компактно: что входит по страховке, какие travel-benefits реально полезны и что нужно активировать.",
+      "sentAtIso": "2026-06-15T09:02:00.000Z"
+    },
+    {
+      "id": "conv15-msg-3",
+      "conversationId": "conv15",
+      "sender": "client",
+      "text": "Отлично. Только без длинных тарифных таблиц, лучше в 3-4 пункта.",
+      "sentAtIso": "2026-06-15T09:13:00.000Z"
+    },
+    {
+      "id": "conv15-msg-4",
+      "conversationId": "conv15",
+      "sender": "manager",
+      "text": "Принято, соберу мобильный формат и один следующий шаг, если тема откликнется.",
+      "sentAtIso": "2026-06-15T09:24:00.000Z"
+    },
+    {
+      "id": "conv16-msg-1",
+      "conversationId": "conv16",
+      "sender": "client",
+      "text": "После продажи доли думаю про инвестиционный план, но рынок выглядит слишком нервным для резкого входа.",
+      "sentAtIso": "2026-06-15T09:58:00.000Z"
+    },
+    {
+      "id": "conv16-msg-2",
+      "conversationId": "conv16",
+      "sender": "manager",
+      "text": "Тогда не делаем резкий вход. Могу разложить план на 3 шага: что можно сделать сейчас, что позже и где точки пересмотра.",
+      "sentAtIso": "2026-06-15T10:07:00.000Z"
+    },
+    {
+      "id": "conv16-msg-3",
+      "conversationId": "conv16",
+      "sender": "client",
+      "text": "Это хорошо. Мне нужно не предложение, а именно поэтапный подход с контролем тайминга.",
+      "sentAtIso": "2026-06-15T10:18:00.000Z"
+    },
+    {
+      "id": "conv16-msg-4",
+      "conversationId": "conv16",
+      "sender": "manager",
+      "text": "Понял. Соберу сценарий по частям и отдельно отмечу, где можно остаться в ликвидности до следующего окна.",
+      "sentAtIso": "2026-06-15T10:28:00.000Z"
+    },
+    {
+      "id": "conv16-msg-5",
+      "conversationId": "conv16",
+      "sender": "client",
+      "text": "Отлично. Если будет коротко и предметно, готов обсудить уже на встрече.",
+      "sentAtIso": "2026-06-15T10:36:00.000Z"
+    },
+    {
+      "id": "conv17-msg-1",
+      "conversationId": "conv17",
+      "sender": "client",
+      "text": "Ещё отдельно: по премиальному пакету нужны travel benefits, но не хочу смешивать это с разговором по ликвидности.",
+      "sentAtIso": "2026-06-12T06:56:00.000Z"
+    },
+    {
+      "id": "conv17-msg-2",
+      "conversationId": "conv17",
+      "sender": "manager",
+      "text": "Согласен, вынесу сервис в отдельный короткий follow-up и не буду мешать его с основным кейсом по ликвидности.",
+      "sentAtIso": "2026-06-12T07:03:00.000Z"
+    },
+    {
+      "id": "conv17-msg-3",
+      "conversationId": "conv17",
+      "sender": "client",
+      "text": "Отлично. Здесь нужен только короткий список без условий в несколько абзацев.",
+      "sentAtIso": "2026-06-12T07:11:00.000Z"
+    },
+    {
+      "id": "conv18-msg-1",
+      "conversationId": "conv18",
+      "sender": "client",
+      "text": "Кроме парковки ликвидности, думаю о более длинных инвестиционных идеях, но сейчас не хочу всё смешивать.",
+      "sentAtIso": "2026-06-13T01:06:00.000Z"
+    },
+    {
+      "id": "conv18-msg-2",
+      "conversationId": "conv18",
+      "sender": "manager",
+      "text": "Полностью согласен. Тогда разделим: отдельно краткосрочную ликвидность и отдельно долгосрочную инвестиционную рамку.",
+      "sentAtIso": "2026-06-13T01:18:00.000Z"
+    },
+    {
+      "id": "conv18-msg-3",
+      "conversationId": "conv18",
+      "sender": "client",
+      "text": "Да, иначе это звучит как слишком широкое предложение. Лучше два четких шага.",
+      "sentAtIso": "2026-06-13T01:28:00.000Z"
+    },
+    {
+      "id": "conv18-msg-4",
+      "conversationId": "conv18",
+      "sender": "manager",
+      "text": "Так и сделаю: сначала короткий бриф по ликвидности, а инвестиционные идеи вынесу в следующий контакт.",
+      "sentAtIso": "2026-06-13T01:36:00.000Z"
+    }
+  ],
+  "insights": [
+    {
+      "conversationId": "conv1",
+      "sentiment": "interested",
+      "urgency": "normal",
+      "buyingSignal": "medium",
+      "waitingMinutes": 12,
+      "nextTouchIso": "2026-06-17T18:40:00.000Z",
+      "recommendedAction": "Отправить компактное сравнение трех сценариев после 12:00",
+      "preferredChannel": "chat",
+      "responseStyle": "comparison",
+      "topics": [
+        "investments",
+        "liquidity",
+        "capital_preservation"
+      ],
+      "constraints": [
+        "risk",
+        "liquidity",
+        "avoid_long_presentation"
+      ],
+      "productCodes": [
+        "p2",
+        "p3"
+      ],
+      "playbook": [
+        "send_comparison",
+        "emphasize_liquidity",
+        "keep_message_short"
+      ]
+    },
+    {
+      "conversationId": "conv1b",
+      "sentiment": "neutral",
+      "urgency": "normal",
+      "buyingSignal": "high",
+      "waitingMinutes": 9,
+      "nextTouchIso": "2026-06-16T16:30:00.000Z",
+      "recommendedAction": "Отдельно отправить короткую подборку по travel-benefits без смешения с инвестиционным кейсом",
+      "preferredChannel": "chat",
+      "responseStyle": "short",
+      "topics": [
+        "travel",
+        "premium_card",
+        "service"
+      ],
+      "constraints": [
+        "risk",
+        "avoid_topic_mixing",
+        "keep_message_short"
+      ],
+      "productCodes": [
+        "p1",
+        "p4"
+      ],
+      "playbook": [
+        "keep_message_short",
+        "separate_topics",
+        "send_comparison"
+      ]
+    },
+    {
+      "conversationId": "conv2",
+      "sentiment": "neutral",
+      "urgency": "high",
+      "buyingSignal": "high",
+      "waitingMinutes": 6,
+      "nextTouchIso": "2026-06-16T13:00:00.000Z",
+      "recommendedAction": "Созвон по обновлению портфеля и сравнению консервативных вариантов",
+      "preferredChannel": "call",
+      "responseStyle": "comparison",
+      "topics": [
+        "capital_protection",
+        "deposit",
+        "structured_deals"
+      ],
+      "constraints": [
+        "risk"
+      ],
+      "productCodes": [
+        "p3"
+      ],
+      "playbook": [
+        "prepare_call",
+        "highlight_capital_protection",
+        "send_comparison"
+      ]
+    },
+    {
+      "conversationId": "conv5",
+      "sentiment": "interested",
+      "urgency": "normal",
+      "buyingSignal": "medium",
+      "waitingMinutes": 12,
+      "nextTouchIso": "2026-06-17T06:40:00.000Z",
+      "recommendedAction": "Отправить пошаговый FX-план и после этого предложить слоты встречи",
+      "preferredChannel": "chat",
+      "responseStyle": "detailed",
+      "topics": [
+        "fx",
+        "brokerage",
+        "portfolio_growth"
+      ],
+      "constraints": [
+        "timing_risk",
+        "aggressive_entry"
+      ],
+      "productCodes": [
+        "p2",
+        "p5"
+      ],
+      "playbook": [
+        "send_comparison",
+        "prepare_call"
+      ]
+    },
+    {
+      "conversationId": "conv3",
+      "sentiment": "neutral",
+      "urgency": "low",
+      "buyingSignal": "low",
+      "waitingMinutes": 705,
+      "nextTouchIso": "2026-06-20T06:40:00.000Z",
+      "recommendedAction": "Вернуться позже коротким сообщением без давления",
+      "preferredChannel": "chat",
+      "responseStyle": "short",
+      "topics": [
+        "insurance",
+        "soft_follow_up"
+      ],
+      "constraints": [
+        "no_long_messages",
+        "avoid_pressure",
+        "no_call"
+      ],
+      "productCodes": [
+        "p4"
+      ],
+      "playbook": [
+        "avoid_pressure",
+        "keep_message_short"
+      ]
+    },
+    {
+      "conversationId": "conv6",
+      "sentiment": "tense",
+      "urgency": "high",
+      "buyingSignal": "speed_sensitive",
+      "waitingMinutes": 5,
+      "nextTouchIso": "2026-06-16T11:30:00.000Z",
+      "recommendedAction": "До 14:30 отправить одно короткое сравнение и при необходимости созвониться",
+      "preferredChannel": "chat",
+      "responseStyle": "comparison",
+      "topics": [
+        "liquidity",
+        "deposit",
+        "bond_alternative"
+      ],
+      "constraints": [
+        "avoid_long_presentation",
+        "needs_speed",
+        "liquidity"
+      ],
+      "productCodes": [
+        "p3",
+        "p2"
+      ],
+      "playbook": [
+        "send_comparison",
+        "emphasize_liquidity",
+        "keep_message_short",
+        "prepare_call"
+      ]
+    },
+    {
+      "conversationId": "conv4",
+      "sentiment": "interested",
+      "urgency": "normal",
+      "buyingSignal": "high",
+      "waitingMinutes": 4,
+      "nextTouchIso": "2026-06-16T17:00:00.000Z",
+      "recommendedAction": "Отправить сегодня вечером короткую подборку travel-benefits",
+      "preferredChannel": "chat",
+      "responseStyle": "short",
+      "topics": [
+        "travel",
+        "premium_card",
+        "insurance",
+        "cashback"
+      ],
+      "constraints": [
+        "mobile_format_only"
+      ],
+      "productCodes": [
+        "p1",
+        "p4"
+      ],
+      "playbook": [
+        "keep_message_short",
+        "send_comparison"
+      ]
+    },
+    {
+      "conversationId": "conv7",
+      "sentiment": "interested",
+      "urgency": "normal",
+      "buyingSignal": "high",
+      "waitingMinutes": 7,
+      "nextTouchIso": "2026-06-16T15:30:00.000Z",
+      "recommendedAction": "Отправить короткий travel-follow-up в одном сообщении с сервисной ценностью",
+      "preferredChannel": "chat",
+      "responseStyle": "short",
+      "topics": [
+        "travel",
+        "service",
+        "premium_card"
+      ],
+      "constraints": [
+        "avoid_long_terms",
+        "mobile_format_only"
+      ],
+      "productCodes": [
+        "p1",
+        "p4"
+      ],
+      "playbook": [
+        "keep_message_short",
+        "send_comparison",
+        "emphasize_service"
+      ]
+    },
+    {
+      "conversationId": "conv8",
+      "sentiment": "neutral",
+      "urgency": "high",
+      "buyingSignal": "speed_sensitive",
+      "waitingMinutes": 8,
+      "nextTouchIso": "2026-06-16T12:00:00.000Z",
+      "recommendedAction": "До звонка отправить короткий ориентир по размещению ликвидности и удержанию части средств",
+      "preferredChannel": "call",
+      "responseStyle": "comparison",
+      "topics": [
+        "liquidity",
+        "retention",
+        "deposit"
+      ],
+      "constraints": [
+        "needs_precision",
+        "avoid_long_presentation"
+      ],
+      "productCodes": [
+        "p3",
+        "p2"
+      ],
+      "playbook": [
+        "prepare_call",
+        "send_comparison",
+        "emphasize_liquidity"
+      ]
+    },
+    {
+      "conversationId": "conv9",
+      "sentiment": "tense",
+      "urgency": "normal",
+      "buyingSignal": "medium",
+      "waitingMinutes": 18,
+      "nextTouchIso": "2026-06-18T06:40:00.000Z",
+      "recommendedAction": "Вернуться отдельно по вопросу качества сервиса, не смешивая с портфелем",
+      "preferredChannel": "chat",
+      "responseStyle": "short",
+      "topics": [
+        "service",
+        "premium_card",
+        "retention"
+      ],
+      "constraints": [
+        "trust",
+        "avoid_topic_mixing"
+      ],
+      "productCodes": [
+        "p1"
+      ],
+      "playbook": [
+        "separate_topics",
+        "show_ownership",
+        "avoid_pressure"
+      ]
+    },
+    {
+      "conversationId": "conv10",
+      "sentiment": "neutral",
+      "urgency": "normal",
+      "buyingSignal": "low",
+      "waitingMinutes": 170,
+      "nextTouchIso": "2026-06-16T11:40:00.000Z",
+      "recommendedAction": "Вернуться очень коротким поэтапным follow-up без давления",
+      "preferredChannel": "chat",
+      "responseStyle": "short",
+      "topics": [
+        "fx",
+        "growth",
+        "investments"
+      ],
+      "constraints": [
+        "timing_risk",
+        "risk",
+        "avoid_pressure"
+      ],
+      "productCodes": [
+        "p5",
+        "p2"
+      ],
+      "playbook": [
+        "avoid_pressure",
+        "keep_message_short",
+        "send_comparison"
+      ]
+    },
+    {
+      "conversationId": "conv11",
+      "sentiment": "negative",
+      "urgency": "critical",
+      "buyingSignal": "speed_sensitive",
+      "waitingMinutes": 4,
+      "nextTouchIso": "2026-06-16T08:40:00.000Z",
+      "recommendedAction": "Сначала закрыть сервисный сбой и только потом возвращаться к удержанию остатков",
+      "preferredChannel": "call",
+      "responseStyle": "short",
+      "topics": [
+        "retention",
+        "service",
+        "liquidity"
+      ],
+      "constraints": [
+        "trust",
+        "negative_service",
+        "no_sales_push"
+      ],
+      "productCodes": [
+        "p1",
+        "p3"
+      ],
+      "playbook": [
+        "show_ownership",
+        "prepare_call",
+        "avoid_pressure"
+      ]
+    },
+    {
+      "conversationId": "conv13",
+      "sentiment": "interested",
+      "urgency": "high",
+      "buyingSignal": "high",
+      "waitingMinutes": 8,
+      "nextTouchIso": "2026-06-16T09:40:00.000Z",
+      "recommendedAction": "Подготовить идею краткосрочной парковки средств и отдельно обозначить окно для инвестиционного плана",
+      "preferredChannel": "call",
+      "responseStyle": "comparison",
+      "topics": [
+        "liquidity",
+        "investments",
+        "capital_preservation"
+      ],
+      "constraints": [
+        "timing",
+        "liquidity",
+        "avoid_topic_mixing"
+      ],
+      "productCodes": [
+        "p3",
+        "p2"
+      ],
+      "playbook": [
+        "send_comparison",
+        "prepare_call",
+        "separate_topics"
+      ]
+    },
+    {
+      "conversationId": "conv14",
+      "sentiment": "neutral",
+      "urgency": "high",
+      "buyingSignal": "low",
+      "waitingMinutes": 960,
+      "nextTouchIso": "2026-06-16T08:40:00.000Z",
+      "recommendedAction": "Сделать одно аккуратное касание по ликвидности и проверить актуальность темы",
+      "preferredChannel": "call",
+      "responseStyle": "short",
+      "topics": [
+        "liquidity",
+        "retention"
+      ],
+      "constraints": [
+        "silent",
+        "avoid_pressure",
+        "no_long_messages"
+      ],
+      "productCodes": [
+        "p3"
+      ],
+      "playbook": [
+        "keep_message_short",
+        "avoid_pressure"
+      ]
+    },
+    {
+      "conversationId": "conv15",
+      "sentiment": "interested",
+      "urgency": "normal",
+      "buyingSignal": "medium",
+      "waitingMinutes": 14,
+      "nextTouchIso": "2026-06-17T02:40:00.000Z",
+      "recommendedAction": "Отправить семейную подборку travel-benefits в мобильном формате",
+      "preferredChannel": "chat",
+      "responseStyle": "short",
+      "topics": [
+        "family",
+        "travel",
+        "insurance"
+      ],
+      "constraints": [
+        "complexity",
+        "mobile_format_only"
+      ],
+      "productCodes": [
+        "p4",
+        "p1"
+      ],
+      "playbook": [
+        "keep_message_short",
+        "send_comparison"
+      ]
+    },
+    {
+      "conversationId": "conv16",
+      "sentiment": "interested",
+      "urgency": "high",
+      "buyingSignal": "medium",
+      "waitingMinutes": 11,
+      "nextTouchIso": "2026-06-16T10:40:00.000Z",
+      "recommendedAction": "Прийти с поэтапным инвестиционным планом и снять страх плохого тайминга",
+      "preferredChannel": "chat",
+      "responseStyle": "comparison",
+      "topics": [
+        "investments",
+        "brokerage",
+        "growth"
+      ],
+      "constraints": [
+        "timing_risk",
+        "risk",
+        "avoid_pressure"
+      ],
+      "productCodes": [
+        "p5",
+        "p2"
+      ],
+      "playbook": [
+        "send_comparison",
+        "prepare_call",
+        "avoid_pressure"
+      ]
+    },
+    {
+      "conversationId": "conv17",
+      "sentiment": "neutral",
+      "urgency": "normal",
+      "buyingSignal": "medium",
+      "waitingMinutes": 16,
+      "nextTouchIso": "2026-06-16T17:40:00.000Z",
+      "recommendedAction": "Отправить отдельный сервисный follow-up без смешения с темой ликвидности",
+      "preferredChannel": "chat",
+      "responseStyle": "short",
+      "topics": [
+        "service",
+        "premium_card",
+        "travel"
+      ],
+      "constraints": [
+        "avoid_topic_mixing",
+        "no_long_messages"
+      ],
+      "productCodes": [
+        "p1"
+      ],
+      "playbook": [
+        "separate_topics",
+        "keep_message_short"
+      ]
+    },
+    {
+      "conversationId": "conv18",
+      "sentiment": "interested",
+      "urgency": "normal",
+      "buyingSignal": "medium",
+      "waitingMinutes": 13,
+      "nextTouchIso": "2026-06-16T22:40:00.000Z",
+      "recommendedAction": "Развести краткосрочную ликвидность и долгосрочные идеи на два контакта",
+      "preferredChannel": "chat",
+      "responseStyle": "comparison",
+      "topics": [
+        "liquidity",
+        "investments",
+        "growth"
+      ],
+      "constraints": [
+        "timing",
+        "avoid_long_presentation",
+        "avoid_topic_mixing"
+      ],
+      "productCodes": [
+        "p3",
+        "p2"
+      ],
+      "playbook": [
+        "send_comparison",
+        "separate_topics",
+        "keep_message_short"
+      ]
+    },
+    {
+      "conversationId": "conv20",
+      "sentiment": "tense",
+      "urgency": "high",
+      "buyingSignal": "low",
+      "waitingMinutes": 110,
+      "nextTouchIso": "2026-06-16T14:40:00.000Z",
+      "recommendedAction": "Отправить короткий компенсационный сервисный статус без продуктового предложения",
+      "preferredChannel": "chat",
+      "responseStyle": "short",
+      "topics": [
+        "service",
+        "retention"
+      ],
+      "constraints": [
+        "no_sales_push",
+        "show_ownership"
+      ],
+      "productCodes": [
+        "p1"
+      ],
+      "playbook": [
+        "show_ownership",
+        "keep_message_short"
+      ]
+    }
+  ],
+  "tasks": [
+    {
+      "id": "task-1",
+      "clientId": "c2",
+      "title": "Подготовить рамку к звонку по портфелю",
+      "description": "Собрать короткое сравнение по вкладу, защитной облигационной части и структурной идее до звонка.",
+      "status": "in_progress",
+      "dueAtIso": "2026-06-16T08:40:00.000Z",
+      "createdAtIso": "2026-06-16T05:40:00.000Z",
+      "channel": "call",
+      "managerPriorityHint": "high",
+      "intent": "portfolio_review",
+      "goal": "Подвести клиента к согласованному обновлению портфеля без избыточного риска",
+      "source": "sfa",
+      "conversationId": "conv2",
+      "productCode": "p3"
+    },
+    {
+      "id": "task-2",
+      "clientId": "c1",
+      "title": "Отправить клиенту компактное сравнение сценариев",
+      "description": "Закрыть обещанный follow-up по 3 вариантам размещения и показать ликвидность в одном сообщении.",
+      "status": "new",
+      "dueAtIso": "2026-06-17T00:40:00.000Z",
+      "createdAtIso": "2026-06-16T03:40:00.000Z",
+      "channel": "chat",
+      "managerPriorityHint": "high",
+      "intent": "offer_follow_up",
+      "goal": "Перевести интерес клиента к инвестициям в следующий осмысленный шаг",
+      "source": "crm",
+      "conversationId": "conv1",
+      "productCode": "p3"
+    },
+    {
+      "id": "task-3",
+      "clientId": "c5",
+      "title": "Подготовить вариант размещения ликвидности",
+      "description": "Собрать короткий оффер по размещению свободного остатка и выделить быстрый выход в кэш.",
+      "status": "new",
+      "dueAtIso": "2026-06-16T14:40:00.000Z",
+      "createdAtIso": "2026-06-16T02:40:00.000Z",
+      "channel": "chat",
+      "managerPriorityHint": "high",
+      "intent": "product_pitch",
+      "goal": "Сконвертировать свободную ликвидность клиента в продуктовый follow-up",
+      "source": "sfa",
+      "conversationId": "conv6",
+      "productCode": "p3"
+    },
+    {
+      "id": "task-4",
+      "clientId": "c4",
+      "title": "Мягкий follow-up перед поездкой",
+      "description": "Вернуться коротким сообщением без давления и подтвердить комфортный формат общения только в чате.",
+      "status": "new",
+      "dueAtIso": "2026-06-16T12:40:00.000Z",
+      "createdAtIso": "2026-06-15T06:40:00.000Z",
+      "channel": "chat",
+      "managerPriorityHint": "medium",
+      "intent": "retention_follow_up",
+      "goal": "Удержать клиента в коммуникации и не допустить выпадения из поля внимания",
+      "source": "crm",
+      "conversationId": "conv3",
+      "productCode": "p4"
+    },
+    {
+      "id": "task-5",
+      "clientId": "c3",
+      "title": "Назначить встречу по валютным идеям",
+      "description": "После отправки базового плана предложить 2 слота на следующую неделю и зафиксировать очную встречу.",
+      "status": "in_progress",
+      "dueAtIso": "2026-06-17T09:40:00.000Z",
+      "createdAtIso": "2026-06-16T01:40:00.000Z",
+      "channel": "meeting",
+      "managerPriorityHint": "medium",
+      "intent": "meeting_conversion",
+      "goal": "Перевести интерес к валютным идеям в очную консультацию",
+      "source": "crm",
+      "conversationId": "conv5",
+      "productCode": "p5"
+    },
+    {
+      "id": "task-6",
+      "clientId": "c6",
+      "title": "Сделать короткий travel-benefits follow-up",
+      "description": "Подобрать лаконичный follow-up с акцентом на travel-пакет и инвестиционные подборки.",
+      "status": "new",
+      "dueAtIso": "2026-06-17T08:40:00.000Z",
+      "createdAtIso": "2026-06-16T04:40:00.000Z",
+      "channel": "chat",
+      "managerPriorityHint": "medium",
+      "intent": "offer_follow_up",
+      "goal": "Поддержать высокий темп коммуникации и расширить интерес клиента",
+      "source": "sfa",
+      "conversationId": "conv4",
+      "productCode": "p1"
+    },
+    {
+      "id": "task-7",
+      "clientId": "c7",
+      "title": "Отправить подборку travel-сервиса",
+      "description": "Подготовить короткий follow-up по travel-benefits и сервисным опциям без перегруза условиями.",
+      "status": "new",
+      "dueAtIso": "2026-06-16T15:40:00.000Z",
+      "createdAtIso": "2026-06-16T04:10:00.000Z",
+      "channel": "chat",
+      "managerPriorityHint": "medium",
+      "intent": "service_follow_up",
+      "goal": "Удержать высокий интерес к сервису и перевести его в follow-up по премиальной карте",
+      "source": "crm",
+      "conversationId": "conv7",
+      "productCode": "p1"
+    },
+    {
+      "id": "task-8",
+      "clientId": "c8",
+      "title": "Согласовать окно по ликвидности",
+      "description": "Собрать короткий бриф по размещению остатка и удержанию части средств в банке.",
+      "status": "new",
+      "dueAtIso": "2026-06-16T13:40:00.000Z",
+      "createdAtIso": "2026-06-16T02:20:00.000Z",
+      "channel": "call",
+      "managerPriorityHint": "high",
+      "intent": "retention_follow_up",
+      "goal": "Не потерять окно для удержания ликвидности и обновления краткосрочного размещения",
+      "source": "sfa",
+      "conversationId": "conv8",
+      "productCode": "p3"
+    },
+    {
+      "id": "task-9",
+      "clientId": "c1",
+      "title": "Разобрать отдельный запрос по сервису карты",
+      "description": "После продуктового сценария коротко закрыть сервисный вопрос по премиальной карте и не смешивать его с инвест-оффером.",
+      "status": "new",
+      "dueAtIso": "2026-06-17T02:40:00.000Z",
+      "createdAtIso": "2026-06-16T05:00:00.000Z",
+      "channel": "chat",
+      "managerPriorityHint": "medium",
+      "intent": "service_follow_up",
+      "goal": "Сохранить точность кейса и не смешать сервисный запрос с инвестиционной коммуникацией",
+      "source": "crm",
+      "conversationId": "conv1b",
+      "productCode": "p1"
+    },
+    {
+      "id": "task-10",
+      "clientId": "c9",
+      "title": "Вернуть клиента в FX-диалог без давления",
+      "description": "Собрать короткий поэтапный follow-up по FX-диверсификации: показать идею, но не давить на немедленное решение.",
+      "status": "new",
+      "dueAtIso": "2026-06-16T11:40:00.000Z",
+      "createdAtIso": "2026-06-16T01:30:00.000Z",
+      "channel": "chat",
+      "managerPriorityHint": "high",
+      "intent": "retention_follow_up",
+      "goal": "Сохранить инвестиционный интерес клиента с высоким риском оттока и не потерять окно для возврата в диалог",
+      "source": "crm",
+      "conversationId": "conv10",
+      "productCode": "p5"
+    },
+    {
+      "id": "task-11",
+      "clientId": "c10",
+      "title": "Снять негатив после сервисного сбоя",
+      "description": "Сначала вернуть доверие после жалобы на сервис, потом отдельно договориться о коротком звонке по ликвидности.",
+      "status": "new",
+      "dueAtIso": "2026-06-16T08:40:00.000Z",
+      "createdAtIso": "2026-06-16T04:00:00.000Z",
+      "channel": "call",
+      "managerPriorityHint": "high",
+      "intent": "service_recovery",
+      "goal": "Остановить отток и восстановить доверие до любого продуктового предложения",
+      "source": "sfa",
+      "conversationId": "conv11",
+      "productCode": "p1"
+    },
+    {
+      "id": "task-12",
+      "clientId": "c11",
+      "title": "Собрать недостающий профиль клиента",
+      "description": "До любого предложения нужно уточнить горизонт, свободную ликвидность и интерес к инвестициям. Сейчас данных недостаточно.",
+      "status": "new",
+      "dueAtIso": "2026-06-16T15:40:00.000Z",
+      "createdAtIso": "2026-06-16T01:55:00.000Z",
+      "channel": "chat",
+      "managerPriorityHint": "medium",
+      "intent": "discovery_follow_up",
+      "goal": "Не пушить продукт до прояснения базовых данных клиента и контекста его запроса",
+      "source": "crm",
+      "conversationId": "conv12",
+      "productCode": null
+    },
+    {
+      "id": "task-13",
+      "clientId": "c12",
+      "title": "Подготовить парковку ликвидности перед сделкой",
+      "description": "Собрать одно короткое сравнение по размещению средств на коротком горизонте и отдельно обозначить, когда вернуться к инвестиционному плану.",
+      "status": "new",
+      "dueAtIso": "2026-06-16T09:40:00.000Z",
+      "createdAtIso": "2026-06-16T05:20:00.000Z",
+      "channel": "call",
+      "managerPriorityHint": "high",
+      "intent": "liquidity_follow_up",
+      "goal": "Закрыть краткосрочную возможность по ликвидности и не смешать её с долгосрочным инвестиционным предложением",
+      "source": "sfa",
+      "conversationId": "conv13",
+      "productCode": "p3"
+    },
+    {
+      "id": "task-14",
+      "clientId": "c13",
+      "title": "Аккуратный возврат молчащего клиента",
+      "description": "Подготовить очень короткое касание по ликвидности и проверить, актуальна ли тема до конца недели.",
+      "status": "new",
+      "dueAtIso": "2026-06-16T08:10:00.000Z",
+      "createdAtIso": "2026-06-16T00:25:00.000Z",
+      "channel": "call",
+      "managerPriorityHint": "high",
+      "intent": "retention_follow_up",
+      "goal": "Вернуть в коммуникацию молчащего клиента с крупным кэш-остатком и высоким риском оттока",
+      "source": "crm",
+      "conversationId": "conv14",
+      "productCode": "p3"
+    },
+    {
+      "id": "task-15",
+      "clientId": "c14",
+      "title": "Подобрать family travel пакет",
+      "description": "Сделать короткую подборку из страховки и премиального travel-сервиса в формате, удобном для мобильного чтения.",
+      "status": "new",
+      "dueAtIso": "2026-06-17T02:40:00.000Z",
+      "createdAtIso": "2026-06-16T03:05:00.000Z",
+      "channel": "chat",
+      "managerPriorityHint": "medium",
+      "intent": "service_follow_up",
+      "goal": "Сконвертировать семейный интерес к travel в понятную кросс-продажу без перегруза условиями",
+      "source": "crm",
+      "conversationId": "conv15",
+      "productCode": "p4"
+    },
+    {
+      "id": "task-16",
+      "clientId": "c15",
+      "title": "Собрать поэтапный инвестиционный план",
+      "description": "Разложить на 3 шага вход в брокерские идеи: что можно сделать сейчас, что позже и где ставить контрольные точки.",
+      "status": "new",
+      "dueAtIso": "2026-06-16T10:40:00.000Z",
+      "createdAtIso": "2026-06-16T04:25:00.000Z",
+      "channel": "meeting",
+      "managerPriorityHint": "high",
+      "intent": "investment_plan",
+      "goal": "Перевести высокий инвестиционный интерес в поэтапный следующий шаг, не провоцируя страх плохого тайминга",
+      "source": "sfa",
+      "conversationId": "conv16",
+      "productCode": "p5"
+    },
+    {
+      "id": "task-17",
+      "clientId": "c8",
+      "title": "Отдельно закрыть сервисный вопрос по премиум-пакету",
+      "description": "Не смешивать удержание ликвидности с сервисным вопросом: собрать короткий ответ по benefits отдельным сообщением.",
+      "status": "new",
+      "dueAtIso": "2026-06-16T17:40:00.000Z",
+      "createdAtIso": "2026-06-16T03:35:00.000Z",
+      "channel": "chat",
+      "managerPriorityHint": "medium",
+      "intent": "service_follow_up",
+      "goal": "Сохранить точность кейса и не перегружать тему ликвидности сервисной темой",
+      "source": "crm",
+      "conversationId": "conv17",
+      "productCode": "p1"
+    },
+    {
+      "id": "task-18",
+      "clientId": "c5",
+      "title": "Развести ликвидность и долгосрочные идеи",
+      "description": "Подготовить сообщение, где краткосрочное размещение и долгосрочные инвестиционные идеи разведены на два следующих шага.",
+      "status": "new",
+      "dueAtIso": "2026-06-16T22:40:00.000Z",
+      "createdAtIso": "2026-06-16T01:20:00.000Z",
+      "channel": "chat",
+      "managerPriorityHint": "medium",
+      "intent": "portfolio_review",
+      "goal": "Не потерять возможность по ликвидности и при этом не запутать клиента смешанным предложением по долгосрочным идеям",
+      "source": "sfa",
+      "conversationId": "conv18",
+      "productCode": "p2"
+    },
+    {
+      "id": "task-19",
+      "clientId": "c2",
+      "title": "Развести сервисный и инвестиционный контур",
+      "description": "После обсуждения сервисного сопровождения вернуться коротким сообщением, где отдельно зафиксировать восстановление сервиса и отдельно инвестиционный follow-up.",
+      "status": "new",
+      "dueAtIso": "2026-06-16T20:40:00.000Z",
+      "createdAtIso": "2026-06-16T03:45:00.000Z",
+      "channel": "chat",
+      "managerPriorityHint": "medium",
+      "intent": "service_follow_up",
+      "goal": "Не смешать восстановление сервиса с обзором портфеля и сохранить доверие клиента",
+      "source": "crm",
+      "conversationId": "conv9",
+      "productCode": "p1"
+    },
+    {
+      "id": "task-20",
+      "clientId": "c10",
+      "title": "Подготовить компенсационный сервисный follow-up",
+      "description": "После звонка вернуть клиенту короткое сообщение о восстановлении сервиса с конкретным статусом и без продуктового предложения.",
+      "status": "new",
+      "dueAtIso": "2026-06-16T14:40:00.000Z",
+      "createdAtIso": "2026-06-16T04:50:00.000Z",
+      "channel": "chat",
+      "managerPriorityHint": "medium",
+      "intent": "service_follow_up",
+      "goal": "Закрыть негативный настрой конкретным сервисным действием и не усиливать отток лишним предложением",
+      "source": "crm",
+      "conversationId": "conv20",
+      "productCode": "p1"
+    }
+  ],
+  "crmNotes": [
+    {
+      "id": "n1",
+      "clientId": "c2",
+      "managerId": "m1",
+      "taskId": "t7",
+      "text": "Созвон состоялся. Клиент подтвердил интерес к продлению вклада и попросил сравнение с инвестиционным мандатом.",
+      "outcome": "follow_up",
+      "channel": "call",
+      "nextContactIso": "2026-06-18T06:40:00.000Z",
+      "createdAtIso": "2026-06-16T04:40:00.000Z"
+    },
+    {
+      "id": "n2",
+      "clientId": "c4",
+      "managerId": "m2",
+      "taskId": null,
+      "text": "Клиент ответил сдержанно, просит не перегружать сообщениями. Нужен мягкий follow-up через несколько дней.",
+      "outcome": "pending",
+      "channel": "chat",
+      "nextContactIso": "2026-06-20T06:40:00.000Z",
+      "createdAtIso": "2026-06-15T06:40:00.000Z"
+    },
+    {
+      "id": "n3",
+      "clientId": "c10",
+      "managerId": "m2",
+      "taskId": null,
+      "text": "Клиент негативно оценивает сервис. До продуктового обсуждения нужно закрыть доверие и вернуться с конкретным решением по сервисному сбою.",
+      "outcome": "follow_up",
+      "channel": "call",
+      "nextContactIso": "2026-06-16T10:40:00.000Z",
+      "createdAtIso": "2026-06-16T00:40:00.000Z"
+    },
+    {
+      "id": "n4",
+      "clientId": "c13",
+      "managerId": "m1",
+      "taskId": null,
+      "text": "Клиент замолчал. Следующий контакт должен быть очень коротким и только по теме краткосрочной ликвидности.",
+      "outcome": "follow_up",
+      "channel": "call",
+      "nextContactIso": "2026-06-16T12:40:00.000Z",
+      "createdAtIso": "2026-06-14T06:40:00.000Z"
+    }
+  ],
+  "followUps": [
+    {
+      "id": "f1",
+      "clientId": "c2",
+      "noteId": "n1",
+      "dueAtIso": "2026-06-18T06:40:00.000Z",
+      "title": "Подготовить сравнение вклада и инвест-мандата",
+      "done": false
+    },
+    {
+      "id": "f2",
+      "clientId": "c4",
+      "noteId": "n2",
+      "dueAtIso": "2026-06-20T06:40:00.000Z",
+      "title": "Вернуться с мягким сообщением про страховую защиту",
+      "done": false
+    },
+    {
+      "id": "f3",
+      "clientId": "c10",
+      "noteId": "n3",
+      "dueAtIso": "2026-06-16T10:40:00.000Z",
+      "title": "Закрыть сервисный сбой и только затем возвращаться к удержанию остатков",
+      "done": false
+    },
+    {
+      "id": "f4",
+      "clientId": "c13",
+      "noteId": "n4",
+      "dueAtIso": "2026-06-16T12:40:00.000Z",
+      "title": "Отправить очень короткое касание по удержанию ликвидности",
+      "done": false
+    }
+  ],
+  "feedback": [
+    {
+      "id": "fb1",
+      "recommendationId": "rec:task:task-1",
+      "managerId": "m1",
+      "kind": "priority_recommendation",
+      "clientId": "c2",
+      "conversationId": "conv2",
+      "decision": "accepted",
+      "comment": "Логика понятна, беру в работу.",
+      "label": "Рамка к звонку по портфелю",
+      "createdAtIso": "2026-06-16T03:40:00.000Z"
+    },
+    {
+      "id": "fb2",
+      "recommendationId": "rec:task:task-15",
+      "managerId": "m2",
+      "kind": "next_best_action",
+      "clientId": "c14",
+      "conversationId": "conv15",
+      "decision": "edited",
+      "comment": "Сделаю более мягкий контакт, чем предлагалось.",
+      "label": "Семейный travel-пакет",
+      "createdAtIso": "2026-06-15T22:40:00.000Z"
+    },
+    {
+      "id": "fb3",
+      "recommendationId": "rec:task:task-3",
+      "managerId": "m1",
+      "kind": "manager_work_item",
+      "clientId": "c5",
+      "conversationId": "conv6",
+      "decision": "accepted",
+      "comment": "Ликвидность берем в работу как отдельный короткий оффер.",
+      "label": "Короткий бриф по ликвидности",
+      "createdAtIso": "2026-06-16T04:20:00.000Z"
+    },
+    {
+      "id": "fb4",
+      "recommendationId": "rec:task:task-4",
+      "managerId": "m2",
+      "kind": "manager_work_item",
+      "clientId": "c4",
+      "conversationId": "conv3",
+      "decision": "edited",
+      "comment": "Нужен ещё более мягкий тон и только в чате.",
+      "label": "Короткий мягкий follow-up",
+      "createdAtIso": "2026-06-15T23:30:00.000Z"
+    },
+    {
+      "id": "fb5",
+      "recommendationId": "rec:task:task-11",
+      "managerId": "m2",
+      "kind": "manager_work_item",
+      "clientId": "c10",
+      "conversationId": "conv11",
+      "decision": "rejected",
+      "comment": "Сначала решаем сервис, любой продающий follow-up сейчас неуместен.",
+      "label": "Только восстановление сервиса",
+      "createdAtIso": "2026-06-16T05:05:00.000Z"
+    },
+    {
+      "id": "fb6",
+      "recommendationId": "rec:task:task-14",
+      "managerId": "m1",
+      "kind": "manager_work_item",
+      "clientId": "c13",
+      "conversationId": "conv14",
+      "decision": "accepted",
+      "comment": "Делаем аккуратный возврат в коммуникацию сегодня.",
+      "label": "Касание по удержанию",
+      "createdAtIso": "2026-06-16T05:35:00.000Z"
+    },
+    {
+      "id": "fb7",
+      "recommendationId": "rec:task:task-16",
+      "managerId": "m1",
+      "kind": "manager_work_item",
+      "clientId": "c15",
+      "conversationId": "conv16",
+      "decision": "edited",
+      "comment": "Нужен поэтапный план вместо прямого инвестиционного предложения.",
+      "label": "Поэтапный вход",
+      "createdAtIso": "2026-06-16T05:45:00.000Z"
+    }
+  ],
+  "managers": [
+    {
+      "id": "m1",
+      "fullName": "Екатерина Лаврова",
+      "role": "Персональный менеджер Alfa Only"
+    },
+    {
+      "id": "m2",
+      "fullName": "Михаил Дорохов",
+      "role": "Персональный менеджер Alfa Only"
+    }
+  ]
+}

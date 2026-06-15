@@ -4,3 +4,16 @@ dist-ssr
 *.local
 .DS_Store
 .vite
+
+# Тесты и артефакты Playwright
+test-results
+playwright-report
+
+# Бэкенд (Python): окружение, кэши, база данных
+backend/.venv
+backend/__pycache__
+backend/**/__pycache__
+backend/.pytest_cache
+backend/*.db
+backend/*.db-wal
+backend/*.db-shm

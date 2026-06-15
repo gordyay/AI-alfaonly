@@ -1,33 +1,21 @@
 // Экран «Аналитика» — панель руководителя (UC-07, FR10): использование и
 // принятие рекомендаций, покрытие приоритетных кейсов, последние решения.
+// Метрики считает бэкенд по логу обратной связи.
 
-import { useMemo } from "react";
+import { useEffect, useState } from "react";
+import { api, type SupervisorMetrics } from "../api/client";
+import { useReference } from "../api/reference";
 import { useStore } from "../store/store";
-import { computeSupervisorMetrics } from "../domain/metrics";
-import { buildAllRecommendations } from "../domain/workqueue";
-import { dataset, clientById } from "../data/index";
 import { timeAgo } from "../domain/format";
-import { Icon } from "../components/Icon";
+import { Icon, type IconName } from "../components/Icon";
 
-// color — яркая заливка полос/точек; textColor — затемнённый вариант для
-// надписи (контраст AA на белой панели; см. --signal-medium-text в tokens.css).
 const DECISION_META = {
   accepted: { label: "Принято", color: "var(--success)", textColor: "var(--success)" },
   edited: { label: "Изменено", color: "var(--signal-medium)", textColor: "var(--signal-medium-text)" },
   rejected: { label: "Отклонено", color: "var(--alfa-red)", textColor: "var(--alfa-red)" },
 } as const;
 
-function KpiCard({
-  label,
-  value,
-  hint,
-  icon,
-}: {
-  label: string;
-  value: string;
-  hint: string;
-  icon: Parameters<typeof Icon>[0]["name"];
-}) {
+function KpiCard({ label, value, hint, icon }: { label: string; value: string; hint: string; icon: IconName }) {
   return (
     <div className="kpi-card panel">
       <div className="kpi-card__icon">
@@ -42,15 +30,33 @@ function KpiCard({
 
 export function SupervisorScreen() {
   const store = useStore();
-  const metrics = useMemo(
-    () =>
-      computeSupervisorMetrics({
-        recommendations: buildAllRecommendations(),
-        feedback: store.state.feedback,
-        managers: dataset.managers,
-      }),
-    [store.state.feedback],
-  );
+  const { clientById } = useReference();
+  const [metrics, setMetrics] = useState<SupervisorMetrics | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    api
+      .getSupervisor()
+      .then(setMetrics)
+      .catch(() => store.toast("Не удалось загрузить аналитику", "info"))
+      .finally(() => setLoading(false));
+  }, [store]);
+
+  if (loading || !metrics) {
+    return (
+      <div className="screen-scroll">
+        <div className="screen-pad">
+          <div className="empty-state">
+            <span className="empty-state__icon">
+              <Icon name="chart" size={22} />
+            </span>
+            <span className="empty-state__title">Загрузка аналитики…</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const totalDecisions = metrics.decided || 1;
 
@@ -85,12 +91,7 @@ export function SupervisorScreen() {
             hint={`${metrics.decisionCounts.accepted} приняты без правок`}
             icon="thumbsUp"
           />
-          <KpiCard
-            label="Качество использования"
-            value={`${metrics.qualityRate}%`}
-            hint="принято или доработано менеджером"
-            icon="checkCircle"
-          />
+          <KpiCard label="Качество использования" value={`${metrics.qualityRate}%`} hint="принято или доработано менеджером" icon="checkCircle" />
           <KpiCard
             label="Покрытие приоритетных"
             value={`${metrics.coverageRate}%`}

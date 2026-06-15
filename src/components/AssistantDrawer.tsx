@@ -1,10 +1,11 @@
-// Диалоговый ассистент по кейсу (FR9, NFR4). Отвечает на свободные вопросы
-// на ограниченном контексте клиента и всегда указывает источники.
+// Диалоговый ассистент по кейсу (FR9, NFR4). Отвечает на свободные вопросы на
+// ограниченном контексте клиента и всегда указывает источники. История ответов
+// хранится на бэкенде и восстанавливается при открытии кейса.
 
 import { useEffect, useRef, useState } from "react";
 import type { ChatTurn } from "../domain/types";
-import type { AIContext } from "../ai/context";
-import { answerCaseQuestion, firstName } from "../ai";
+import { firstName } from "../ai/context";
+import { api, type CaseDetail } from "../api/client";
 import { Icon } from "./Icon";
 import { Avatar } from "./Primitives";
 
@@ -17,19 +18,26 @@ const SUGGESTIONS = [
 
 export function AssistantDrawer({
   open,
-  ctx,
-  turns,
+  detail,
   onClose,
-  onTurns,
 }: {
   open: boolean;
-  ctx: AIContext | null;
-  turns: ChatTurn[];
+  detail: CaseDetail | null;
   onClose: () => void;
-  onTurns: (turns: ChatTurn[]) => void;
 }) {
   const [input, setInput] = useState("");
+  const [turns, setTurns] = useState<ChatTurn[]>([]);
+  const [asking, setAsking] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
+
+  const wid = detail?.item.id ?? null;
+  const ctx = detail?.context ?? null;
+
+  // История ассистента синхронизируется при смене кейса (FR9).
+  useEffect(() => {
+    setTurns(detail?.chatHistory ?? []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wid]);
 
   useEffect(() => {
     if (open && bodyRef.current) {
@@ -37,12 +45,23 @@ export function AssistantDrawer({
     }
   }, [turns, open]);
 
-  function ask(question: string) {
-    if (!ctx || !question.trim()) return;
-    const userTurn: ChatTurn = { role: "manager", text: question.trim() };
-    const answer = answerCaseQuestion(ctx, question.trim());
-    onTurns([...turns, userTurn, answer]);
+  async function ask(question: string) {
+    const q = question.trim();
+    if (!wid || !q || asking) return;
+    setAsking(true);
     setInput("");
+    setTurns((prev) => [...prev, { role: "manager", text: q }]);
+    try {
+      const res = await api.chat(wid, q);
+      setTurns(res.turns);
+    } catch {
+      setTurns((prev) => [
+        ...prev,
+        { role: "assistant", text: "Не удалось получить ответ ассистента. Попробуйте ещё раз.", sources: [] },
+      ]);
+    } finally {
+      setAsking(false);
+    }
   }
 
   return (
@@ -98,7 +117,7 @@ export function AssistantDrawer({
         {ctx && turns.length === 0 && (
           <div className="drawer__suggest">
             {SUGGESTIONS.map((s) => (
-              <button key={s} className="chip drawer__chip" onClick={() => ask(s)}>
+              <button key={s} className="chip drawer__chip" onClick={() => ask(s)} disabled={asking}>
                 {s}
               </button>
             ))}
@@ -118,9 +137,9 @@ export function AssistantDrawer({
             placeholder="Вопрос по кейсу…"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            disabled={!ctx}
+            disabled={!ctx || asking}
           />
-          <button className="btn btn--primary btn--icon" type="submit" disabled={!ctx || !input.trim()} aria-label="Отправить">
+          <button className="btn btn--primary btn--icon" type="submit" disabled={!ctx || !input.trim() || asking} aria-label="Отправить">
             <Icon name="send" size={17} />
           </button>
         </form>

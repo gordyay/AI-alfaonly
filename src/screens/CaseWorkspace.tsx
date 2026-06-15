@@ -1,13 +1,12 @@
 // Рабочее пространство кейса (раздел 6.5): единый поток работы вокруг клиента —
-// диалог, сценарий, итог/CRM, профиль. Объединяет ИИ-функции и решения менеджера.
+// диалог, сценарий, итог/CRM, профиль. Данные кейса и результаты ИИ-функций
+// приходят с бэкенда; действия менеджера уходят на бэкенд после подтверждения.
 
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import type { CaseTab } from "../store/store";
 import { useStore } from "../store/store";
-import type { FeedbackDecision, ReplySource, WorkItem } from "../domain/types";
-import { buildAIContext } from "../domain/contextBuilders";
-import { isWorkItemHandled } from "../domain/workqueue";
-import { clientById, messagesByConversation, dataset } from "../data/index";
+import { api, type CaseDetail } from "../api/client";
+import type { FeedbackDecision, ReplySource } from "../domain/types";
 import { Icon, type IconName } from "../components/Icon";
 import { CaseHeader } from "../components/case/CaseHeader";
 import { DialogTab } from "../components/case/DialogTab";
@@ -23,54 +22,26 @@ const TABS: { key: CaseTab; label: string; icon: IconName }[] = [
 ];
 
 export function CaseWorkspace({
-  item,
+  detail,
+  managerId,
+  onMutated,
   hasNext,
   onAdvance,
 }: {
-  item: WorkItem;
+  detail: CaseDetail;
+  managerId: string;
+  onMutated: () => void;
   hasNext: boolean;
   onAdvance: () => void;
 }) {
   const store = useStore();
-  const client = clientById.get(item.clientId)!;
-  const ctx = useMemo(() => buildAIContext(item), [item]);
-
-  // Кейс «обработан» в этой сессии (есть отправленный ответ или решение) —
-  // показываем спокойный итог и переход к следующему кейсу (импульс прохождения
-  // очереди без авто-перескока: переход делает менеджер, человек в контуре).
-  const handled = isWorkItemHandled(
-    item,
-    store.state.sentMessages,
-    store.state.feedback,
-    store.state.managerId,
-  );
+  const item = detail.item;
+  const ctx = detail.context;
+  const client = ctx.client;
+  const wid = item.id;
 
   const [replyDraft, setReplyDraft] = useState("");
   const [replySource, setReplySource] = useState<ReplySource>("manual");
-
-  // Сброс состояния ответа при смене кейса.
-  useEffect(() => {
-    setReplyDraft("");
-    setReplySource("manual");
-  }, [item.id]);
-
-  const baseMessages = item.conversationId ? messagesByConversation.get(item.conversationId) ?? [] : [];
-  const thread = store.threadMessages(item.conversationId, baseMessages);
-
-  const notes = useMemo(() => {
-    const seedNotes = dataset.crmNotes.filter((n) => n.clientId === item.clientId);
-    const runtimeNotes = store.state.savedNotes.filter((n) => n.clientId === item.clientId);
-    return [...runtimeNotes, ...seedNotes].sort(
-      (a, b) => new Date(b.createdAtIso).getTime() - new Date(a.createdAtIso).getTime(),
-    );
-  }, [item.clientId, store.state.savedNotes]);
-
-  const savedDecision = useMemo<FeedbackDecision | null>(() => {
-    const events = store.state.feedback
-      .filter((f) => f.recommendationId === item.recommendationId)
-      .sort((a, b) => new Date(b.createdAtIso).getTime() - new Date(a.createdAtIso).getTime());
-    return events[0]?.decision ?? null;
-  }, [store.state.feedback, item.recommendationId]);
 
   function handleUseReply(text: string, source: ReplySource) {
     setReplyDraft(text);
@@ -79,42 +50,69 @@ export function CaseWorkspace({
     store.toast("Текст перенесён в ответ клиенту", "info");
   }
 
-  function handleSend(text: string) {
-    if (item.conversationId) store.sendReply(item.conversationId, text);
-    else store.toast("Сообщение отправлено клиенту", "success");
-    setReplyDraft("");
-    setReplySource("manual");
+  async function handleSend(text: string): Promise<boolean> {
+    try {
+      await api.send(wid, text, managerId);
+      setReplyDraft("");
+      setReplySource("manual");
+      store.toast("Сообщение отправлено клиенту", "success");
+      onMutated();
+      return true;
+    } catch {
+      store.toast("Не удалось отправить сообщение — попробуйте ещё раз", "info");
+      return false;
+    }
   }
 
-  function handleRecordFeedback(
+  async function handleRecordFeedback(
     decision: FeedbackDecision,
     comment: string,
-    opts?: { recommendationId?: string; kind?: string },
-  ) {
-    // Отклонение черновика CRM логируется отдельным id/kind, чтобы не
-    // перетирать решение по рекомендации и не искажать метрики (FR8/FR10).
+    opts?: { kind?: string },
+  ): Promise<boolean> {
+    // Отклонение черновика CRM логируется отдельным id/kind, чтобы не перетирать
+    // решение по рекомендации и не искажать метрики (FR8/FR10).
     const recommendationId =
       opts?.kind === "crm_draft" ? `${item.recommendationId}:crm-draft` : item.recommendationId;
-    store.recordFeedback({
-      recommendationId,
-      decision,
-      comment,
-      clientId: item.clientId,
-      conversationId: item.conversationId,
-      label: item.title,
-      kind: opts?.kind,
-    });
+    try {
+      await api.recordFeedback({
+        recommendationId,
+        decision,
+        comment,
+        clientId: item.clientId,
+        conversationId: item.conversationId,
+        label: item.title,
+        kind: opts?.kind,
+        managerId,
+      });
+      const verb =
+        decision === "accepted" ? "принято" : decision === "edited" ? "отредактировано" : "отклонено";
+      store.toast(`Решение зафиксировано: ${verb}`, "info");
+      onMutated();
+      return true;
+    } catch {
+      store.toast("Не удалось зафиксировать решение — попробуйте ещё раз", "info");
+      return false;
+    }
   }
 
-  function handleSaveNote(text: string, nextContactIso: string) {
-    store.saveNote({
-      clientId: item.clientId,
-      taskId: item.taskId,
-      text,
-      outcome: "follow_up",
-      channel: item.channel,
-      nextContactIso,
-    });
+  async function handleSaveNote(text: string, nextContactIso: string): Promise<boolean> {
+    try {
+      await api.saveNote({
+        clientId: item.clientId,
+        taskId: item.taskId,
+        text,
+        outcome: "follow_up",
+        channel: item.channel,
+        nextContactIso,
+        managerId,
+      });
+      store.toast("Заметка сохранена в CRM", "success");
+      onMutated();
+      return true;
+    } catch {
+      store.toast("Не удалось сохранить заметку — попробуйте ещё раз", "info");
+      return false;
+    }
   }
 
   const tab = store.state.caseTab;
@@ -149,8 +147,9 @@ export function CaseWorkspace({
           <div className="case-tab-panel">
             {tab === "dialog" && (
               <DialogTab
+                wid={wid}
                 ctx={ctx}
-                messages={thread}
+                messages={ctx.messages}
                 clientName={client.fullName}
                 replyDraft={replyDraft}
                 replySource={replySource}
@@ -162,21 +161,21 @@ export function CaseWorkspace({
               />
             )}
             {tab === "actions" && (
-              <ActionsTab ctx={ctx} defaultGoal={item.nextBestAction} onUseReply={handleUseReply} />
+              <ActionsTab wid={wid} ctx={ctx} defaultGoal={item.nextBestAction} onUseReply={handleUseReply} />
             )}
             {tab === "crm" && (
               <CrmTab
-                ctx={ctx}
-                notes={notes}
-                savedDecision={savedDecision}
+                wid={wid}
+                notes={detail.notes}
+                savedDecision={detail.savedDecision}
                 onRecordFeedback={handleRecordFeedback}
                 onSaveNote={handleSaveNote}
               />
             )}
-            {tab === "client" && <ClientTab ctx={ctx} />}
+            {tab === "client" && <ClientTab ctx={ctx} propensities={detail.propensities} />}
           </div>
 
-          {handled && (
+          {detail.handled && (
             <div className="case-next">
               <span className="case-next__label">
                 <Icon name="check" size={15} /> Кейс обработан

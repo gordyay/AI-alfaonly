@@ -1,18 +1,19 @@
-// Вкладка «Сценарий»: генерация персонального сценария продаж (FR3, FR5)
-// и разбор возражений с вариантами ответа и списком «чего не говорить» (FR4).
+// Вкладка «Сценарий»: персональный сценарий продаж (FR3, FR5) и разбор
+// возражений (FR4). Тексты готовит бэкенд по ограниченному контексту кейса.
 
 import { useState } from "react";
 import type { ObjectionResult, ReplySource, ScriptResult } from "../../domain/types";
-import type { AIContext } from "../../ai/context";
-import { generateObjection, generateScript } from "../../ai";
-import { lastIncoming } from "../../ai/context";
+import { lastIncoming, type AIContext } from "../../ai/context";
+import { api } from "../../api/client";
 import { Icon } from "../Icon";
 
 export function ActionsTab({
+  wid,
   ctx,
   defaultGoal,
   onUseReply,
 }: {
+  wid: string;
   ctx: AIContext;
   defaultGoal: string;
   onUseReply: (text: string, source: ReplySource) => void;
@@ -28,23 +29,25 @@ export function ActionsTab({
   const [objection, setObjection] = useState<ObjectionResult | null>(null);
   const [objectionLoading, setObjectionLoading] = useState(false);
 
-  function runScript() {
+  async function runScript() {
     setScriptLoading(true);
-    // Имитация обработки для ощущения работы ассистента.
-    window.setTimeout(() => {
-      setScript(generateScript(ctx, goal.trim() || defaultGoal, instruction.trim() || undefined));
+    try {
+      const result = await api.generateScript(wid, goal.trim() || defaultGoal, instruction.trim() || undefined);
+      setScript(result);
       setActiveVariant(0);
+    } finally {
       setScriptLoading(false);
-    }, 480);
+    }
   }
 
-  function runObjection() {
+  async function runObjection() {
     if (!objectionText.trim()) return;
     setObjectionLoading(true);
-    window.setTimeout(() => {
-      setObjection(generateObjection(ctx, objectionText.trim()));
+    try {
+      setObjection(await api.generateObjection(wid, objectionText.trim()));
+    } finally {
       setObjectionLoading(false);
-    }, 480);
+    }
   }
 
   return (
