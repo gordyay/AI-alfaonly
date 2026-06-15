@@ -1,0 +1,33 @@
+import type { ClientProduct } from "../domain/types";
+import { ago } from "./clock";
+
+export const CLIENT_PRODUCTS: ClientProduct[] = [
+  { clientId: "c1", productId: "p1", status: "active", balance: 240000.0, openedAtIso: ago({ days: 800 }) },
+  { clientId: "c1", productId: "p2", status: "active", balance: 3100000.0, openedAtIso: ago({ days: 380 }) },
+  { clientId: "c2", productId: "p1", status: "active", balance: 520000.0, openedAtIso: ago({ days: 1200 }) },
+  { clientId: "c2", productId: "p3", status: "active", balance: 12500000.0, openedAtIso: ago({ days: 160 }) },
+  { clientId: "c3", productId: "p2", status: "active", balance: 1850000.0, openedAtIso: ago({ days: 220 }) },
+  { clientId: "c3", productId: "p5", status: "active", balance: 720000.0, openedAtIso: ago({ days: 140 }) },
+  { clientId: "c4", productId: "p4", status: "active", balance: 35000.0, openedAtIso: ago({ days: 95 }) },
+  { clientId: "c5", productId: "p1", status: "active", balance: 610000.0, openedAtIso: ago({ days: 900 }) },
+  { clientId: "c5", productId: "p3", status: "active", balance: 18900000.0, openedAtIso: ago({ days: 60 }) },
+  { clientId: "c6", productId: "p1", status: "active", balance: 180000.0, openedAtIso: ago({ days: 300 }) },
+  { clientId: "c6", productId: "p2", status: "active", balance: 960000.0, openedAtIso: ago({ days: 200 }) },
+  { clientId: "c6", productId: "p4", status: "active", balance: 42000.0, openedAtIso: ago({ days: 25 }) },
+  { clientId: "c7", productId: "p1", status: "active", balance: 260000.0, openedAtIso: ago({ days: 430 }) },
+  { clientId: "c7", productId: "p4", status: "active", balance: 56000.0, openedAtIso: ago({ days: 120 }) },
+  { clientId: "c8", productId: "p1", status: "active", balance: 720000.0, openedAtIso: ago({ days: 980 }) },
+  { clientId: "c8", productId: "p3", status: "active", balance: 16400000.0, openedAtIso: ago({ days: 210 }) },
+  { clientId: "c9", productId: "p1", status: "active", balance: 230000.0, openedAtIso: ago({ days: 640 }) },
+  { clientId: "c9", productId: "p5", status: "active", balance: 1260000.0, openedAtIso: ago({ days: 320 }) },
+  { clientId: "c10", productId: "p1", status: "active", balance: 480000.0, openedAtIso: ago({ days: 850 }) },
+  { clientId: "c10", productId: "p3", status: "active", balance: 9700000.0, openedAtIso: ago({ days: 140 }) },
+  { clientId: "c11", productId: "p1", status: "active", balance: 92000.0, openedAtIso: ago({ days: 200 }) },
+  { clientId: "c12", productId: "p1", status: "active", balance: 340000.0, openedAtIso: ago({ days: 500 }) },
+  { clientId: "c12", productId: "p3", status: "active", balance: 5200000.0, openedAtIso: ago({ days: 90 }) },
+  { clientId: "c13", productId: "p1", status: "active", balance: 510000.0, openedAtIso: ago({ days: 760 }) },
+  { clientId: "c13", productId: "p3", status: "active", balance: 10300000.0, openedAtIso: ago({ days: 240 }) },
+  { clientId: "c14", productId: "p1", status: "active", balance: 210000.0, openedAtIso: ago({ days: 410 }) },
+  { clientId: "c14", productId: "p4", status: "active", balance: 30000.0, openedAtIso: ago({ days: 75 }) },
+  { clientId: "c15", productId: "p5", status: "active", balance: 2460000.0, openedAtIso: ago({ days: 110 }) },
+];

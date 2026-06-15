@@ -1,36 +1,6 @@
-# Python cache
-__pycache__/
-*.py[cod]
-
-# Virtual environments
-venv/
-.venv/
-env/
-
-# Frontend toolchain
-*node_modules/
-*dist/
-app/static/assets
-
-# Test/cache artifacts
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.coverage
-htmlcov/
-test-results/
-playwright-report/
-
-# Local databases and runtime files
-*.sqlite3
-*.db
-
-# Environment/config secrets
-.env
-.env.*
-!.env.example
-
-# Editor/OS files
+node_modules
+dist
+dist-ssr
+*.local
 .DS_Store
-.idea/
-.vscode/
+.vite

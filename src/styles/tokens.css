@@ -1,0 +1,119 @@
+/* ==========================================================================
+   Дизайн-токены Alfa Only.
+   Основа брендбука: красный как функциональный акцент, спокойная белая база,
+   графитовый текст, светлый перламутровый premium-слой для ИИ-блоков.
+   Раскладка цвета: 70–80% нейтраль · 10–15% графит · 5–10% красный · ≤10% pearl.
+   ========================================================================== */
+
+:root {
+  /* --- Базовая палитра бренда --- */
+  --alfa-red: #ef3124;
+  --alfa-red-hover: #d81d11;
+  --alfa-red-press: #bd1409;
+  --alfa-red-tint: #fdecea;
+  --alfa-red-tint-strong: #fbd9d5;
+
+  --black: #111111;
+  --graphite: #505759;
+  --graphite-soft: #6b7173;
+
+  /* --- Нейтральная база --- */
+  --canvas: #f4f3ef; /* фон приложения (молочный) */
+  --canvas-deep: #eceae4;
+  --surface: #ffffff; /* карточки */
+  --surface-muted: #faf9f6;
+  --surface-sunken: #f6f5f1;
+
+  --border: #e6e4dd;
+  --border-strong: #d9d9d6;
+  --border-faint: #efede7;
+
+  /* --- Текст --- */
+  --text-primary: #14181a;
+  --text-secondary: #565d5f;
+  --text-tertiary: #8b9193;
+  --text-on-dark: #f6f5f1;
+  --text-on-red: #ffffff;
+
+  /* --- Premium / AI перламутровый слой (только для ИИ-блоков) --- */
+  --pearl-1: #ece6f5;
+  --pearl-2: #e6edf6;
+  --pearl-3: #dcf1f1;
+  --pearl-ink: #4b4668; /* текст на pearl-фоне */
+  --pearl-border: #d7d3ea;
+  --ai-gradient: linear-gradient(135deg, var(--pearl-1) 0%, var(--pearl-2) 48%, var(--pearl-3) 100%);
+  --ai-gradient-vivid: linear-gradient(135deg, #d9cdf0 0%, #cfe0f5 50%, #c7eef0 100%);
+  --ai-glow: 0 8px 28px -12px rgba(120, 99, 196, 0.45);
+
+  /* --- Сигнальные цвета приоритета/статуса --- */
+  --signal-high: #ef3124; /* высокий приоритет */
+  --signal-high-bg: #fdecea;
+  --signal-medium: #c6842a; /* средний — тёплый янтарь (заливки, дуги, точки) */
+  --signal-medium-text: #8a5a16; /* янтарь как ТЕКСT — затемнён до AA-контраста */
+  --signal-medium-bg: #f8efdf;
+  --signal-low: #7d8486; /* низкий — нейтральный графит */
+  --signal-low-bg: #eeede9;
+
+  --success: #1f8a52;
+  --success-bg: #e4f3ea;
+  --warning: #c6842a;
+  --warning-bg: #f8efdf;
+  --danger: #d81d11;
+  --info: #2f6df0;
+
+  /* --- Типографика --- */
+  --font-display: "Manrope", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "SF Mono", "JetBrains Mono", ui-monospace, "Cascadia Code", monospace;
+
+  --fs-display: 28px;
+  --fs-h1: 22px;
+  --fs-h2: 18px;
+  --fs-h3: 15.5px;
+  --fs-body: 14px;
+  --fs-sm: 13px;
+  --fs-xs: 12px;
+  --fs-2xs: 11px;
+
+  --lh-tight: 1.15;
+  --lh-snug: 1.32;
+  --lh-normal: 1.5;
+
+  /* --- Радиусы --- */
+  --r-xs: 6px;
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 20px;
+  --r-2xl: 26px;
+  --r-pill: 999px;
+
+  /* --- Тени --- */
+  --shadow-xs: 0 1px 2px rgba(20, 24, 26, 0.04);
+  --shadow-sm: 0 1px 3px rgba(20, 24, 26, 0.06), 0 1px 2px rgba(20, 24, 26, 0.04);
+  --shadow-md: 0 6px 18px -8px rgba(20, 24, 26, 0.16);
+  --shadow-lg: 0 18px 44px -22px rgba(20, 24, 26, 0.28);
+  --shadow-card: 0 1px 2px rgba(20, 24, 26, 0.05), 0 8px 24px -18px rgba(20, 24, 26, 0.22);
+  --shadow-focus: 0 0 0 3px rgba(239, 49, 36, 0.18);
+  --shadow-focus-ai: 0 0 0 3px rgba(120, 99, 196, 0.22);
+
+  /* --- Раскладка --- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 40px;
+  --space-9: 56px;
+
+  --header-h: 60px;
+  --rail-w: 384px;
+  --content-max: 1480px;
+
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --t-fast: 130ms;
+  --t-base: 220ms;
+}
